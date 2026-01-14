@@ -20,33 +20,33 @@ import {
 const appliedJobs = [
   {
     id: 1,
-    title: "Gat lua 2 ngay",
-    location: "Xa Tan Phu, Ben Tre",
-    salary: "350,000d/ngay",
+    title: "Gặt lúa 2 ngày",
+    location: "Xã Tân Phú, Bến Tre",
+    salary: "350,000đ/ngày",
     date: "15-16/01/2026",
     status: "pending",
-    farmer: "Nguyen Van An",
+    farmer: "Nguyễn Văn An",
   },
   {
     id: 2,
-    title: "Phun thuoc tru sau",
-    location: "Ap 3, Xa Long Hoa",
-    salary: "400,000d/ngay",
+    title: "Phun thuốc trừ sâu",
+    location: "Ấp 3, Xã Long Hòa",
+    salary: "400,000đ/ngày",
     date: "18/01/2026",
     status: "approved",
-    farmer: "Tran Van Binh",
+    farmer: "Trần Văn Bình",
   },
 ]
 
 const upcomingJobs = [
   {
     id: 3,
-    title: "Bon phan cho vuon cam",
-    location: "Xa Phu Thanh, Vinh Long",
-    salary: "300,000d/ngay",
+    title: "Bón phân cho vườn cam",
+    location: "Xã Phú Thạnh, Vĩnh Long",
+    salary: "300,000đ/ngày",
     date: "14/01/2026",
-    time: "7:00 sang",
-    farmer: "Le Thi Cam",
+    time: "7:00 sáng",
+    farmer: "Lê Thị Cẩm",
     canCheckin: true,
   },
 ]
@@ -54,22 +54,22 @@ const upcomingJobs = [
 const historyJobs = [
   {
     id: 4,
-    title: "Lam dat chuan bi vu mua",
-    location: "Xa My Hoa, Dong Thap",
-    salary: "380,000d/ngay",
+    title: "Làm đất chuẩn bị vụ mùa",
+    location: "Xã Mỹ Hòa, Đồng Tháp",
+    salary: "380,000đ/ngày",
     date: "10-12/01/2026",
-    totalEarned: "1,140,000d",
-    farmer: "Pham Van Dung",
+    totalEarned: "1,140,000đ",
+    farmer: "Phạm Văn Dũng",
     rating: 5,
   },
   {
     id: 5,
-    title: "Thu hoach dua hau",
-    location: "Xa Tan Hung, Long An",
-    salary: "320,000d/ngay",
+    title: "Thu hoạch dưa hấu",
+    location: "Xã Tân Hưng, Long An",
+    salary: "320,000đ/ngày",
     date: "05-06/01/2026",
-    totalEarned: "640,000d",
-    farmer: "Nguyen Thi E",
+    totalEarned: "640,000đ",
+    farmer: "Nguyễn Thị E",
     rating: 4,
   },
 ]
@@ -81,8 +81,8 @@ export default function MyJobsPage() {
     <div className="container mx-auto px-4 lg:px-8 py-6">
       {/* Page Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Viec cua toi</h1>
-        <p className="text-muted-foreground">Quan ly cac cong viec da ung tuyen va hoan thanh</p>
+        <h1 className="text-2xl font-bold text-foreground">Việc của tôi</h1>
+        <p className="text-muted-foreground">Quản lý các công việc đã ứng tuyển và hoàn thành</p>
       </div>
 
       {/* Stats Cards */}
@@ -94,7 +94,7 @@ export default function MyJobsPage() {
             </div>
             <div>
               <p className="text-2xl font-bold">{appliedJobs.filter((j) => j.status === "pending").length}</p>
-              <p className="text-sm text-muted-foreground">Dang cho duyet</p>
+              <p className="text-sm text-muted-foreground">Đang chờ duyệt</p>
             </div>
           </CardContent>
         </Card>
@@ -105,7 +105,7 @@ export default function MyJobsPage() {
             </div>
             <div>
               <p className="text-2xl font-bold">{upcomingJobs.length}</p>
-              <p className="text-sm text-muted-foreground">Viec sap toi</p>
+              <p className="text-sm text-muted-foreground">Việc sắp tới</p>
             </div>
           </CardContent>
         </Card>
@@ -116,7 +116,7 @@ export default function MyJobsPage() {
             </div>
             <div>
               <p className="text-2xl font-bold">{historyJobs.length}</p>
-              <p className="text-sm text-muted-foreground">Da hoan thanh</p>
+              <p className="text-sm text-muted-foreground">Đã hoàn thành</p>
             </div>
           </CardContent>
         </Card>
@@ -131,21 +131,21 @@ export default function MyJobsPage() {
                 className="gap-2 data-[state=active]:bg-agro-orange data-[state=active]:text-white"
               >
                 <Hourglass className="h-4 w-4" />
-                Da ung tuyen ({appliedJobs.length})
+                Đã ứng tuyển ({appliedJobs.length})
               </TabsTrigger>
               <TabsTrigger
                 value="upcoming"
                 className="gap-2 data-[state=active]:bg-agro-orange data-[state=active]:text-white"
               >
                 <Calendar className="h-4 w-4" />
-                Sap toi ({upcomingJobs.length})
+                Sắp tới ({upcomingJobs.length})
               </TabsTrigger>
               <TabsTrigger
                 value="history"
                 className="gap-2 data-[state=active]:bg-agro-orange data-[state=active]:text-white"
               >
                 <CheckCircle className="h-4 w-4" />
-                Lich su ({historyJobs.length})
+                Lịch sử ({historyJobs.length})
               </TabsTrigger>
             </TabsList>
 
@@ -169,12 +169,12 @@ export default function MyJobsPage() {
                           {job.status === "approved" ? (
                             <>
                               <CheckCircle className="h-3 w-3 mr-1" />
-                              Da nhan
+                              Đã nhận
                             </>
                           ) : (
                             <>
                               <Hourglass className="h-3 w-3 mr-1" />
-                              Cho duyet
+                              Chờ duyệt
                             </>
                           )}
                         </Badge>
@@ -210,7 +210,7 @@ export default function MyJobsPage() {
                           <h3 className="font-semibold text-lg">{job.title}</h3>
                           <p className="text-sm text-muted-foreground">{job.farmer}</p>
                         </div>
-                        <Badge className="bg-agro-green text-white">Hom nay</Badge>
+                        <Badge className="bg-agro-green text-white">Hôm nay</Badge>
                       </div>
                       <div className="space-y-2 text-sm text-muted-foreground mb-4">
                         <div className="flex items-center gap-2">
@@ -232,7 +232,7 @@ export default function MyJobsPage() {
                         )}
                         <Button variant="outline" className="flex-1 gap-2 bg-transparent">
                           <MessageCircle className="h-4 w-4" />
-                          Chat voi chu
+                          Chat với chủ
                         </Button>
                       </div>
                     </CardContent>
@@ -241,7 +241,7 @@ export default function MyJobsPage() {
                 {upcomingJobs.length === 0 && (
                   <div className="col-span-2 text-center py-12 text-muted-foreground">
                     <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>Khong co viec sap toi</p>
+                    <p>Không có việc sắp tới</p>
                   </div>
                 )}
               </div>
