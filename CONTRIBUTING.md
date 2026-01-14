@@ -258,12 +258,11 @@ constants/         → App constants
 # Run linter
 pnpm lint
 
-# Run type check
-pnpm type-check
-
 # Run tests (when available)
 pnpm test
 ```
+
+**Note:** Project uses pnpm as the primary package manager. Always use pnpm for installing dependencies to avoid lockfile conflicts.
 
 ## 📦 Before Committing
 

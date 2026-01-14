@@ -177,7 +177,17 @@ CAPSTONE_SP25_FE/
 ### Prerequisites
 
 - **Node.js** >= 18.x
-- **pnpm** >= 8.x (hoặc npm/yarn)
+- **pnpm** >= 9.x
+
+**Cài đặt pnpm:**
+
+```bash
+# Windows (PowerShell)
+npm install -g pnpm
+
+# macOS/Linux
+curl -fsSL https://get.pnpm.io/install.sh | sh -
+```
 
 ### Clone Repository
 
@@ -189,15 +199,11 @@ cd CAPSTONE_SP25_FE
 ### Install Dependencies
 
 ```bash
-# Sử dụng pnpm (recommended)
+# Sử dụng pnpm
 pnpm install
-
-# Hoặc npm
-npm install
-
-# Hoặc yarn
-yarn install
 ```
+
+**⚠️ Lưu ý:** Dự án sử dụng pnpm làm package manager chính. Vui lòng không dùng npm/yarn để tránh conflict lockfiles.
 
 ### Environment Variables
 
@@ -231,7 +237,7 @@ Mở [http://localhost:3000](http://localhost:3000) để xem kết quả.
 ### Available Scripts
 
 ```bash
-# Development server
+# Development server (Turbopack enabled)
 pnpm dev
 
 # Build for production
@@ -242,9 +248,21 @@ pnpm start
 
 # Lint code
 pnpm lint
+```
 
-# Type check
-pnpm type-check
+### First Time Setup
+
+```bash
+# 1. Install pnpm globally
+npm install -g pnpm
+
+# 2. Install dependencies
+pnpm install
+
+# 3. Run development server
+pnpm dev
+
+# 4. Open browser at http://localhost:3000
 ```
 
 ### Adding New Components
