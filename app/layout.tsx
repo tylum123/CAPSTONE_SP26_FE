@@ -8,8 +8,9 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "AgroTemp - Nền tảng tuyển dụng việc làm thời vụ nông nghiệp",
-  description: "Kết nối nông dân với người lao động thời vụ. Tìm việc nhanh, đăng tuyển dễ dàng, thanh toán an toàn.",
+  title: "AgroTemp - Kết Nối Mùa Vụ",
+  description:
+    "Nền tảng tiên phong kết nối nông dân và lao động thời vụ tại Việt Nam. Minh bạch, An toàn, Thanh toán nhanh.",
   generator: "v0.app",
   icons: {
     icon: [

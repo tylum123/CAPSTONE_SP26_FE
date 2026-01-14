@@ -1,4 +1,4 @@
-# 🌾 AgroTemp - Nền tảng Tuyển dụng Nông nghiệp Thời vụ
+﻿# AgroTemp - Nền tảng Tuyển dụng Nông nghiệp Thời vụ
 
 ![Next.js](https://img.shields.io/badge/Next.js-16.0-black?style=flat&logo=next.js)
 ![React](https://img.shields.io/badge/React-19.2-blue?style=flat&logo=react)
@@ -9,48 +9,48 @@
 
 ---
 
-## 📋 Mục lục
+## Mục lục
 
-- [Tính năng chính](#-tính-năng-chính)
-- [Tech Stack](#-tech-stack)
-- [Cấu trúc dự án](#-cấu-trúc-dự-án)
-- [Cài đặt](#-cài-đặt)
-- [Development](#-development)
-- [User Roles](#-user-roles)
-- [Roadmap](#-roadmap)
-- [Contributing](#-contributing)
-
----
-
-## ✨ Tính năng chính
-
-### 👷 Cho Người lao động (Worker)
-
-- 🔍 **Tìm kiếm thông minh** - Tìm việc theo GPS, lọc theo khoảng cách, lương, loại công việc
-- ⚡ **Ứng tuyển nhanh** - Ứng tuyển chỉ trong vài phút
-- 💳 **Ví điện tử** - Nhận lương qua VNPay/Momo an toàn
-- ⭐ **Hệ thống đánh giá** - Xây dựng reputation qua rating
-- 💬 **Chat trực tiếp** - Liên hệ nông dân để làm rõ công việc
-
-### 🌾 Cho Nông dân (Farmer)
-
-- 📝 **Đăng tin tuyển dụng** - Tạo và quản lý tin tuyển dụng dễ dàng
-- 👥 **Quản lý ứng viên** - Duyệt/từ chối ứng viên, xem profile & rating
-- 💰 **Quản lý thanh toán** - Theo dõi chi phí, thanh toán qua nền tảng
-- 📊 **Thống kê chi tiết** - Dashboard với metrics về tuyển dụng
-- 🔔 **Thông báo real-time** - Nhận thông báo khi có ứng viên mới
-
-### 👨‍💼 Cho Quản trị viên (Admin)
-
-- 📈 **Dashboard tổng quan** - Thống kê users, jobs, transactions
-- 👤 **Quản lý người dùng** - Quản lý farmers & workers
-- ⚖️ **Giải quyết tranh chấp** - Hệ thống xử lý khiếu nại
-- 💵 **Quản lý tài chính** - Theo dõi doanh thu, commission
-- 🔐 **Xác minh tài khoản** - Verify users để tăng độ tin cậy
+- [Tính năng chính](#tính-năng-chính)
+- [Tech Stack](#tech-stack)
+- [Cấu trúc dự án](#cấu-trúc-dự-án)
+- [Cài đặt](#cài-đặt)
+- [Development](#development)
+- [User Roles](#user-roles)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
 
 ---
 
-## 🛠️ Tech Stack
+## Tính năng chính
+
+### Cho Người lao động (Worker)
+
+- **Tìm kiếm thông minh** - Tìm việc theo GPS, lọc theo khoảng cách, lương, loại công việc
+- **Ứng tuyển nhanh** - Ứng tuyển chỉ trong vài phút
+- **Ví điện tử** - Nhận lương qua VNPay/Momo an toàn
+- **Hệ thống đánh giá** - Xây dựng reputation qua rating
+- **Chat trực tiếp** - Liên hệ nông dân để làm rõ công việc
+
+### Cho Nông dân (Farmer)
+
+- **Đăng tin tuyển dụng** - Tạo và quản lý tin tuyển dụng dễ dàng
+- **Quản lý ứng viên** - Duyệt/từ chối ứng viên, xem profile & rating
+- **Quản lý thanh toán** - Theo dõi chi phí, thanh toán qua nền tảng
+- **Thống kê chi tiết** - Dashboard với metrics về tuyển dụng
+- **Thông báo real-time** - Nhận thông báo khi có ứng viên mới
+
+### Cho Quản trị viên (Admin)
+
+- **Dashboard tổng quan** - Thống kê users, jobs, transactions
+- **Quản lý người dùng** - Quản lý farmers & workers
+- **Giải quyết tranh chấp** - Hệ thống xử lý khiếu nại
+- **Quản lý tài chính** - Theo dõi doanh thu, commission
+- **Xác minh tài khoản** - Verify users để tăng độ tin cậy
+
+---
+
+## Tech Stack
 
 ### Frontend Framework
 
@@ -90,7 +90,7 @@
 
 ---
 
-## 📁 Cấu trúc dự án
+## Cấu trúc dự án
 
 ```
 CAPSTONE_SP25_FE/
@@ -172,12 +172,22 @@ CAPSTONE_SP25_FE/
 
 ---
 
-## 🚀 Cài đặt
+## Cài đặt
 
 ### Prerequisites
 
 - **Node.js** >= 18.x
-- **pnpm** >= 8.x (hoặc npm/yarn)
+- **pnpm** >= 9.x
+
+**Cài đặt pnpm:**
+
+```bash
+# Windows (PowerShell)
+npm install -g pnpm
+
+# macOS/Linux
+curl -fsSL https://get.pnpm.io/install.sh | sh -
+```
 
 ### Clone Repository
 
@@ -189,15 +199,11 @@ cd CAPSTONE_SP25_FE
 ### Install Dependencies
 
 ```bash
-# Sử dụng pnpm (recommended)
+# Sử dụng pnpm
 pnpm install
-
-# Hoặc npm
-npm install
-
-# Hoặc yarn
-yarn install
 ```
+
+**⚠️ Lưu ý:** Dự án sử dụng pnpm làm package manager chính. Vui lòng không dùng npm/yarn để tránh conflict lockfiles.
 
 ### Environment Variables
 
@@ -226,12 +232,12 @@ Mở [http://localhost:3000](http://localhost:3000) để xem kết quả.
 
 ---
 
-## 💻 Development
+## Development
 
 ### Available Scripts
 
 ```bash
-# Development server
+# Development server (Turbopack enabled)
 pnpm dev
 
 # Build for production
@@ -242,9 +248,21 @@ pnpm start
 
 # Lint code
 pnpm lint
+```
 
-# Type check
-pnpm type-check
+### First Time Setup
+
+```bash
+# 1. Install pnpm globally
+npm install -g pnpm
+
+# 2. Install dependencies
+pnpm install
+
+# 3. Run development server
+pnpm dev
+
+# 4. Open browser at http://localhost:3000
 ```
 
 ### Adding New Components
@@ -288,9 +306,9 @@ import { cn } from '@/lib/utils'
 
 ---
 
-## 👥 User Roles
+## User Roles
 
-### 🏠 Landing Page (/)
+### Landing Page (/)
 
 - Hero section với CTA
 - Feature showcase (Worker/Farmer)
@@ -298,7 +316,7 @@ import { cn } from '@/lib/utils'
 - How it works
 - Footer với links
 
-### 👷 Worker Portal (/worker)
+### Worker Portal (/worker)
 
 **Mobile-First Design**
 
@@ -308,7 +326,7 @@ import { cn } from '@/lib/utils'
 - Wallet: Xem số dư, lịch sử giao dịch
 - Profile: Thông tin cá nhân, rating, history
 
-### 🌾 Farmer Portal (/farmer)
+### Farmer Portal (/farmer)
 
 **Desktop-Optimized Dashboard**
 
@@ -320,7 +338,7 @@ import { cn } from '@/lib/utils'
 - Applicants: Review và quản lý ứng viên
 - Payments: Lịch sử thanh toán, chi phí
 
-### 👨‍💼 Admin Portal (/admin)
+### Admin Portal (/admin)
 
 **Full System Management**
 
@@ -334,7 +352,7 @@ import { cn } from '@/lib/utils'
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
 ### Phase 1: UI/UX Foundation ✅ (Current)
 
