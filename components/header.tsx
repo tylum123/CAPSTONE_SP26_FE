@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Globe, Smartphone } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +15,7 @@ import {
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [language, setLanguage] = useState<"vi" | "en">("vi");
+  const { isAuthenticated } = useAuth();
 
   const navItems = [
     { label: language === "vi" ? "Giới thiệu" : "About", href: "#about" },
@@ -71,6 +73,30 @@ export function Header() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Portal Navigation - Only show when logged in */}
+          {isAuthenticated && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <Menu className="h-4 w-4" />
+                  {language === "vi" ? "Cổng thông tin" : "Portals"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem asChild>
+                  <Link href="/farmer" className="cursor-pointer">
+                    {language === "vi" ? "Cổng Nông dân" : "Farmer Portal"}
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/worker/home" className="cursor-pointer">
+                    {language === "vi" ? "Cổng Lao động" : "Worker Portal"}
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {/* Download App Button */}
           <Link href="/worker/home">

@@ -23,15 +23,15 @@ import {
 import Link from "next/link"
 
 const userProfile = {
-  name: "Nguyen Van B",
+  name: "Nguyễn Văn B",
   phone: "0912 345 678",
-  address: "Xa Tan Phu, Huyen Chau Thanh, Ben Tre",
+  address: "Xã Tân Phú, Huyện Châu Thành, Bến Tre",
   avatar: null,
   rating: 4.9,
   totalJobs: 28,
-  totalEarned: "8,540,000d",
+  totalEarned: "8,540,000đ",
   joinDate: "01/2025",
-  skills: ["Thu hoach lua", "Lam dat", "Phun thuoc", "Bon phan", "Van chuyen"],
+  skills: ["Thu hoạch lúa", "Làm đất", "Phun thuốc", "Bón phân", "Vận chuyển"],
   verified: true,
 }
 
@@ -44,12 +44,12 @@ export default function ProfilePage() {
       {/* Page Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Ho so cua toi</h1>
-          <p className="text-muted-foreground">Quan ly thong tin ca nhan va cai dat</p>
+          <h1 className="text-2xl font-bold text-foreground">Hồ sơ của tôi</h1>
+          <p className="text-muted-foreground">Quản lý thông tin cá nhân và cài đặt</p>
         </div>
         <Button variant="outline" className="gap-2 bg-transparent">
           <Edit className="h-4 w-4" />
-          Chinh sua
+          Chỉnh sửa
         </Button>
       </div>
 
@@ -74,7 +74,7 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-1">
                   <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
                   <span className="font-semibold text-lg">{userProfile.rating}</span>
-                  <span className="text-muted-foreground">({userProfile.totalJobs} viec)</span>
+                  <span className="text-muted-foreground">({userProfile.totalJobs} việc)</span>
                 </div>
               </div>
             </CardContent>
@@ -83,27 +83,27 @@ export default function ProfilePage() {
           {/* Stats Card */}
           <Card>
             <CardHeader>
-              <CardTitle>Thong ke</CardTitle>
+              <CardTitle>Thống kê</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between p-3 bg-agro-green/5 rounded-lg">
                 <div className="flex items-center gap-3">
                   <Briefcase className="h-5 w-5 text-agro-green" />
-                  <span>Viec da lam</span>
+                  <span>Việc đã làm</span>
                 </div>
                 <span className="font-bold text-agro-green">{userProfile.totalJobs}</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-agro-orange/5 rounded-lg">
                 <div className="flex items-center gap-3">
                   <DollarSign className="h-5 w-5 text-agro-orange" />
-                  <span>Tong thu nhap</span>
+                  <span>Tổng thu nhập</span>
                 </div>
                 <span className="font-bold text-agro-orange">{userProfile.totalEarned}</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                 <div className="flex items-center gap-3">
                   <Calendar className="h-5 w-5 text-muted-foreground" />
-                  <span>Tham gia tu</span>
+                  <span>Tham gia từ</span>
                 </div>
                 <span className="font-medium">{userProfile.joinDate}</span>
               </div>
@@ -118,7 +118,7 @@ export default function ProfilePage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MapPin className="h-5 w-5" />
-                Dia chi
+                Địa chỉ
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -129,7 +129,7 @@ export default function ProfilePage() {
           {/* Skills */}
           <Card>
             <CardHeader>
-              <CardTitle>Ky nang</CardTitle>
+              <CardTitle>Kỹ năng</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
@@ -145,20 +145,20 @@ export default function ProfilePage() {
           {/* Settings */}
           <Card>
             <CardHeader>
-              <CardTitle>Cai dat</CardTitle>
+              <CardTitle>Cài đặt</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1">
               <div className="flex items-center justify-between p-4 hover:bg-muted/50 rounded-lg transition-colors">
                 <div className="flex items-center gap-3">
                   <Bell className="h-5 w-5 text-muted-foreground" />
-                  <span>Thong bao</span>
+                  <span>Thông báo</span>
                 </div>
                 <Switch checked={notifications} onCheckedChange={setNotifications} />
               </div>
               <div className="flex items-center justify-between p-4 hover:bg-muted/50 rounded-lg transition-colors">
                 <div className="flex items-center gap-3">
                   <MapPin className="h-5 w-5 text-muted-foreground" />
-                  <span>Chia se vi tri</span>
+                  <span>Chia sẻ vị trí</span>
                 </div>
                 <Switch checked={locationSharing} onCheckedChange={setLocationSharing} />
               </div>
@@ -168,7 +168,7 @@ export default function ProfilePage() {
               >
                 <div className="flex items-center gap-3">
                   <Settings className="h-5 w-5 text-muted-foreground" />
-                  <span>Cai dat khac</span>
+                  <span>Cài đặt khác</span>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted-foreground" />
               </Link>
@@ -178,7 +178,7 @@ export default function ProfilePage() {
               >
                 <div className="flex items-center gap-3">
                   <HelpCircle className="h-5 w-5 text-muted-foreground" />
-                  <span>Tro giup</span>
+                  <span>Trợ giúp</span>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted-foreground" />
               </Link>
@@ -192,7 +192,7 @@ export default function ProfilePage() {
               className="w-full text-destructive border-destructive hover:bg-destructive/10 bg-transparent"
             >
               <LogOut className="h-4 w-4 mr-2" />
-              Dang xuat
+              Đăng xuất
             </Button>
           </Link>
         </div>

@@ -3,7 +3,7 @@
 import type React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Briefcase, Wallet, User, Menu, LogOut, Bell, Leaf } from "lucide-react"
+import { Home, Briefcase, Wallet, User, Menu, LogOut, Bell, Leaf, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -19,10 +19,11 @@ export default function WorkerLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname()
 
   const navItems = [
-    { icon: Home, label: "Trang chu", href: "/worker/home" },
-    { icon: Briefcase, label: "Viec cua toi", href: "/worker/my-jobs" },
-    { icon: Wallet, label: "Vi tien", href: "/worker/wallet" },
-    { icon: User, label: "Ho so", href: "/worker/profile" },
+    { icon: Home, label: "Trang chủ", href: "/worker/home" },
+    { icon: Briefcase, label: "Việc của tôi", href: "/worker/my-jobs" },
+    { icon: MessageCircle, label: "Tin nhắn", href: "/worker/messages", badge: 2 },
+    { icon: Wallet, label: "Ví tiền", href: "/worker/wallet" },
+    { icon: User, label: "Hồ sơ", href: "/worker/profile" },
   ]
 
   return (
@@ -51,6 +52,11 @@ export default function WorkerLayout({ children }: { children: React.ReactNode }
                     >
                       <item.icon className="h-4 w-4" />
                       {item.label}
+                      {item.badge && item.badge > 0 && (
+                        <span className="ml-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                          {item.badge}
+                        </span>
+                      )}
                     </Button>
                   </Link>
                 )
@@ -71,21 +77,27 @@ export default function WorkerLayout({ children }: { children: React.ReactNode }
                       <AvatarImage src="/placeholder.svg" />
                       <AvatarFallback className="bg-agro-orange text-white">NV</AvatarFallback>
                     </Avatar>
-                    <span className="font-medium">Nguyen Van B</span>
+                    <span className="font-medium">Nguyễn Văn B</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem asChild>
                     <Link href="/worker/profile" className="cursor-pointer">
                       <User className="h-4 w-4 mr-2" />
-                      Ho so
+                      Hồ sơ
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
+                    <Link href="/" className="cursor-pointer">
+                      <Leaf className="h-4 w-4 mr-2" />
+                      Về trang chủ
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link href="/" className="cursor-pointer text-destructive">
                       <LogOut className="h-4 w-4 mr-2" />
-                      Dang xuat
+                      Đăng xuất
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -106,8 +118,8 @@ export default function WorkerLayout({ children }: { children: React.ReactNode }
                         <AvatarFallback className="bg-agro-orange text-white">NV</AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-semibold">Nguyen Van B</p>
-                        <p className="text-sm text-muted-foreground">Lao dong</p>
+                        <p className="font-semibold">Nguyễn Văn B</p>
+                        <p className="text-sm text-muted-foreground">Lao động</p>
                       </div>
                     </div>
                     <nav className="flex flex-col gap-1">
@@ -121,6 +133,11 @@ export default function WorkerLayout({ children }: { children: React.ReactNode }
                             >
                               <item.icon className="h-5 w-5" />
                               {item.label}
+                              {item.badge && item.badge > 0 && (
+                                <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                                  {item.badge}
+                                </span>
+                              )}
                             </Button>
                           </Link>
                         )
@@ -128,9 +145,15 @@ export default function WorkerLayout({ children }: { children: React.ReactNode }
                     </nav>
                     <div className="mt-auto pt-4 border-t">
                       <Link href="/">
+                        <Button variant="ghost" className="w-full justify-start gap-3">
+                          <Leaf className="h-5 w-5" />
+                          Về trang chủ
+                        </Button>
+                      </Link>
+                      <Link href="/">
                         <Button variant="ghost" className="w-full justify-start gap-3 text-destructive">
                           <LogOut className="h-5 w-5" />
-                          Dang xuat
+                          Đăng xuất
                         </Button>
                       </Link>
                     </div>
@@ -143,7 +166,7 @@ export default function WorkerLayout({ children }: { children: React.ReactNode }
       </header>
 
       {/* Main Content */}
-      <main>{children}</main>
+      <main className="container mx-auto px-4 lg:px-8 py-6">{children}</main>
     </div>
   )
 }

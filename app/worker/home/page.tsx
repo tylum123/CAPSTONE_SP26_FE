@@ -102,12 +102,12 @@ export default function WorkerHomePage() {
             <CardHeader className="pb-4">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Filter className="h-5 w-5" />
-                Bo loc tim kiem
+                Bộ lộc tìm kiếm
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-3">
-                <label className="text-sm font-medium">Ban kinh tim kiem: {radiusFilter[0]}km</label>
+                <label className="text-sm font-medium">Bán kính tìm kiếm: {radiusFilter[0]}km</label>
                 <Slider value={radiusFilter} onValueChange={setRadiusFilter} max={20} min={1} step={1} />
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>1km</span>
