@@ -181,6 +181,12 @@ export function FarmerLayout({ children }: FarmerLayoutProps) {
                     Cài đặt
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/">
+                      <Leaf className="mr-2 h-4 w-4" />
+                      Về trang chủ
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem className="text-destructive">
                     <LogOut className="mr-2 h-4 w-4" />
                     Đăng xuất

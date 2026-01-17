@@ -83,6 +83,12 @@ export default function WorkerLayout({ children }: { children: React.ReactNode }
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
+                    <Link href="/" className="cursor-pointer">
+                      <Leaf className="h-4 w-4 mr-2" />
+                      Về trang chủ
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link href="/" className="cursor-pointer text-destructive">
                       <LogOut className="h-4 w-4 mr-2" />
                       Đăng xuất
@@ -127,6 +133,12 @@ export default function WorkerLayout({ children }: { children: React.ReactNode }
                       })}
                     </nav>
                     <div className="mt-auto pt-4 border-t">
+                      <Link href="/">
+                        <Button variant="ghost" className="w-full justify-start gap-3">
+                          <Leaf className="h-5 w-5" />
+                          Về trang chủ
+                        </Button>
+                      </Link>
                       <Link href="/">
                         <Button variant="ghost" className="w-full justify-start gap-3 text-destructive">
                           <LogOut className="h-5 w-5" />

@@ -72,6 +72,28 @@ export function Header() {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {/* Portal Navigation */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-2">
+                <Menu className="h-4 w-4" />
+                {language === "vi" ? "Cổng thông tin" : "Portals"}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem asChild>
+                <Link href="/farmer" className="cursor-pointer">
+                  {language === "vi" ? "Cổng Nông dân" : "Farmer Portal"}
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/worker/home" className="cursor-pointer">
+                  {language === "vi" ? "Cổng Lao động" : "Worker Portal"}
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {/* Download App Button */}
           <Link href="/worker/home">
             <Button
