@@ -26,7 +26,7 @@ lib/api/
 ### Basic Example
 
 ```typescript
-import { authService } from '@/lib/api';
+import { authService } from '@/libs/api';
 
 // Login
 const response = await authService.login({
@@ -42,7 +42,7 @@ localStorage.setItem('refresh_token', response.data.refreshToken);
 ### Using Services
 
 ```typescript
-import { farmerService, workerService } from '@/lib/api';
+import { farmerService, workerService } from '@/libs/api';
 
 // Farmer: Get all jobs
 const jobs = await farmerService.getJobs({ page: 1, limit: 10 });
@@ -61,9 +61,9 @@ await workerService.applyJob(jobId);
 ### Error Handling
 
 ```typescript
-import { authService } from '@/lib/api';
+import { authService } from '@/libs/api';
 import { AxiosError } from 'axios';
-import type { ApiError } from '@/lib/api';
+import type { ApiError } from '@/libs/api';
 
 try {
   await authService.login(credentials);
@@ -81,7 +81,7 @@ try {
 If you need to make a custom request not covered by the services:
 
 ```typescript
-import { axiosInstance } from '@/lib/api';
+import { axiosInstance } from '@/libs/api';
 
 const response = await axiosInstance.get('/custom-endpoint', {
   params: { key: 'value' },

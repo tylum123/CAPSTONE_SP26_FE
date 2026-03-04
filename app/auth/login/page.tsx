@@ -16,10 +16,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
-import { authService } from "@/lib/api/services/auth.service";
+import { authService } from "@/libs/api/services/auth.service";
 import { useToast } from "@/hooks/use-toast";
 import { GoogleLoginButton } from "@/components/auth/google-login-button";
-import { handleAuthError } from "@/lib/utils/error-handler";
+import { handleAuthError } from "@/libs/utils/error-handler";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -43,25 +43,31 @@ export default function LoginPage() {
 
       if (response.status_code === 200 || response.status_code === 0) {
         toast({
-          title: "Thành công",
-          description: response.message || "Đăng nhập thành công",
+          title: "✅ Thành công",
+          description: response.message || "Đăng nhập thành công! Đang chuyển hướng...",
+          variant: "default",
         });
         
-        // Redirect to farmer dashboard
-        router.push("/farmer/dashboard");
+        // Redirect to farmer dashboard after a short delay
+        setTimeout(() => {
+          router.push("/farmer/dashboard");
+        }, 1000);
       } else {
         // Handle error response from API
+        const errorMessage = handleAuthError({ response: { data: response } });
         toast({
-          title: "Lỗi",
-          description: handleAuthError({ response: { data: response } }),
+          title: "❌ Đăng nhập thất bại",
+          description: errorMessage,
           variant: "destructive",
         });
       }
     } catch (error: any) {
       // Handle network errors or unexpected errors
+      console.error("Login error:", error);
+      const errorMessage = handleAuthError(error);
       toast({
-        title: "Lỗi",
-        description: handleAuthError(error),
+        title: "❌ Đăng nhập thất bại",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

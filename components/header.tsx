@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Globe, Smartphone } from "lucide-react";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuth } from "@/stores/auth.store";
 import {
   DropdownMenu,
   DropdownMenuContent,

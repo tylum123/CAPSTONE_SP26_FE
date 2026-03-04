@@ -1,11 +1,11 @@
 "use client";
 
 import { GoogleLogin } from '@react-oauth/google';
-import { authService } from '@/lib/api/services/auth.service';
+import { authService } from '@/libs/api/services/auth.service';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState } from 'react';
-import { handleAuthError } from '@/lib/utils/error-handler';
+import { handleAuthError } from '@/libs/utils/error-handler';
 
 interface GoogleLoginButtonProps {
   roleId: number;

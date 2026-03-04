@@ -21,24 +21,21 @@ export function Footer() {
               <span className="text-xl font-bold">AgroTemp</span>
             </div>
             <p className="mb-4 text-sm text-gray-400 leading-relaxed">
-              Nền tảng tiên phong kết nối nông dân và lao động thời vụ tại Việt
+              Nền tảng kết nối nông dân và lao động thời vụ tại Việt
               Nam.
-            </p>
-            <p className="text-sm font-semibold text-agro-green">
-              Sứ mệnh: Số hóa nông nghiệp Việt Nam
             </p>
           </div>
 
           {/* Column 2: Quick Links */}
           <div>
-            <h3 className="mb-4 text-lg font-bold">Liên kết nhanh</h3>
+            <h3 className="mb-4 text-lg font-bold">Liên kết</h3>
             <ul className="space-y-3 text-sm text-gray-400">
               <li>
                 <Link
                   href="/farmer/register"
                   className="hover:text-agro-green transition-colors"
                 >
-                  Đăng ký Farmer
+                  Đăng ký 
                 </Link>
               </li>
               <li>
@@ -46,7 +43,7 @@ export function Footer() {
                   href="/farmer"
                   className="hover:text-agro-green transition-colors"
                 >
-                  Farmer Portal
+                  Trang chủ cho Nông Dân
                 </Link>
               </li>
               <li>
@@ -97,7 +94,7 @@ export function Footer() {
                 className="h-full w-full object-contain"
               />
             </div>
-            <p className="mb-4 text-sm text-gray-400">Quét mã để tải app</p>
+            <p className="mb-4 text-sm text-gray-400">Tải App Ngay</p>
             <div className="flex gap-2">
               <img
                 src="/google-play-store-badge.png"
@@ -115,7 +112,7 @@ export function Footer() {
 
         {/* Copyright */}
         <div className="mt-12 border-t border-gray-800 pt-8 text-center text-sm text-gray-500">
-          <p>© 2026 AgroTemp. Tất cả quyền được bảo lưu.</p>
+          <p>© 2026 AgroTemp. All rights reserved.</p>
         </div>
       </div>
     </footer>

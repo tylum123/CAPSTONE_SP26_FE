@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "react"
 
 const stats = [
   { value: 10000, suffix: "+", label: "Công việc đã hoàn thành" },
@@ -9,9 +9,7 @@ const stats = [
 ];
 
 const partners = [
-  { name: "VNPay", logo: "/vnpay-logo-payment.jpg" },
-  { name: "Momo", logo: "/momo-logo-payment-pink.jpg" },
-  { name: "ZaloPay", logo: "/zalopay-logo-payment-blue.jpg" },
+  { name: "VNPay", logo: "/vnpay.png" },
 ];
 
 function AnimatedCounter({ value, suffix }: { value: number; suffix: string }) {
@@ -70,7 +68,6 @@ export function StatsSection() {
           ))}
         </div>
 
-        {/* Partners */}
         <div className="relative overflow-hidden rounded-3xl border border-white/20 bg-gradient-to-br from-white/5 to-white/10 p-10 backdrop-blur-md">
           {/* Decorative background elements */}
           <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-white/5 blur-3xl" />
