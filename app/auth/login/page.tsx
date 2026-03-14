@@ -107,18 +107,16 @@ export default function LoginPage() {
         <Card className="border-agro-green/20 shadow-xl">
           <CardHeader className="text-center pb-2">
             <div className="flex justify-center mb-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-agro-green">
-                <svg
-                  className="h-10 w-10 text-white"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M12 2L4 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-8-5zm0 15.5l-5-3v-6l5-3 5 3v6l-5 3z" />
-                </svg>
+              <div className="flex h-16 w-16 items-center justify-center rounded-full">
+                <img
+                  src="/logo.png"
+                  alt="AgroTemp Logo"
+                  className="h-10 w-10 object-contain"
+                />
               </div>
             </div>
             <CardTitle className="text-2xl text-agro-green">
-              Đăng nhập AgroTemp
+              Đăng nhập
             </CardTitle>
             <CardDescription>Đăng nhập dành cho Nông dân</CardDescription>
           </CardHeader>
