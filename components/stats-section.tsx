@@ -1,46 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react"
-
-const stats = [
-  { value: 10000, suffix: "+", label: "Công việc đã hoàn thành" },
-  { value: 5000, suffix: "+", label: "Lao động thường xuyên" },
-  { value: 98, suffix: "%", label: "Đánh giá hài lòng" },
-];
-
 const partners = [
   { name: "VNPay", logo: "/vnpay.png" },
 ];
-
-function AnimatedCounter({ value, suffix }: { value: number; suffix: string }) {
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    const duration = 2000;
-    const steps = 60;
-    const increment = value / steps;
-    let current = 0;
-
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= value) {
-        setCount(value);
-        clearInterval(timer);
-      } else {
-        setCount(Math.floor(current));
-      }
-    }, duration / steps);
-
-    return () => clearInterval(timer);
-  }, [value]);
-
-  return (
-    <span>
-      {count.toLocaleString()}
-      {suffix}
-    </span>
-  );
-}
 
 export function StatsSection() {
   return (
@@ -49,23 +11,11 @@ export function StatsSection() {
         {/* Section Header */}
         <div className="mb-16 text-center">
           <h2 className="mb-4 text-3xl font-bold md:text-4xl">
-            Thống kê & Đối tác
+            Đối tác thanh toán
           </h2>
           <p className="mx-auto max-w-2xl text-white/80">
-            Con số ấn tượng từ cộng đồng AgroTemp
+            Các đối tác tin tưởng của AgroTemp
           </p>
-        </div>
-
-        {/* Stats */}
-        <div className="mb-16 grid gap-8 md:grid-cols-3">
-          {stats.map((stat, index) => (
-            <div key={index} className="text-center">
-              <div className="mb-2 text-4xl font-bold md:text-5xl">
-                <AnimatedCounter value={stat.value} suffix={stat.suffix} />
-              </div>
-              <p className="text-lg text-white/80">{stat.label}</p>
-            </div>
-          ))}
         </div>
 
         <div className="relative overflow-hidden rounded-3xl border border-white/20 bg-gradient-to-br from-white/5 to-white/10 p-10 backdrop-blur-md">
@@ -74,9 +24,6 @@ export function StatsSection() {
           <div className="absolute -bottom-20 -left-20 h-40 w-40 rounded-full bg-white/5 blur-3xl" />
 
           <div className="relative">
-            <p className="mb-8 text-center text-xs font-bold uppercase tracking-widest text-white/70">
-              Đối tác thanh toán
-            </p>
             <div className="flex flex-wrap items-center justify-center gap-6">
               {partners.map((partner, index) => (
                 <div

@@ -101,11 +101,11 @@ export function Footer() {
                 alt="Google Play"
                 className="h-10 rounded"
               />
-              <img
+              {/* <img
                 src="/apple-app-store-badge.png"
                 alt="App Store"
                 className="h-10 rounded"
-              />
+              /> */}
             </div>
           </div>
         </div>

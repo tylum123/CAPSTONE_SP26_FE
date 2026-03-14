@@ -145,7 +145,7 @@ export function FarmerDashboard() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            Xin chào, {profile?.contactName || 'Loading...'}
+            Xin chào, {profile?.contactName || 'Nông dân'}
           </h1>
           <p className="text-muted-foreground">Đây là tổng quan hoạt động của nông trại hôm nay.</p>
         </div>

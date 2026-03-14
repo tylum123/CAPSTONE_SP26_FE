@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -8,21 +8,26 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { MapPin, Upload, Save, Loader2 } from "lucide-react"
+import { Upload, Save, Loader2 } from "lucide-react"
 import { FarmerProfile, UpdateFarmerRequest } from "@/libs/api/types"
 import { farmerService } from "@/libs/api/services/farmer.service"
+import { cloudinaryService } from "@/libs/api/services/cloudinary.service"
 import { useToast } from "@/hooks/use-toast"
 
 export default function SettingsPage() {  
   const [profile, setProfile] = useState<FarmerProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [avatarPreview, setAvatarPreview] = useState("")
+  const avatarInputRef = useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState<UpdateFarmerRequest>({
     organizationName: "",
     contactName: "",
     contactNumber: "",
     cooperativeAffiliation: "",
     farmType: "",
+    avatarUrl: "",
   })
 
   const [notifications, setNotifications] = useState({
@@ -42,12 +47,15 @@ export default function SettingsPage() {
         const response = await farmerService.getProfile()
         if (response.data) {
           setProfile(response.data)
+          const initialAvatar = response.data.avatarUrl || response.data.avatar || ""
+          setAvatarPreview(initialAvatar)
           setFormData({
             organizationName: response.data.organizationName || "",
             contactName: response.data.contactName || "",
             contactNumber: response.data.contactNumber || "",
             cooperativeAffiliation: response.data.cooperativeAffiliation || "",
             farmType: response.data.farmType || "",
+            avatarUrl: initialAvatar,
           })
         }
       } catch (error: any) {
@@ -87,13 +95,50 @@ export default function SettingsPage() {
       console.error("Failed to update profile:", error)
       toast({
         title: "Lỗi",
-        description: error.response?.data?.message || "Không thể cập nhật thông tin",
+        description: error.response?.data?.message || "Không thể cập nhật thông tin tài khoản của bạn",
         variant: "destructive",
       })
     } finally {
       setSaving(false)
     }
   }
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      setUploadingAvatar(true)
+
+      const uploadResponse = await cloudinaryService.uploadImage(file)
+      const uploadedUrl = uploadResponse.data
+
+      if (!uploadedUrl) {
+        throw new Error("Không nhận được URL ảnh từ server")
+      }
+
+      setAvatarPreview(uploadedUrl)
+      setFormData((prev) => ({
+        ...prev,
+        avatarUrl: uploadedUrl,
+      }))
+
+      toast({
+        title: "Thành công",
+        description: "Tải ảnh lên thành công. Nhấn 'Lưu thay đổi' để cập nhật hồ sơ.",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.response?.data?.message || error.message || "Không thể tải ảnh đại diện lên",
+        variant: "destructive",
+      })
+    } finally {
+      setUploadingAvatar(false)
+      event.target.value = ""
+    }
+  }
+
 
   if (loading) {
     return (
@@ -104,7 +149,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 max-w-3xl">
+    <div className="p-4 lg:p-6 space-y-6 max-w-3xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold">Cài đặt tài khoản</h1>
         <p className="text-muted-foreground">Quản lý thông tin cá nhân và nông trại</p>
@@ -119,14 +164,30 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
             <Avatar className="h-20 w-20">
-              <AvatarImage src="/placeholder.svg" />
+              <AvatarImage src={avatarPreview || "/placeholder.svg"} />
               <AvatarFallback className="bg-agro-green text-white text-2xl">
                 {profile?.contactName?.charAt(0).toUpperCase() || "NA"}
               </AvatarFallback>
             </Avatar>
-            <Button variant="outline" className="gap-2 bg-transparent">
-              <Upload className="h-4 w-4" />
-              Đổi ảnh đại diện
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarUpload}
+            />
+            <Button
+              variant="outline"
+              className="gap-2 bg-transparent"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={uploadingAvatar}
+            >
+              {uploadingAvatar ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              {uploadingAvatar ? "Đang tải lên..." : "Đổi ảnh đại diện"}
             </Button>
           </div>
 

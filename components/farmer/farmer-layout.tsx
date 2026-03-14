@@ -190,7 +190,7 @@ export function FarmerLayout({ children }: FarmerLayoutProps) {
                       </AvatarFallback>
                     </Avatar>
                     <div className="hidden text-left md:block">
-                      <p className="text-sm font-medium">{profile?.contactName || 'Loading...'}</p>
+                      <p className="text-sm font-medium">{profile?.contactName || 'Nông dân'}</p>
                       <p className="text-xs text-muted-foreground">{profile?.organizationName || ''}</p>
                     </div>
                     <ChevronDown className="h-4 w-4 text-muted-foreground" />

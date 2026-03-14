@@ -20,10 +20,12 @@ import { authService } from "@/libs/api/services/auth.service";
 import { useToast } from "@/hooks/use-toast";
 import { GoogleLoginButton } from "@/components/auth/google-login-button";
 import { handleAuthError } from "@/libs/utils/error-handler";
+import { useAuth } from "@/stores/auth.store";
 
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -42,6 +44,22 @@ export default function LoginPage() {
       });
 
       if (response.status_code === 200 || response.status_code === 0) {
+        // Extract user data and tokens from response
+        const userData = response.data;
+        const accessToken = userData.token || '';
+        const refreshToken = userData.refresh_token || '';
+        
+        // Create user object for auth context
+        const user = {
+          id: userData.id || '',
+          email: userData.email || farmerEmail,
+          fullName: userData.fullName || userData.email || '',
+          role: 'farmer' as const,
+        };
+
+        // Update auth context
+        login(user, accessToken, refreshToken);
+
         toast({
           title: "✅ Thành công",
           description: response.message || "Đăng nhập thành công! Đang chuyển hướng...",
@@ -112,6 +130,7 @@ export default function LoginPage() {
                     <Label htmlFor="farmer-email">Email</Label>
                     <Input
                       id="farmer-email"
+                      name="email"
                       type="email"
                       placeholder="email@example.com"
                       value={farmerEmail}
@@ -124,6 +143,7 @@ export default function LoginPage() {
                     <div className="relative">
                       <Input
                         id="farmer-password"
+                        name="password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Nhập mật khẩu"
                         value={farmerPassword}
@@ -147,6 +167,7 @@ export default function LoginPage() {
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
+                        name="remember"
                         className="rounded border-agro-green/30"
                       />
                       <span>Ghi nhớ đăng nhập</span>

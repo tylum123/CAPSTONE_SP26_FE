@@ -41,6 +41,7 @@ export interface LoginResponse {
   email: string;
 }
 
+
 export interface RegisterRequest {
   email: string;
   password: string;
@@ -48,13 +49,22 @@ export interface RegisterRequest {
   address?: string;
   roleId: number;
 }
+export interface ForgetPasswordRequest {
+  email: string;
+}
 
+export interface ResetPasswordRequest {
+  email: string;
+  otp: string;
+  newPassword: string;
+}
 export interface UpdateFarmerRequest {
   organizationName?: string;
   contactName?: string;
   contactNumber?: string;
   cooperativeAffiliation?: string;
   farmType?: string;
+  avatarUrl?: string;
 }
 
 export interface GoogleLoginRequest {
@@ -85,6 +95,7 @@ export interface FarmerProfile {
   id: string;
   userId: string;
   email: string;
+  avatarUrl?: string;
   organizationName: string;
   contactName: string;
   contactNumber: string;

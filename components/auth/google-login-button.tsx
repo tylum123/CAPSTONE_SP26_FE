@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState } from 'react';
 import { handleAuthError } from '@/libs/utils/error-handler';
+import { useAuth } from '@/stores/auth.store';
 
 interface GoogleLoginButtonProps {
   roleId: number;
@@ -17,6 +18,7 @@ interface GoogleLoginButtonProps {
 export function GoogleLoginButton({ roleId, showDivider = false, onSuccess, onError }: GoogleLoginButtonProps) {
   const router = useRouter();
   const { toast } = useToast();
+  const { login } = useAuth();
   const [isConfigured, setIsConfigured] = useState(false);
 
   useEffect(() => {
@@ -42,6 +44,22 @@ export function GoogleLoginButton({ roleId, showDivider = false, onSuccess, onEr
       );
 
       if (response.status_code === 200 || response.status_code === 0) {
+        // Extract user data and tokens from response
+        const userData = response.data;
+        const accessToken = userData.token || '';
+        const refreshToken = userData.refresh_token || '';
+        
+        // Create user object for auth context
+        const user = {
+          id: userData.id || '',
+          email: userData.email || '',
+          fullName: userData.fullName || '',
+          role: 'farmer' as const,
+        };
+
+        // Update auth context
+        login(user, accessToken, refreshToken);
+
         toast({
           title: "Thành công",
           description: response.message || "Đăng nhập thành công",
@@ -94,7 +112,6 @@ export function GoogleLoginButton({ roleId, showDivider = false, onSuccess, onEr
           }}
           theme="outline"
           size="large"
-          width="100%"
           text="continue_with"
         />
       </div>

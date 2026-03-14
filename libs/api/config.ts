@@ -23,6 +23,7 @@ export const API_ENDPOINTS = {
   FARMER: {
     PROFILE: '/farmer', 
     UPDATEPROFILE: '/farmer',
+    UPDATEAVATAR: '/farmer/upload-avatar',
     DASHBOARD: '/farmer/dashboard',
     JOBS: '/farmer/jobs',
     JOB_DETAIL: (id: string) => `/farmer/jobs/${id}`,
@@ -50,6 +51,16 @@ export const API_ENDPOINTS = {
   },
   
   // Common
+  MEDIA: {
+    UPLOAD_IMAGE: '/media/upload/image',
+    UPLOAD_IMAGES: '/media/upload/images',
+    UPLOAD_VIDEO: '/media/upload/video',
+    UPLOAD_VIDEOS: '/media/upload/videos',
+    UPLOAD_RAW_FILE: '/media/upload/raw-file',
+    UPLOAD_RAW_FILES: '/media/upload/raw-files',
+    DELETE_RESOURCE: '/media/delete/resource',
+    DELETE_RESOURCES: '/media/delete/resources',
+  },
   NOTIFICATIONS: '/notifications',
   MESSAGES: '/messages',
   UPLOAD: '/upload',

@@ -21,10 +21,12 @@ import { authService } from "@/libs/api/services/auth.service";
 import { useToast } from "@/hooks/use-toast";
 import { GoogleLoginButton } from "@/components/auth/google-login-button";
 import { handleRegistrationError } from "@/libs/utils/error-handler";
+import { useAuth } from "@/stores/auth.store";
 
 function RegisterContent() {
   const router = useRouter();
   const { toast } = useToast();
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -76,7 +78,7 @@ function RegisterContent() {
         password: formData.password,
         phoneNumber: formData.phoneNumber,
         address: formData.address,
-        roleId: 3,
+        roleId: 2,
       });
 
       const isSuccess =
@@ -99,6 +101,17 @@ function RegisterContent() {
         localStorage.setItem("access_token", response.data.token);
         localStorage.setItem("user_email", response.data.email);
         localStorage.setItem("token_expires_at", response.data.expiresAt);
+
+        // Create user object for auth context
+        const user = {
+          id: response.data.id || '',
+          email: response.data.email || formData.email,
+          fullName: response.data.fullName || '',
+          role: 'farmer' as const,
+        };
+
+        // Update auth context to auto-login user after registration
+        login(user, response.data.token, response.data.refresh_token || '');
       }
 
       toast({
@@ -108,7 +121,7 @@ function RegisterContent() {
       });
 
       setTimeout(() => {
-        router.push("/auth/login");
+        router.push("/farmer/dashboard");
       }, 1000);
     } catch (error: any) {
       const errorMessage = handleRegistrationError(error);
@@ -158,6 +171,7 @@ function RegisterContent() {
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
+                  name="email"
                   type="email"
                   placeholder="email@example.com"
                   value={formData.email}
@@ -176,6 +190,7 @@ function RegisterContent() {
                 <Label htmlFor="phoneNumber">Số điện thoại</Label>
                 <Input
                   id="phoneNumber"
+                  name="tel"
                   type="tel"
                   placeholder="0912 345 678"
                   value={formData.phoneNumber}
@@ -194,6 +209,7 @@ function RegisterContent() {
                 <Label htmlFor="address">Địa chỉ</Label>
                 <Textarea
                   id="address"
+                  name="address"
                   placeholder="Số nhà, đường, xã/phường, huyện/quận, tỉnh"
                   value={formData.address}
                   onChange={(e) =>
@@ -212,6 +228,7 @@ function RegisterContent() {
                 <div className="relative">
                   <Input
                     id="password"
+                    name="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Tối thiểu 8 ký tự"
                     value={formData.password}
@@ -243,6 +260,7 @@ function RegisterContent() {
                 <div className="relative">
                   <Input
                     id="confirmPassword"
+                    name="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
                     placeholder="Nhập lại mật khẩu"
                     value={formData.confirmPassword}
@@ -302,7 +320,7 @@ function RegisterContent() {
                 </Button>
               </div>
 
-              <GoogleLoginButton roleId={3} showDivider />
+              <GoogleLoginButton roleId={2} showDivider />
 
               <p className="text-center text-sm text-muted-foreground">
                 Đã có tài khoản?{" "}

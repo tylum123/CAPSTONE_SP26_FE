@@ -6,6 +6,8 @@ import type {
   LoginResponse,
   RegisterRequest,
   GoogleLoginRequest,
+  ForgetPasswordRequest,
+  ResetPasswordRequest,
 } from '../types';
 
 export const authService = {
@@ -63,11 +65,17 @@ export const authService = {
   /**
    * Logout user
    */
-  logout: async (): Promise<void> => {
-    // Clear tokens from localStorage
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user_email');
-    localStorage.removeItem('refresh_token');
+  logout: async (): Promise<ApiResponse<string>> => {
+    try {
+      const response = await axiosInstance.post(API_ENDPOINTS.AUTH.LOGOUT);
+      return response.data;
+    } finally {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user_email');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('token_expires_at');
+    }
   },
 
   /**
@@ -89,21 +97,18 @@ export const authService = {
   },
 
   /**
-   * Request password reset
+   * Request password reset (sends OTP to email)
    */
-  forgotPassword: async (email: string): Promise<ApiResponse<void>> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, { email });
+  forgotPassword: async (data: ForgetPasswordRequest): Promise<ApiResponse<void>> => {
+    const response = await axiosInstance.post(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, data);
     return response.data;
   },
 
   /**
-   * Reset password
+   * Reset password using OTP
    */
-  resetPassword: async (token: string, password: string): Promise<ApiResponse<void>> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.AUTH.RESET_PASSWORD, {
-      token,
-      password,
-    });
+  resetPassword: async (data: ResetPasswordRequest): Promise<ApiResponse<void>> => {
+    const response = await axiosInstance.post(API_ENDPOINTS.AUTH.RESET_PASSWORD, data);
     return response.data;
   },
 };

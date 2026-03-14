@@ -13,7 +13,7 @@ const features = [
   },
   {
     icon: BarChart3,
-    title: "Quản lý mùa vụ",
+    title: "Quản lý công việc",
     description: "Theo dõi chi phí và lịch sử thuê mướn dễ dàng.",
   },
 ]

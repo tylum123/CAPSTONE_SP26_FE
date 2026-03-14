@@ -15,6 +15,10 @@ axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     // Get token from localStorage or cookies
     const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData && config.headers) {
+      delete (config.headers as any)['Content-Type'];
+    }
     
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;

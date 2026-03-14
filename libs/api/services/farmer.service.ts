@@ -62,6 +62,10 @@ export const farmerService = {
   },
 
   /**
+   * Upload farmer avatar
+   */
+
+  /**
    * Get farmer dashboard data
    */
   getDashboard: async (): Promise<ApiResponse<any>> => {

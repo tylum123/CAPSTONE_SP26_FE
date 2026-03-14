@@ -241,15 +241,8 @@ export function FarmerJobForm() {
         <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-background">
           <CardHeader>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="gap-1 rounded-full px-3 py-1">
-                <Coins className="h-3.5 w-3.5" />
-                Không tính lương theo giờ
-              </Badge>
-              <Badge variant="outline" className="rounded-full px-3 py-1">
-                Bắt đầu từ cách trả công
-              </Badge>
             </div>
-            <CardTitle>1. Chọn hình thức tính lương</CardTitle>
+            <CardTitle>Chọn hình thức tính lương</CardTitle>
             <CardDescription>
               Nông dân chọn trả công theo ngày hoặc theo khoán trước để hệ thống hiển thị đúng trường thông tin và cách
               tính ngân sách.
@@ -299,7 +292,7 @@ export function FarmerJobForm() {
 
         <Card>
           <CardHeader>
-            <CardTitle>2. Thông tin cơ bản</CardTitle>
+            <CardTitle>Thông tin cơ bản</CardTitle>
             <CardDescription>Mô tả đầu việc mà worker sẽ thực hiện.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
@@ -341,7 +334,7 @@ export function FarmerJobForm() {
 
         <Card>
           <CardHeader>
-            <CardTitle>3. Lịch làm việc & địa điểm</CardTitle>
+            <CardTitle>Lịch làm việc & địa điểm</CardTitle>
             <CardDescription>
               Chỉ dùng để hẹn lịch làm việc. Hệ thống không dùng số giờ để tính lương cho tin tuyển này.
             </CardDescription>
@@ -392,104 +385,12 @@ export function FarmerJobForm() {
                 />
               </div>
             </div>
-
-            <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-4 text-sm text-muted-foreground">
-              Thời gian hiện tại là <span className="font-medium text-foreground">{startTime}</span> đến{" "}
-              <span className="font-medium text-foreground">{endTime}</span>. Khung giờ này chỉ để worker chủ động sắp
-              xếp lịch, không quy đổi thành lương theo giờ.
-            </div>
-
-            <div className="rounded-2xl border bg-muted/20 p-4 sm:p-5">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="flex items-center gap-2 text-sm font-medium text-foreground">
-                    <CalendarDays className="h-4 w-4 text-primary" />
-                    Placeholder lịch làm việc đã có người được duyệt
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Hiển thị sẵn 4 ngày mẫu. Khi chọn một ngày, bên dưới sẽ liệt kê worker đã được duyệt cho ngày đó.
-                  </p>
-                </div>
-                <Badge variant="outline" className="w-fit rounded-full px-3 py-1">
-                  {schedulePlaceholders.length} ngày có lịch
-                </Badge>
-              </div>
-
-              <div className="mt-4 grid gap-3 md:grid-cols-4">
-                {schedulePlaceholders.map((schedule) => {
-                  const isActive = schedule.id === selectedSchedule.id
-
-                  return (
-                    <button
-                      key={schedule.id}
-                      type="button"
-                      onClick={() => setSelectedScheduleId(schedule.id)}
-                      className={cn(
-                        "rounded-2xl border p-4 text-left transition-all",
-                        isActive
-                          ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/20"
-                          : "border-border bg-background hover:border-primary/40 hover:bg-primary/5",
-                      )}
-                    >
-                      <p className="text-sm font-semibold text-foreground">{schedule.shortLabel}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">{schedule.timeRange}</p>
-                      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{schedule.area}</span>
-                        <span>{schedule.workers.length} người</span>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-
-              <div className="mt-5 rounded-2xl border bg-background p-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-semibold text-foreground">{selectedSchedule.dateLabel}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedSchedule.timeRange} • {selectedSchedule.area}
-                    </p>
-                  </div>
-                  <Badge className="w-fit gap-1 rounded-full px-3 py-1">
-                    <Users className="h-3.5 w-3.5" />
-                    {selectedSchedule.workers.length} worker đã duyệt
-                  </Badge>
-                </div>
-
-                <Separator className="my-4" />
-
-                <div className="space-y-3">
-                  {selectedSchedule.workers.map((worker) => (
-                    <div
-                      key={worker.id}
-                      className="flex flex-col gap-3 rounded-xl border border-border/70 p-3 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10 border bg-primary/10">
-                          <AvatarFallback className="bg-primary/10 font-medium text-primary">
-                            {getInitials(worker.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium text-foreground">{worker.name}</p>
-                          <p className="text-sm text-muted-foreground">{worker.role}</p>
-                        </div>
-                      </div>
-                      <Badge variant="secondary" className="w-fit gap-1 rounded-full px-3 py-1">
-                        <CheckCheck className="h-3.5 w-3.5 text-primary" />
-                        {worker.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>4. Mức lương & ngân sách</CardTitle>
+            <CardTitle>Mức lương & ngân sách</CardTitle>
             <CardDescription>
               {paymentMode === "daily"
                 ? "Thiết lập đơn giá theo ngày rồi nhập số người để hệ thống ước tính chi phí."
@@ -582,7 +483,7 @@ export function FarmerJobForm() {
 
         <Card>
           <CardHeader>
-            <CardTitle>5. Yêu cầu công việc</CardTitle>
+            <CardTitle>Yêu cầu công việc</CardTitle>
             <CardDescription>Các tiêu chí giúp lọc đúng worker phù hợp.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -617,7 +518,7 @@ export function FarmerJobForm() {
 
         <Card>
           <CardHeader>
-            <CardTitle>6. Quyền lợi</CardTitle>
+            <CardTitle>Quyền lợi</CardTitle>
             <CardDescription>Các hỗ trợ thêm để tin tuyển hấp dẫn hơn.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -652,7 +553,7 @@ export function FarmerJobForm() {
 
         <Card>
           <CardHeader>
-            <CardTitle>7. Tùy chọn khác</CardTitle>
+            <CardTitle>Tùy chọn khác</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="flex items-center gap-2">

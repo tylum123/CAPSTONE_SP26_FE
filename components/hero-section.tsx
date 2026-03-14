@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { QrCode, FileText } from "lucide-react"
+import Link from "next/link"
 
 export function HeroSection() {
   return (
@@ -18,12 +19,12 @@ export function HeroSection() {
       <div className="container relative mx-auto flex min-h-[90vh] flex-col items-center justify-center px-4 py-20 text-center">
         {/* Headline */}
         <h1 className="mb-6 max-w-4xl text-balance text-4xl font-bold leading-tight text-white md:text-5xl lg:text-6xl">
-          Kết Nối Mùa Vụ - Tìm Việc Nhanh, Thuê Người Dễ
+          Tìm Việc Nhanh, Thuê Người Dễ
         </h1>
 
         {/* Sub-headline */}
         <p className="mb-12 max-w-2xl text-pretty text-lg text-white/90 md:text-xl">
-          Nền tảng tiên phong kết nối nông dân và lao động thời vụ tại Việt Nam.
+          Nền tảng kết nối nông dân và lao động thời vụ tại Việt Nam.
           <span className="font-semibold text-agro-orange"> Minh bạch, An toàn, Thanh toán nhanh.</span>
         </p>
 
@@ -36,9 +37,11 @@ export function HeroSection() {
             </div>
             <h3 className="mb-2 text-xl font-bold text-white">Tôi là Nông dân</h3>
             <p className="mb-4 text-sm text-white/80">Đăng tin tuyển dụng và tìm lao động phù hợp ngay hôm nay</p>
-            <Button size="lg" className="w-full bg-agro-green hover:bg-agro-green-dark text-white font-semibold">
-              Đăng tin tuyển dụng ngay
-            </Button>
+            <Link href="/auth/login" passHref>
+              <Button size="lg" className="w-full bg-agro-green hover:bg-agro-green-dark text-white font-semibold cursor-pointer">
+                Đăng tin tuyển dụng ngay
+              </Button>
+            </Link>
           </div>
 
         </div>
