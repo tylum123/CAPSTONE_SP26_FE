@@ -6,7 +6,9 @@ import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
 import { Briefcase, Users, DollarSign, Clock, ChevronRight, Star } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { farmerService } from "@/libs/api/services/farmer.service"
+import type { FarmerProfile } from "@/libs/api/types"
 
 const stats = [
   { label: "Tin đang tuyển", value: "3", icon: Briefcase, color: "text-agro-green", bgColor: "bg-agro-green/10" },
@@ -54,13 +56,29 @@ const scheduledDates = [new Date(2026, 0, 15), new Date(2026, 0, 16), new Date(2
 
 export default function FarmerDashboard() {
   const [date, setDate] = useState<Date | undefined>(new Date())
+  const [profile, setProfile] = useState<FarmerProfile | null>(null)
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await farmerService.getProfile()
+        setProfile(response.data)
+      } catch (error) {
+        console.error('Failed to fetch farmer profile:', error)
+      }
+    }
+
+    fetchProfile()
+  }, [])
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
       {/* Welcome Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Xin chào, Nguyễn Văn An!</h1>
+          <h1 className="text-2xl font-bold text-foreground">
+            Xin chào, {profile?.contactName || 'Loading...'}!
+          </h1>
           <p className="text-muted-foreground">Đây là tổng quan hoạt động của nông trại.</p>
         </div>
         <Link href="/farmer/create-job">

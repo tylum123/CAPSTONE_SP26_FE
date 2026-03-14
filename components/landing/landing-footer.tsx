@@ -22,11 +22,6 @@ export function LandingFooter() {
             <h4 className="mb-4 font-semibold text-foreground">Nền tảng</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link href="/worker" className="hover:text-foreground">
-                  Worker App
-                </Link>
-              </li>
-              <li>
                 <Link href="/farmer" className="hover:text-foreground">
                   Farmer Portal
                 </Link>

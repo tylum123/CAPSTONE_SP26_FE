@@ -1,42 +1,70 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Globe, Smartphone } from "lucide-react";
-import { useAuth } from "@/contexts/auth-context";
+import { Menu, X, Settings, LogOut, Leaf } from "lucide-react";
+import { useAuth } from "@/stores/auth.store";
+import { farmerService } from "@/libs/api/services/farmer.service";
+import { FarmerProfile } from "@/libs/api/types";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [language, setLanguage] = useState<"vi" | "en">("vi");
-  const { isAuthenticated } = useAuth();
+  const [profile, setProfile] = useState<FarmerProfile | null>(null);
+  const router = useRouter();
+  const { isAuthenticated, logout } = useAuth();
 
   const navItems = [
-    { label: language === "vi" ? "Giới thiệu" : "About", href: "#about" },
-    { label: language === "vi" ? "Tính năng" : "Features", href: "#features" },
-    { label: language === "vi" ? "Hướng dẫn" : "Guide", href: "#how-it-works" },
-    { label: language === "vi" ? "Liên hệ" : "Contact", href: "#contact" },
+    { label: "Giới thiệu", href: "#about" },
+    { label: "Tính năng", href: "#features" },
+    { label: "Hướng dẫn", href: "#how-it-works" },
+    { label: "Liên hệ", href: "#contact" },
   ];
 
+  const handleLogout = () => {
+    logout();
+    localStorage.clear();
+    router.push("/auth/login");
+  };
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await farmerService.getProfile();
+        setProfile(response.data);
+      } catch {
+        setProfile(null);
+      }
+    };
+
+    if (isAuthenticated) {
+      fetchProfile();
+    } else {
+      setProfile(null);
+    }
+  }, [isAuthenticated]);
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-agro-green/10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+    <header className="sticky top-0 z-50 w-full border-b border-agro-green/10 bg-white/95 backdrop-blur supports-backdrop-filter:bg-white/60">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-agro-green">
-            <svg
-              className="h-6 w-6 text-white"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M12 2L4 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-8-5zm0 15.5l-5-3v-6l5-3 5 3v6l-5 3z" />
-            </svg>
+          <div className="flex h-10 w-10 items-center justify-center rounded-full">
+            <img
+              src="/logo.png"
+              alt="AgroTemp Logo"
+              className="h-10 w-10 object-contain"
+            />
           </div>
           <span className="text-xl font-bold text-agro-green">AgroTemp</span>
         </Link>
@@ -56,69 +84,67 @@ export function Header() {
 
         {/* Actions */}
         <div className="hidden items-center gap-3 md:flex">
-          {/* Language Switcher */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-2">
-                <Globe className="h-4 w-4" />
-                {language === "vi" ? "VI" : "EN"}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => setLanguage("vi")}>
-                Tiếng Việt
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setLanguage("en")}>
-                English
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
           {/* Portal Navigation - Only show when logged in */}
           {isAuthenticated && (
+            <Link href="/farmer">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <Menu className="h-4 w-4" />
+                Cổng Nông dân
+              </Button>
+            </Link>
+          )}
+
+          {isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <Menu className="h-4 w-4" />
-                  {language === "vi" ? "Cổng thông tin" : "Portals"}
+                <Button variant="ghost" className="gap-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} />
+                    <AvatarFallback className="bg-agro-green text-white">
+                      {profile?.contactName?.charAt(0).toUpperCase() || "NA"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="font-medium">{profile?.contactName || "Nông dân"}</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent>
+              <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem asChild>
-                  <Link href="/farmer" className="cursor-pointer">
-                    {language === "vi" ? "Cổng Nông dân" : "Farmer Portal"}
+                  <Link href="/farmer/settings" className="cursor-pointer">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Cài đặt
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/worker/home" className="cursor-pointer">
-                    {language === "vi" ? "Cổng Lao động" : "Worker Portal"}
+                  <Link href="/" className="cursor-pointer">
+                    <Leaf className="h-4 w-4 mr-2" />
+                    Về trang chủ
                   </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Đăng xuất
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+          ) : (
+            <>
+              <Link href="/auth/register?type=farmer">
+                <Button variant="outline" size="sm" className="border-agro-green text-agro-green hover:bg-agro-green/10 cursor-pointer">
+                  Đăng ký
+                </Button>
+              </Link>
+
+              <Link href="/auth/login">
+                <Button
+                  size="sm"
+                  className="bg-agro-green hover:bg-agro-green-dark text-white cursor-pointer"
+                >
+                  Đăng nhập
+                </Button>
+              </Link>
+            </>
           )}
-
-          {/* Download App Button */}
-          <Link href="/worker/home">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 border-agro-green text-agro-green hover:bg-agro-green hover:text-white bg-transparent"
-            >
-              <Smartphone className="h-4 w-4" />
-              {language === "vi" ? "Tải App Worker" : "Download Worker App"}
-            </Button>
-          </Link>
-
-          {/* Farmer Login Button */}
-          <Link href="/auth/login">
-            <Button
-              size="sm"
-              className="bg-agro-green hover:bg-agro-green-dark text-white"
-            >
-              {language === "vi" ? "Đăng nhập Nông dân" : "Farmer Login"}
-            </Button>
-          </Link>
         </div>
 
         {/* Mobile Menu Button */}
@@ -149,20 +175,34 @@ export function Header() {
               </Link>
             ))}
             <div className="flex flex-col gap-2 pt-4">
-              <Link href="/worker/home">
-                <Button
-                  variant="outline"
-                  className="w-full gap-2 border-agro-green text-agro-green bg-transparent"
-                >
-                  <Smartphone className="h-4 w-4" />
-                  {language === "vi" ? "Tải App Worker" : "Download Worker App"}
-                </Button>
-              </Link>
-              <Link href="/auth/login">
-                <Button className="w-full bg-agro-green text-white hover:bg-agro-green-dark">
-                  {language === "vi" ? "Đăng nhập Nông dân" : "Farmer Login"}
-                </Button>
-              </Link>
+              {isAuthenticated ? (
+                <>
+                  <Link href="/farmer/settings">
+                    <Button variant="outline" className="w-full border-agro-green text-agro-green hover:bg-agro-green/10">
+                      Cài đặt tài khoản
+                    </Button>
+                  </Link>
+                  <Button
+                    className="w-full bg-agro-green text-white hover:bg-agro-green-dark"
+                    onClick={handleLogout}
+                  >
+                    Đăng xuất
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Link href="/auth/register?type=farmer">
+                    <Button variant="outline" className="w-full border-agro-green text-agro-green hover:bg-agro-green/10">
+                      Đăng ký Nông dân
+                    </Button>
+                  </Link>
+                  <Link href="/auth/login">
+                    <Button className="w-full bg-agro-green text-white hover:bg-agro-green-dark">
+                      Đăng nhập Nông dân
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </nav>
         </div>

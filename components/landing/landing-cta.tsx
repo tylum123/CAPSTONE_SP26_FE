@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Download, Monitor } from "lucide-react"
+import { Monitor } from "lucide-react"
 
 export function LandingCTA() {
   return (
@@ -13,16 +13,9 @@ export function LandingCTA() {
           </p>
 
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Button size="lg" variant="secondary" asChild>
-              <Link href="/worker">
-                <Download className="mr-2 h-5 w-5" />
-                Tải App cho Người lao động
-              </Link>
-            </Button>
             <Button
               size="lg"
-              variant="outline"
-              className="border-primary-foreground/20 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
+              variant="secondary"
               asChild
             >
               <Link href="/farmer">

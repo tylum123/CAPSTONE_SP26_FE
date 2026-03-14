@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import {
   Users,
@@ -18,8 +19,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
+import { farmerService } from "@/libs/api/services/farmer.service"
+import type { FarmerProfile } from "@/libs/api/types"
 
 export function FarmerDashboard() {
+  const [profile, setProfile] = useState<FarmerProfile | null>(null)
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await farmerService.getProfile()
+        setProfile(response.data)
+      } catch (error) {
+        console.error('Failed to fetch farmer profile:', error)
+      }
+    }
+
+    fetchProfile()
+  }, [])
+
   const stats = [
     {
       title: "Tin đang tuyển",
@@ -126,7 +144,9 @@ export function FarmerDashboard() {
       {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Xin chào, Nguyễn Văn A</h1>
+          <h1 className="text-2xl font-bold text-foreground">
+            Xin chào, {profile?.contactName || 'Nông dân'}
+          </h1>
           <p className="text-muted-foreground">Đây là tổng quan hoạt động của nông trại hôm nay.</p>
         </div>
         <Button asChild>

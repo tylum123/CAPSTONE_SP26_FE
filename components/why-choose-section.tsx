@@ -4,13 +4,13 @@ const features = [
   {
     icon: Zap,
     title: "Tốc độ",
-    description: "Tuyển người chỉ trong 5 phút. Thuật toán thông minh tìm lao động gần nhất.",
+    description: "Thuật toán thông minh tìm lao động gần nhất.",
     color: "bg-agro-green",
   },
   {
     icon: Shield,
     title: "Tin cậy",
-    description: "Hồ sơ minh bạch, có đánh giá 2 chiều. Hệ thống xác thực danh tính.",
+    description: "Hồ sơ minh bạch, đánh giá 2 chiều. Hệ thống xác thực danh tính.",
     color: "bg-agro-orange",
   },
   {
@@ -32,7 +32,7 @@ export function WhyChooseSection() {
           </span>
           <h2 className="mb-4 text-3xl font-bold text-foreground md:text-4xl">Tại sao chọn AgroTemp?</h2>
           <p className="mx-auto max-w-2xl text-muted-foreground">
-            Chúng tôi mang đến giải pháp toàn diện cho cả nông dân và người lao động thời vụ
+            Chúng tôi mang đến giải pháp cho cả nông dân và người lao động thời vụ
           </p>
         </div>
 

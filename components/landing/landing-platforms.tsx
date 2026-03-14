@@ -1,19 +1,9 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Smartphone, Monitor, Settings, ArrowRight } from "lucide-react"
+import { Monitor, Settings, ArrowRight } from "lucide-react"
 
 export function LandingPlatforms() {
   const platforms = [
-    {
-      icon: Smartphone,
-      title: "Worker Mobile App",
-      description:
-        "Ứng dụng di động cho người lao động tìm việc thời vụ nhanh chóng, theo dõi công việc và nhận thanh toán.",
-      features: ["Tìm việc theo vị trí GPS", "Ứng tuyển 1 chạm", "Ví điện tử tích hợp", "Nhận thông báo real-time"],
-      link: "/worker",
-      buttonText: "Khám phá App",
-      color: "primary",
-    },
     {
       icon: Monitor,
       title: "Farmer Web Portal",
@@ -21,7 +11,7 @@ export function LandingPlatforms() {
       features: ["Đăng tin tuyển dụng", "Quản lý ứng viên", "Theo dõi thanh toán", "Phân tích & báo cáo"],
       link: "/farmer",
       buttonText: "Truy cập Portal",
-      color: "accent",
+      color: "primary",
     },
     {
       icon: Settings,
@@ -38,31 +28,27 @@ export function LandingPlatforms() {
     <section id="platforms" className="bg-secondary/30 py-20 lg:py-28">
       <div className="container mx-auto px-4">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold text-foreground lg:text-4xl">Ba nền tảng, một hệ sinh thái</h2>
+          <h2 className="text-3xl font-bold text-foreground lg:text-4xl">Hai nền tảng, một hệ sinh thái</h2>
           <p className="mt-4 text-lg text-muted-foreground">
             Mỗi nền tảng được thiết kế riêng cho từng đối tượng sử dụng
           </p>
         </div>
 
-        <div className="mt-16 grid gap-8 lg:grid-cols-3">
+        <div className="mt-16 grid gap-8 lg:grid-cols-2">
           {platforms.map((platform, index) => (
             <div key={index} className="flex flex-col rounded-2xl border border-border bg-card p-8">
               <div
                 className={`mb-6 flex h-14 w-14 items-center justify-center rounded-xl ${
                   platform.color === "primary"
                     ? "bg-primary/10"
-                    : platform.color === "accent"
-                      ? "bg-accent/20"
-                      : "bg-muted"
+                    : "bg-muted"
                 }`}
               >
                 <platform.icon
                   className={`h-7 w-7 ${
                     platform.color === "primary"
                       ? "text-primary"
-                      : platform.color === "accent"
-                        ? "text-accent-foreground"
-                        : "text-muted-foreground"
+                      : "text-muted-foreground"
                   }`}
                 />
               </div>

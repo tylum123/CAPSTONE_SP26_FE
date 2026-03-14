@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -19,7 +19,7 @@ import {
   LogOut,
   User,
 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn } from "@/libs/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -30,6 +30,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
+import { farmerService } from "@/libs/api/services/farmer.service"
+import type { FarmerProfile } from "@/libs/api/types"
 
 interface FarmerLayoutProps {
   children: React.ReactNode
@@ -38,6 +40,20 @@ interface FarmerLayoutProps {
 export function FarmerLayout({ children }: FarmerLayoutProps) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [profile, setProfile] = useState<FarmerProfile | null>(null)
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await farmerService.getProfile()
+        setProfile(response.data)
+      } catch (error) {
+        console.error('Failed to fetch farmer profile:', error)
+      }
+    }
+
+    fetchProfile()
+  }, [])
 
   const navItems = [
     { icon: LayoutDashboard, label: "Tổng quan", href: "/farmer" },
@@ -162,11 +178,20 @@ export function FarmerLayout({ children }: FarmerLayoutProps) {
                   <Button variant="ghost" className="flex items-center gap-2 pl-2">
                     <Avatar className="h-8 w-8">
                       <AvatarImage src="/vietnamese-farmer-portrait.jpg" />
-                      <AvatarFallback>NV</AvatarFallback>
+                      <AvatarFallback>
+                        {profile?.contactName
+                          ? profile.contactName
+                              .split(' ')
+                              .map((n) => n[0])
+                              .join('')
+                              .toUpperCase()
+                              .slice(0, 2)
+                          : 'NV'}
+                      </AvatarFallback>
                     </Avatar>
                     <div className="hidden text-left md:block">
-                      <p className="text-sm font-medium">Nguyễn Văn A</p>
-                      <p className="text-xs text-muted-foreground">Nông trại Mỹ Khánh</p>
+                      <p className="text-sm font-medium">{profile?.contactName || 'Nông dân'}</p>
+                      <p className="text-xs text-muted-foreground">{profile?.organizationName || ''}</p>
                     </div>
                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
                   </Button>

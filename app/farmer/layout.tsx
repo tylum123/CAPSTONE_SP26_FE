@@ -2,7 +2,7 @@
 
 import type React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -24,7 +24,12 @@ import {
   Menu,
   Leaf,
   MessageCircle,
+  Loader2,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { FarmerProfile, farmerService } from "@/libs/api";
+import { useAuth } from "@/stores/auth.store";
+import { AnimatedBubbles } from "@/components/farmer/animated-bubbles";
 
 export default function FarmerLayout({
   children,
@@ -32,6 +37,8 @@ export default function FarmerLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { isAuthenticated, isLoading, logout } = useAuth();
 
   const navItems = [
     { icon: LayoutDashboard, label: "Tổng quan", href: "/farmer/dashboard" },
@@ -39,19 +46,67 @@ export default function FarmerLayout({
     { icon: Users, label: "Ứng viên", href: "/farmer/applications" },
     { icon: MessageCircle, label: "Tin nhắn", href: "/farmer/messages", badge: 3 },
     { icon: Wallet, label: "Thanh toán", href: "/farmer/payments" },
-    { icon: Settings, label: "Cài đặt", href: "/farmer/settings" },
+    { icon: Leaf, label: "Công việc", href: "/farmer/jobs" },
   ];
+  const [profile, setProfile] = useState<FarmerProfile | null>(null)
+
+  // Auth gate - redirect if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/auth/login");
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  useEffect(() => {
+      const fetchProfile = async () => {
+        try {
+          const response = await farmerService.getProfile()
+          setProfile(response.data)
+        } catch (error) {
+          console.error('Failed to fetch farmer profile:', error)
+        }
+      }
+  
+      if (isAuthenticated) {
+        fetchProfile()
+      }
+    }, [isAuthenticated])
+
+  const handleLogout = () => {
+    logout();
+    localStorage.clear();
+    router.push("/auth/login");
+  };
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-agro-cream flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-agro-green" />
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (redirect will happen in useEffect)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
-    <div className="min-h-screen bg-agro-cream">
+    <div className="min-h-screen bg-agro-cream relative">
+      <AnimatedBubbles />
       {/* Top Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-border shadow-sm">
+      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-border shadow-sm">
         <div className="container mx-auto px-4 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link href="/farmer/dashboard" className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-agro-green flex items-center justify-center">
-                <Leaf className="h-6 w-6 text-white" />
+              <div className="w-10 h-10 rounded-full flex items-center justify-center">
+                <img
+                  src="/logo.png"
+                  alt="AgroTemp Logo"
+                  className="h-10 w-10 object-contain"
+                />
               </div>
               <span className="text-xl font-bold text-agro-green">AgroTemp</span>
             </Link>
@@ -94,10 +149,12 @@ export default function FarmerLayout({
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="gap-2 hidden md:flex">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src="/placeholder.svg" />
-                      <AvatarFallback className="bg-agro-green text-white">NA</AvatarFallback>
+                      <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} />
+                      <AvatarFallback className="bg-agro-green text-white">
+                        {profile?.contactName?.charAt(0).toUpperCase() || "NA"}
+                      </AvatarFallback>
                     </Avatar>
-                    <span className="font-medium">Nguyễn Văn An</span>
+                    <span className="font-medium">{profile?.contactName || 'Nông dân'}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
@@ -114,11 +171,11 @@ export default function FarmerLayout({
                       Về trang chủ
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/" className="cursor-pointer text-destructive">
+                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
+                    <span className="flex items-center">
                       <LogOut className="h-4 w-4 mr-2" />
                       Đăng xuất
-                    </Link>
+                    </span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -134,11 +191,13 @@ export default function FarmerLayout({
                   <div className="flex flex-col gap-4 mt-8">
                     <div className="flex items-center gap-3 pb-4 border-b">
                       <Avatar className="h-12 w-12">
-                        <AvatarImage src="/placeholder.svg" />
-                        <AvatarFallback className="bg-agro-green text-white">NA</AvatarFallback>
+                        <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} />
+                        <AvatarFallback className="bg-agro-green text-white">
+                          {profile?.contactName?.charAt(0).toUpperCase() || "NA"}
+                        </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-semibold">Nguyễn Văn An</p>
+                        <p className="font-semibold">{profile?.contactName || 'Null'}</p>
                         <p className="text-sm text-muted-foreground">Nông dân</p>
                       </div>
                     </div>
@@ -172,12 +231,14 @@ export default function FarmerLayout({
                           Về trang chủ
                         </Button>
                       </Link>
-                      <Link href="/">
-                        <Button variant="ghost" className="w-full justify-start gap-3 text-destructive">
-                          <LogOut className="h-5 w-5" />
-                          Đăng xuất
-                        </Button>
-                      </Link>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start gap-3 text-destructive"
+                        onClick={handleLogout}
+                      >
+                        <LogOut className="h-5 w-5" />
+                        Đăng xuất
+                      </Button>
                     </div>
                   </div>
                 </SheetContent>
@@ -188,7 +249,7 @@ export default function FarmerLayout({
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 lg:px-8 py-6">{children}</main>
+      <main className="relative z-10 container mx-auto px-4 lg:px-8 py-6">{children}</main>
     </div>
   );
 }

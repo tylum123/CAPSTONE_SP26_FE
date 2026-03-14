@@ -1,4 +1,4 @@
-﻿# AgroTemp - Nền tảng Tuyển dụng Nông nghiệp Thời vụ
+# AgroTemp - Nền tảng Tuyển dụng Nông nghiệp Thời vụ
 
 ![Next.js](https://img.shields.io/badge/Next.js-16.0-black?style=flat&logo=next.js)
 ![React](https://img.shields.io/badge/React-19.2-blue?style=flat&logo=react)
@@ -289,7 +289,7 @@ npx shadcn@latest add sheet
 
 ```tsx
 // ✅ Good: Use cn() helper for conditional classes
-import { cn } from '@/lib/utils'
+import { cn } from '@/libs/utils'
 
 <div className={cn(
   "base-classes",
