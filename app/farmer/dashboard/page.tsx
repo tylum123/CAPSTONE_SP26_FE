@@ -4,11 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
-import { Briefcase, Users, DollarSign, Clock, ChevronRight, Star } from "lucide-react"
+import { Briefcase, Users, DollarSign, Clock, ChevronRight, Star, Cloud, Droplets, Wind, X } from "lucide-react"
 import Link from "next/link"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { farmerService } from "@/libs/api/services/farmer.service"
 import type { FarmerProfile } from "@/libs/api/types"
+import { useWeather } from "@/hooks/use-weather"
+import { weatherService } from "@/libs/api/services/weather.service"
+import Image from "next/image"
 
 const stats = [
   { label: "Tin đang tuyển", value: "3", icon: Briefcase, color: "text-agro-green", bgColor: "bg-agro-green/10" },
@@ -57,6 +60,26 @@ const scheduledDates = [new Date(2026, 0, 15), new Date(2026, 0, 16), new Date(2
 export default function FarmerDashboard() {
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [profile, setProfile] = useState<FarmerProfile | null>(null)
+  const [weatherPopup, setWeatherPopup] = useState<{ date: Date; position: { x: number; y: number } } | null>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
+  const { currentWeather, dailyForecast, loading: weatherLoading } = useWeather({
+    city: 'Hanoi',
+    country: 'VN',
+    enableForecast: true,
+  })
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
+        setWeatherPopup(null)
+      }
+    }
+
+    if (weatherPopup) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [weatherPopup])
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -168,16 +191,56 @@ export default function FarmerDashboard() {
         {/* Calendar Widget */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Lịch mùa vụ</CardTitle>
+            <CardTitle className="text-lg">Lịch mùa vụ & Thời tiết</CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Current Weather */}
+            {!weatherLoading && currentWeather && (
+              <div className="mb-4 p-3 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 rounded-lg animate-in fade-in slide-in-from-top-2 duration-500">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground animate-in fade-in slide-in-from-left-2 duration-300">
+                      {currentWeather.name}
+                    </p>
+                    <p className="text-3xl font-bold animate-in fade-in zoom-in-50 duration-500 delay-100">
+                      {Math.round(currentWeather.main.temp)}°C
+                    </p>
+                    <p className="text-xs text-muted-foreground capitalize animate-in fade-in slide-in-from-left-2 duration-300 delay-200">
+                      {currentWeather.weather[0].description}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-center animate-in fade-in slide-in-from-right-2 duration-500 delay-150">
+                    <Image
+                      src={weatherService.getWeatherIconUrl(currentWeather.weather[0].icon)}
+                      alt={currentWeather.weather[0].description}
+                      width={64}
+                      height={64}
+                      className="animate-bounce-slow"
+                      unoptimized
+                    />
+                    <div className="flex gap-3 text-xs text-muted-foreground mt-1">
+                      <div className="flex items-center gap-1 hover:scale-110 transition-transform">
+                        <Droplets className="h-3 w-3" />
+                        {currentWeather.main.humidity}%
+                      </div>
+                      <div className="flex items-center gap-1 hover:scale-110 transition-transform">
+                        <Wind className="h-3 w-3" />
+                        {currentWeather.wind.speed}m/s
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <Calendar
               mode="single"
               selected={date}
               onSelect={setDate}
-              className="rounded-md"
+              className="rounded-md w-full"
               modifiers={{
                 scheduled: scheduledDates,
+                hasWeather: Array.from(dailyForecast.keys()).map(key => new Date(key)),
               }}
               modifiersStyles={{
                 scheduled: {
@@ -186,16 +249,147 @@ export default function FarmerDashboard() {
                   fontWeight: "bold",
                 },
               }}
+              modifiersClassNames={{
+                hasWeather: "relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:w-1.5 after:h-1.5 after:rounded-full after:bg-blue-500 after:animate-pulse",
+              }}
+              components={{
+                DayButton: ({ day, ...props }) => {
+                  const dateKey = day.date.toISOString().split('T')[0];
+                  const weatherForDay = dailyForecast.get(dateKey);
+                  
+                  return (
+                    <button
+                      {...props}
+                      className={`${props.className} ${weatherForDay ? 'cursor-pointer' : ''}`}
+                      onClick={(e) => {
+                        setDate(day.date);
+                        if (weatherForDay) {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const windowWidth = window.innerWidth;
+                          const popupWidth = 320;
+                          
+                          let x = rect.right + 10;
+                          if (x + popupWidth > windowWidth) {
+                            x = rect.left - popupWidth - 10;
+                          }
+                          
+                          let y = rect.top;
+                          const windowHeight = window.innerHeight;
+                          const popupHeight = 400;
+                          if (y + popupHeight > windowHeight) {
+                            y = windowHeight - popupHeight - 20;
+                          }
+                          
+                          setWeatherPopup({
+                            date: day.date,
+                            position: { x, y },
+                          });
+                        }
+                      }}
+                    >
+                      {day.date.getDate()}
+                    </button>
+                  );
+                },
+              }}
             />
             <div className="mt-3 pt-3 border-t">
-              <p className="text-sm text-muted-foreground">
-                <span className="inline-block w-3 h-3 rounded bg-agro-green/20 mr-2" />
-                Ngày có thuê người làm
-              </p>
+              <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 rounded bg-agro-green/20" />
+                  <span>Ngày có thuê người làm</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  <span>Có dự báo thời tiết (click để xem)</span>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Weather Popup */}
+      {weatherPopup && dailyForecast.get(weatherPopup.date.toISOString().split('T')[0]) && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 animate-in fade-in duration-200"
+            onClick={() => setWeatherPopup(null)}
+          />
+          <div
+            ref={popupRef}
+            className="fixed z-50 animate-in fade-in zoom-in-95 slide-in-from-left-5 duration-300"
+            style={{
+              left: `${weatherPopup.position.x}px`,
+              top: `${weatherPopup.position.y}px`,
+            }}
+          >
+            <div className="w-80 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-4 relative">
+              <button
+                onClick={() => setWeatherPopup(null)}
+                className="absolute top-2 right-2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              
+              <div className="flex items-center justify-between mb-4 pr-6">
+                <div>
+                  <p className="text-base font-bold">
+                    {weatherPopup.date.getDate()} tháng {weatherPopup.date.getMonth() + 1}
+                  </p>
+                  <p className="text-sm text-muted-foreground capitalize mt-0.5">
+                    {dailyForecast.get(weatherPopup.date.toISOString().split('T')[0])!.description}
+                  </p>
+                </div>
+                <Image
+                  src={weatherService.getWeatherIconUrl(dailyForecast.get(weatherPopup.date.toISOString().split('T')[0])!.icon)}
+                  alt={dailyForecast.get(weatherPopup.date.toISOString().split('T')[0])!.description}
+                  width={72}
+                  height={72}
+                  className="animate-bounce-slow"
+                  unoptimized
+                />
+              </div>
+              
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/50 dark:to-red-950/50 rounded-lg hover:scale-[1.02] transition-transform border border-orange-200 dark:border-orange-800">
+                  <div className="p-2 bg-gradient-to-br from-orange-400 to-red-500 rounded-lg shadow-lg">
+                    <span className="text-xl">🌡️</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground font-medium">Nhiệt độ</p>
+                    <p className="text-lg font-bold">
+                      {Math.round(dailyForecast.get(weatherPopup.date.toISOString().split('T')[0])!.tempMin)}° - {Math.round(dailyForecast.get(weatherPopup.date.toISOString().split('T')[0])!.tempMax)}°C
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="flex flex-col gap-2 p-3 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/50 dark:to-cyan-950/50 rounded-lg hover:scale-[1.02] transition-transform border border-blue-200 dark:border-blue-800">
+                    <div className="p-2 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg w-fit shadow-lg">
+                      <Droplets className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground font-medium">Độ ẩm</p>
+                      <p className="text-base font-bold">{dailyForecast.get(weatherPopup.date.toISOString().split('T')[0])!.humidity}%</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2 p-3 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/50 dark:to-emerald-950/50 rounded-lg hover:scale-[1.02] transition-transform border border-green-200 dark:border-green-800">
+                    <div className="p-2 bg-gradient-to-br from-green-400 to-emerald-600 rounded-lg w-fit shadow-lg">
+                      <Wind className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground font-medium">Gió</p>
+                      <p className="text-base font-bold">{dailyForecast.get(weatherPopup.date.toISOString().split('T')[0])!.windSpeed} m/s</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
