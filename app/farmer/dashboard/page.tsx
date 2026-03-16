@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
-import { Briefcase, Users, DollarSign, Clock, ChevronRight, Star, Cloud, Droplets, Wind, X } from "lucide-react"
+import { Briefcase, Users, DollarSign, Clock, ChevronRight, Star, Cloud, Droplets, Wind, X, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect, useRef } from "react"
 import { farmerService } from "@/libs/api/services/farmer.service"
@@ -61,12 +61,29 @@ export default function FarmerDashboard() {
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [profile, setProfile] = useState<FarmerProfile | null>(null)
   const [weatherPopup, setWeatherPopup] = useState<{ date: Date; position: { x: number; y: number } } | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const popupRef = useRef<HTMLDivElement>(null)
-  const { currentWeather, dailyForecast, loading: weatherLoading } = useWeather({
+  const { currentWeather, dailyForecast, loading: weatherLoading, refetch } = useWeather({
     city: 'Hanoi',
     country: 'VN',
     enableForecast: true,
   })
+
+  const handleRefreshWeather = async () => {
+    setIsRefreshing(true)
+    await refetch()
+    setLastUpdated(new Date())
+    setIsRefreshing(false)
+  }
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      handleRefreshWeather()
+    }, 10 * 60 * 1000)
+
+    return () => clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -190,8 +207,17 @@ export default function FarmerDashboard() {
 
         {/* Calendar Widget */}
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Lịch mùa vụ & Thời tiết</CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefreshWeather}
+              disabled={isRefreshing}
+              className="h-8 w-8 p-0"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
           </CardHeader>
           <CardContent>
             {/* Current Weather */}
@@ -207,6 +233,9 @@ export default function FarmerDashboard() {
                     </p>
                     <p className="text-xs text-muted-foreground capitalize animate-in fade-in slide-in-from-left-2 duration-300 delay-200">
                       {currentWeather.weather[0].description}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/70 mt-1">
+                      Cập nhật: {lastUpdated.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                   <div className="flex flex-col items-center animate-in fade-in slide-in-from-right-2 duration-500 delay-150">
