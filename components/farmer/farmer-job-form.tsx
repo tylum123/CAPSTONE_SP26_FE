@@ -1,116 +1,53 @@
 "use client"
 
-import { type KeyboardEvent, useMemo, useState } from "react"
+import { type KeyboardEvent, useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, BriefcaseBusiness, CalendarDays, CheckCheck, Coins, Info, Plus, TimerReset, Users, X } from "lucide-react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { ArrowLeft, CheckCheck, MapPinned, Plus, X } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Separator } from "@/components/ui/separator"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/libs/utils"
 
-type PaymentMode = "daily" | "contract"
-type ApprovedWorker = {
-  id: string
-  name: string
-  role: string
-  status: string
+type WorkScheduleType = "contract" | "daily"
+
+type OSMPlace = {
+  display_name: string
+  lat: string
+  lon: string
 }
 
-type SchedulePlaceholder = {
+type PostedJobPreview = {
   id: string
-  dateLabel: string
-  shortLabel: string
-  timeRange: string
-  area: string
-  workers: ApprovedWorker[]
-}
-
-const jobTypes = [
-  { value: "harvest", label: "Thu hoạch" },
-  { value: "planting", label: "Gieo trồng" },
-  { value: "soil", label: "Làm đất" },
-  { value: "care", label: "Chăm sóc cây" },
-  { value: "spray", label: "Phun thuốc" },
-  { value: "transport", label: "Vận chuyển" },
-  { value: "other", label: "Khác" },
-]
-
-const paymentModeOptions: Array<{
-  value: PaymentMode
+  createdAt: string
   title: string
-  description: string
-  helper: string
-}> = [
-  {
-    value: "daily",
-    title: "Tính công theo ngày",
-    description: "Phù hợp khi trả công theo số ngày làm và số người tham gia.",
-    helper: "Nhập đơn giá theo người/ngày. Hệ thống sẽ ước tính ngân sách theo số ngày làm việc.",
-  },
-  {
-    value: "contract",
-    title: "Khoán trọn công việc",
-    description: "Phù hợp khi chốt giá cho toàn bộ đầu việc hoặc một khối lượng cụ thể.",
-    helper: "Không tính lương theo giờ. Thời gian chỉ dùng để hẹn ca làm và theo dõi tiến độ.",
-  },
-]
+  income: number
+  workersNeeded: number
+  location: string
+  locationLat?: number
+  locationLng?: number
+  requirements: string[]
+  skills: string[]
+  benefits: string[]
+  scheduleType: WorkScheduleType
+  contractStartDate?: string
+  contractEndDate?: string
+  daysToHire?: number
+  dailyStartTime?: string
+  dailyEndTime?: string
+}
 
-const schedulePlaceholders: SchedulePlaceholder[] = [
-  {
-    id: "2026-03-18",
-    dateLabel: "Thứ Tư, 18/03/2026",
-    shortLabel: "18/03",
-    timeRange: "06:00 - 11:00",
-    area: "Lô xoài A3",
-    workers: [
-      { id: "w1", name: "Nguyễn Văn Phát", role: "Cắt cỏ", status: "Đã duyệt" },
-      { id: "w2", name: "Trần Thị Hồng", role: "Thu gom cành", status: "Đã duyệt" },
-      { id: "w3", name: "Lê Minh Tâm", role: "Bốc xếp", status: "Đã duyệt" },
-    ],
-  },
-  {
-    id: "2026-03-19",
-    dateLabel: "Thứ Năm, 19/03/2026",
-    shortLabel: "19/03",
-    timeRange: "06:30 - 15:30",
-    area: "Ruộng lúa khu B",
-    workers: [
-      { id: "w4", name: "Phạm Quốc Bảo", role: "Thu hoạch lúa", status: "Đã duyệt" },
-      { id: "w5", name: "Đỗ Thị Lan", role: "Đóng bao", status: "Đã duyệt" },
-    ],
-  },
-  {
-    id: "2026-03-21",
-    dateLabel: "Thứ Bảy, 21/03/2026",
-    shortLabel: "21/03",
-    timeRange: "07:00 - 16:00",
-    area: "Vườn bưởi phía sau kho",
-    workers: [
-      { id: "w6", name: "Võ Thanh Hà", role: "Bao trái", status: "Đã duyệt" },
-      { id: "w7", name: "Huỳnh Quốc Anh", role: "Phân loại trái", status: "Đã duyệt" },
-      { id: "w8", name: "Ngô Thị Yến", role: "Vận chuyển sọt", status: "Đã duyệt" },
-      { id: "w9", name: "Bùi Nhật Nam", role: "Hỗ trợ kiểm đếm", status: "Đã duyệt" },
-    ],
-  },
-  {
-    id: "2026-03-22",
-    dateLabel: "Chủ Nhật, 22/03/2026",
-    shortLabel: "22/03",
-    timeRange: "05:30 - 10:30",
-    area: "Nhà màng dưa lưới C1",
-    workers: [
-      { id: "w10", name: "Mai Khánh Vy", role: "Tỉa lá", status: "Đã duyệt" },
-      { id: "w11", name: "Tạ Văn Hậu", role: "Thu gom dây", status: "Đã duyệt" },
-    ],
-  },
+const SKILL_OPTIONS = [
+  "Thu hoạch",
+  "Gieo trồng",
+  "Làm đất",
+  "Tưới tiêu",
+  "Phun thuốc",
+  "Vận chuyển nông sản",
 ]
 
 const formatCurrency = (value: number) =>
@@ -120,85 +57,123 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value)
 
-export function FarmerJobForm() {
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>("daily")
-  const [selectedScheduleId, setSelectedScheduleId] = useState(schedulePlaceholders[0].id)
-  const [requirements, setRequirements] = useState<string[]>(["Có sức khỏe tốt"])
-  const [newRequirement, setNewRequirement] = useState("")
-  const [benefits, setBenefits] = useState<string[]>(["Bao ăn trưa"])
-  const [newBenefit, setNewBenefit] = useState("")
-  const [workersNeeded, setWorkersNeeded] = useState("5")
-  const [workDays, setWorkDays] = useState("1")
-  const [amount, setAmount] = useState("")
-  const [startTime, setStartTime] = useState("06:00")
-  const [endTime, setEndTime] = useState("17:00")
-
-  const paymentCopy = useMemo(
-    () =>
-      paymentMode === "daily"
-        ? {
-            amountLabel: "Đơn giá theo ngày (VNĐ/người/ngày) *",
-            amountPlaceholder: "Ví dụ: 280000",
-            amountHint: "Số tiền mỗi người nhận cho một ngày làm việc hoàn chỉnh.",
-            extraLabel: "Khối lượng công việc trong ngày",
-            extraPlaceholder: "Ví dụ: Cắt cỏ 2 sào, gom trái trong vườn, làm cỏ luống dưa...",
-            extraHint: "Mô tả để người lao động biết trong 1 ngày cần hoàn thành phần việc nào.",
-            summaryTitle: "Ước tính ngân sách theo ngày",
-            summaryFormula: "Đơn giá × số người × số ngày",
-          }
-        : {
-            amountLabel: "Tiền khoán trọn gói (VNĐ/công việc) *",
-            amountPlaceholder: "Ví dụ: 2500000",
-            amountHint: "Tổng tiền trả cho toàn bộ đầu việc hoặc gói việc đã mô tả.",
-            extraLabel: "Khối lượng khoán *",
-            extraPlaceholder: "Ví dụ: Thu hoạch 2 công lúa, đóng bao và chuyển ra điểm tập kết.",
-            extraHint: "Nêu rõ khối lượng hoặc đầu việc để worker biết tiêu chí hoàn thành.",
-            summaryTitle: "Ước tính ngân sách khoán",
-            summaryFormula: "Tiền khoán trọn gói cho cả công việc",
-          },
-    [paymentMode],
-  )
-
-  const { subtotal, fee, total } = useMemo(() => {
-    const parsedAmount = Number.parseInt(amount, 10) || 0
-    const parsedWorkers = Number.parseInt(workersNeeded, 10) || 0
-    const parsedDays = Number.parseInt(workDays, 10) || 0
-
-    const estimatedSubtotal = paymentMode === "daily" ? parsedAmount * parsedWorkers * parsedDays : parsedAmount
-    const estimatedFee = Math.round(estimatedSubtotal * 0.05)
-
-    return {
-      subtotal: estimatedSubtotal,
-      fee: estimatedFee,
-      total: estimatedSubtotal + estimatedFee,
-    }
-  }, [amount, paymentMode, workDays, workersNeeded])
-
-  const selectedSchedule = useMemo(
-    () => schedulePlaceholders.find((schedule) => schedule.id === selectedScheduleId) ?? schedulePlaceholders[0],
-    [selectedScheduleId],
-  )
-
-  const addRequirement = () => {
-    if (newRequirement.trim()) {
-      setRequirements([...requirements, newRequirement.trim()])
-      setNewRequirement("")
-    }
+const formatDateDDMMYYYY = (dateValue: string) => {
+  if (!dateValue) {
+    return ""
   }
 
-  const removeRequirement = (index: number) => {
-    setRequirements(requirements.filter((_, i) => i !== index))
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateValue)) {
+    return dateValue
+  }
+
+  const [year, month, day] = dateValue.split("-")
+
+  if (!year || !month || !day) {
+    return dateValue
+  }
+
+  return `${day}/${month}/${year}`
+}
+
+const parseDDMMYYYYToDate = (dateValue: string) => {
+  const normalized = dateValue.trim()
+  const match = normalized.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+
+  if (!match) {
+    return null
+  }
+
+  const [, dayStr, monthStr, yearStr] = match
+  const day = Number.parseInt(dayStr, 10)
+  const month = Number.parseInt(monthStr, 10)
+  const year = Number.parseInt(yearStr, 10)
+  const parsedDate = new Date(year, month - 1, day)
+
+  const isSameDate =
+    parsedDate.getFullYear() === year && parsedDate.getMonth() === month - 1 && parsedDate.getDate() === day
+
+  if (!isSameDate) {
+    return null
+  }
+
+  return parsedDate
+}
+
+const buildOSMEmbedUrl = (lat: number, lng: number) => {
+  const delta = 0.0035
+  const left = lng - delta
+  const right = lng + delta
+  const top = lat + delta
+  const bottom = lat - delta
+
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${left},${bottom},${right},${top}&layer=mapnik&marker=${lat},${lng}`
+}
+
+export function FarmerJobForm() {
+  const [step, setStep] = useState<1 | 2>(1)
+  const [title, setTitle] = useState("")
+  const [income, setIncome] = useState("")
+  const [workersNeeded, setWorkersNeeded] = useState("1")
+  const [location, setLocation] = useState("")
+  const [locationLat, setLocationLat] = useState<number | undefined>(undefined)
+  const [locationLng, setLocationLng] = useState<number | undefined>(undefined)
+
+  const [requirements, setRequirements] = useState<string[]>(["Có sức khỏe tốt"])
+  const [newRequirement, setNewRequirement] = useState("")
+
+  const [skills, setSkills] = useState<string[]>(["Thu hoạch"])
+
+  const [benefits, setBenefits] = useState<string[]>(["Bao ăn"])
+  const [newBenefit, setNewBenefit] = useState("")
+
+  const [scheduleType, setScheduleType] = useState<WorkScheduleType>("contract")
+  const [contractStartDate, setContractStartDate] = useState("")
+  const [contractEndDate, setContractEndDate] = useState("")
+
+  const [daysToHire, setDaysToHire] = useState("1")
+  const [dailyStartTime, setDailyStartTime] = useState("06:00")
+  const [dailyEndTime, setDailyEndTime] = useState("17:00")
+
+  const [locationSuggestions, setLocationSuggestions] = useState<OSMPlace[]>([])
+  const [isSearchingLocation, setIsSearchingLocation] = useState(false)
+
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [postedJob, setPostedJob] = useState<PostedJobPreview | null>(null)
+
+  const workersNeededNumber = Number.parseInt(workersNeeded, 10) || 0
+  const daysToHireNumber = Number.parseInt(daysToHire, 10) || 0
+  const incomeNumber = Number.parseInt(income, 10) || 0
+
+  const hasDailyRuleError = scheduleType === "daily" && workersNeededNumber < daysToHireNumber
+
+  const toggleSkill = (skillName: string) => {
+    setSkills((currentSkills) =>
+      currentSkills.includes(skillName)
+        ? currentSkills.filter((item) => item !== skillName)
+        : [...currentSkills, skillName],
+    )
+  }
+
+  const addRequirement = () => {
+    const value = newRequirement.trim()
+
+    if (!value) {
+      return
+    }
+
+    setRequirements((current) => [...current, value])
+    setNewRequirement("")
   }
 
   const addBenefit = () => {
-    if (newBenefit.trim()) {
-      setBenefits([...benefits, newBenefit.trim()])
-      setNewBenefit("")
-    }
-  }
+    const value = newBenefit.trim()
 
-  const removeBenefit = (index: number) => {
-    setBenefits(benefits.filter((_, i) => i !== index))
+    if (!value) {
+      return
+    }
+
+    setBenefits((current) => [...current, value])
+    setNewBenefit("")
   }
 
   const handleRequirementKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -215,13 +190,181 @@ export function FarmerJobForm() {
     }
   }
 
-  const getInitials = (name: string) =>
-    name
-      .split(" ")
-      .filter(Boolean)
-      .slice(-2)
-      .map((part) => part[0]?.toUpperCase())
-      .join("")
+  useEffect(() => {
+    const keyword = location.trim()
+
+    if (keyword.length < 3) {
+      setLocationSuggestions([])
+      setIsSearchingLocation(false)
+      return
+    }
+
+    const timer = window.setTimeout(async () => {
+      try {
+        setIsSearchingLocation(true)
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=vn&q=${encodeURIComponent(keyword)}`,
+          {
+            headers: {
+              "Accept-Language": "vi",
+            },
+          },
+        )
+
+        if (!response.ok) {
+          setLocationSuggestions([])
+          return
+        }
+
+        const places = (await response.json()) as OSMPlace[]
+        setLocationSuggestions(Array.isArray(places) ? places : [])
+      } catch {
+        setLocationSuggestions([])
+      } finally {
+        setIsSearchingLocation(false)
+      }
+    }, 350)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [location])
+
+  const selectOSMLocation = (place: OSMPlace) => {
+    const lat = Number.parseFloat(place.lat)
+    const lng = Number.parseFloat(place.lon)
+
+    setLocation(place.display_name)
+    setLocationSuggestions([])
+
+    if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+      setLocationLat(lat)
+      setLocationLng(lng)
+    }
+  }
+
+  const validateBeforePreview = () => {
+    if (!title.trim()) {
+      return "Vui lòng nhập tiêu đề công việc."
+    }
+
+    if (!incomeNumber || incomeNumber < 1) {
+      return "Vui lòng nhập thu nhập hợp lệ."
+    }
+
+    if (!workersNeededNumber || workersNeededNumber < 1) {
+      return "Số lượng nhân công cần phải lớn hơn 0."
+    }
+
+    if (!location.trim()) {
+      return "Vui lòng nhập địa điểm làm việc."
+    }
+
+    if (!requirements.length) {
+      return "Vui lòng thêm ít nhất 1 yêu cầu."
+    }
+
+    if (!skills.length) {
+      return "Vui lòng chọn ít nhất 1 kỹ năng kinh nghiệm."
+    }
+
+    if (!benefits.length) {
+      return "Vui lòng thêm ít nhất 1 quyền lợi."
+    }
+
+    if (scheduleType === "contract") {
+      if (!contractStartDate || !contractEndDate) {
+        return "Vui lòng chọn ngày bắt đầu và kết thúc cho công việc khoán."
+      }
+
+      const parsedStartDate = parseDDMMYYYYToDate(contractStartDate)
+      const parsedEndDate = parseDDMMYYYYToDate(contractEndDate)
+
+      if (!parsedStartDate || !parsedEndDate) {
+        return "Vui lòng nhập ngày theo định dạng dd/mm/yyyy."
+      }
+
+      if (parsedEndDate < parsedStartDate) {
+        return "Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu."
+      }
+    }
+
+    if (scheduleType === "daily") {
+      if (!daysToHireNumber || daysToHireNumber < 1) {
+        return "Vui lòng nhập số ngày muốn thuê hợp lệ."
+      }
+
+      if (!dailyStartTime || !dailyEndTime) {
+        return "Vui lòng nhập giờ làm việc theo ngày."
+      }
+
+      if (workersNeededNumber < daysToHireNumber) {
+        return "Số lượng nhân công luôn phải lớn hơn hoặc bằng số ngày muốn thuê."
+      }
+    }
+
+    return null
+  }
+
+  const goToPreview = () => {
+    const validationError = validateBeforePreview()
+
+    if (validationError) {
+      setSubmitError(validationError)
+      return
+    }
+
+    setSubmitError(null)
+    setStep(2)
+  }
+
+  const postFakeJob = () => {
+    const payload: PostedJobPreview = {
+      id: `JOB-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      title: title.trim(),
+      income: incomeNumber,
+      workersNeeded: workersNeededNumber,
+      location: location.trim(),
+      locationLat,
+      locationLng,
+      requirements,
+      skills,
+      benefits,
+      scheduleType,
+      contractStartDate: scheduleType === "contract" ? contractStartDate : undefined,
+      contractEndDate: scheduleType === "contract" ? contractEndDate : undefined,
+      daysToHire: scheduleType === "daily" ? daysToHireNumber : undefined,
+      dailyStartTime: scheduleType === "daily" ? dailyStartTime : undefined,
+      dailyEndTime: scheduleType === "daily" ? dailyEndTime : undefined,
+    }
+
+    setPostedJob(payload)
+    setSubmitError(null)
+  }
+
+  const resetAll = () => {
+    setStep(1)
+    setTitle("")
+    setIncome("")
+    setWorkersNeeded("1")
+    setLocation("")
+    setLocationLat(undefined)
+    setLocationLng(undefined)
+    setRequirements(["Có sức khỏe tốt"])
+    setNewRequirement("")
+    setSkills(["Thu hoạch"])
+    setBenefits(["Bao ăn"])
+    setNewBenefit("")
+    setScheduleType("contract")
+    setContractStartDate("")
+    setContractEndDate("")
+    setDaysToHire("1")
+    setDailyStartTime("06:00")
+    setDailyEndTime("17:00")
+    setSubmitError(null)
+    setPostedJob(null)
+  }
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -232,355 +375,465 @@ export function FarmerJobForm() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Đăng tin tuyển worker</h1>
-          <p className="text-muted-foreground">Chọn cách trả công trước, sau đó điền thông tin công việc và lịch làm.</p>
+          <h1 className="text-2xl font-bold text-foreground">Đăng tin công việc</h1>
+          <p className="text-muted-foreground">
+            Bước {step}/2: {step === 1 ? "Điền thông tin" : "Xem sơ lược trước khi đăng"}
+          </p>
         </div>
       </div>
 
-      <div className="flex flex-col gap-6">
-        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-background">
+      {postedJob ? (
+        <Card className="border-primary/30 bg-primary/5">
           <CardHeader>
-            <div className="flex flex-wrap items-center gap-2">
-            </div>
-            <CardTitle>Chọn hình thức tính lương</CardTitle>
-            <CardDescription>
-              Nông dân chọn trả công theo ngày hoặc theo khoán trước để hệ thống hiển thị đúng trường thông tin và cách
-              tính ngân sách.
-            </CardDescription>
+            <CardTitle className="flex items-center gap-2 text-primary">
+              <CheckCheck className="h-5 w-5" />
+              Đăng bài thành công (fake data)
+            </CardTitle>
+            <CardDescription>Tin đã được tạo phía client, chưa gọi backend.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <RadioGroup
-              value={paymentMode}
-              onValueChange={(value) => setPaymentMode(value as PaymentMode)}
-              className="grid gap-4 md:grid-cols-2"
-            >
-              {paymentModeOptions.map((option) => {
-                const isSelected = paymentMode === option.value
+            <div className="rounded-lg border bg-background p-4 text-sm">
+              <p>
+                <span className="font-medium">Mã tin:</span> {postedJob.id}
+              </p>
+              <p>
+                <span className="font-medium">Tiêu đề:</span> {postedJob.title}
+              </p>
+              <p>
+                <span className="font-medium">Thu nhập:</span> {formatCurrency(postedJob.income)}
+              </p>
+              <p>
+                <span className="font-medium">Địa điểm:</span> {postedJob.location}
+              </p>
+            </div>
 
-                return (
-                  <label
-                    key={option.value}
-                    htmlFor={`payment-mode-${option.value}`}
-                    className={cn(
-                      "flex cursor-pointer rounded-2xl border p-4 transition-all",
-                      isSelected
-                        ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/20"
-                        : "border-border hover:border-primary/40 hover:bg-muted/40",
+            <div className="flex gap-3">
+              <Button type="button" onClick={resetAll}>
+                Đăng tin mới
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href="/farmer/jobs">Về danh sách công việc</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-6">
+          {step === 1 ? (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Thông tin chính</CardTitle>
+                  <CardDescription>Tiêu đề, thu nhập, số lượng nhân công và địa điểm.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4">
+                  <div>
+                    <Label htmlFor="job-title">Tiêu đề (tên công việc) *</Label>
+                    <Input
+                      id="job-title"
+                      value={title}
+                      onChange={(event) => setTitle(event.target.value)}
+                      placeholder="VD: Thu hoạch dưa lưới nhà màng C1"
+                      className="mt-2"
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <Label htmlFor="income">Thu nhập (VNĐ) *</Label>
+                      <Input
+                        id="income"
+                        type="number"
+                        min="0"
+                        value={income}
+                        onChange={(event) => setIncome(event.target.value)}
+                        placeholder="Ví dụ: 300000"
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="workers-needed">Số lượng nhân công cần *</Label>
+                      <Input
+                        id="workers-needed"
+                        type="number"
+                        min="1"
+                        value={workersNeeded}
+                        onChange={(event) => setWorkersNeeded(event.target.value)}
+                        className="mt-2"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="location">Địa điểm (OpenStreetMap) *</Label>
+                    <Input
+                      id="location"
+                      value={location}
+                      onChange={(event) => {
+                        setLocation(event.target.value)
+                        setLocationLat(undefined)
+                        setLocationLng(undefined)
+                      }}
+                      placeholder="Nhập địa điểm"
+                      className="mt-2"
+                    />
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Nhập ít nhất 3 ký tự để hiển thị gợi ý địa điểm.
+                    </p>
+
+                    {(isSearchingLocation || locationSuggestions.length > 0) && (
+                      <div className="mt-2 rounded-md border bg-background p-2">
+                        {isSearchingLocation ? (
+                          <p className="text-sm text-muted-foreground">Đang tìm địa điểm...</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {locationSuggestions.map((place) => (
+                              <button
+                                key={`${place.lat}-${place.lon}-${place.display_name}`}
+                                type="button"
+                                onClick={() => selectOSMLocation(place)}
+                                className="w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+                              >
+                                {place.display_name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
+                  </div>
+
+                  <div className="overflow-hidden rounded-xl border">
+                    <div className="flex items-center gap-2 border-b bg-muted/30 p-3 text-sm text-muted-foreground">
+                      <MapPinned className="h-4 w-4" />
+                      Xem nhanh vị trí
+                    </div>
+                    {locationLat != null && locationLng != null ? (
+                      <iframe
+                        title="OpenStreetMap preview"
+                        src={buildOSMEmbedUrl(locationLat, locationLng)}
+                        className="h-70 w-full"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex h-70 items-center justify-center p-4 text-center text-sm text-muted-foreground">
+                        Chọn một địa điểm từ gợi ý để hiển thị bản đồ.
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Yêu cầu</CardTitle>
+                  <CardDescription>
+                    Farmer có thể tự thêm yêu cầu (dụng cụ, độ tuổi, giới tính, điều kiện khác...).
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    {requirements.map((item, index) => (
+                      <Badge key={`${item}-${index}`} variant="secondary" className="gap-1">
+                        {item}
+                        <button
+                          type="button"
+                          onClick={() => setRequirements((current) => current.filter((_, i) => i !== index))}
+                          className="ml-1 rounded-full hover:text-destructive"
+                          aria-label={`Xóa yêu cầu ${item}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={newRequirement}
+                      onChange={(event) => setNewRequirement(event.target.value)}
+                      onKeyDown={handleRequirementKeyDown}
+                      placeholder="Thêm yêu cầu mới..."
+                    />
+                    <Button type="button" variant="outline" onClick={addRequirement}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Kinh nghiệm</CardTitle>
+                  <CardDescription>Chọn skill cần thiết (đang dùng danh sách hardcode tạm thời).</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-3 sm:grid-cols-2">
+                  {SKILL_OPTIONS.map((skillName) => {
+                    const isSelected = skills.includes(skillName)
+
+                    return (
+                      <label
+                        key={skillName}
+                        htmlFor={`skill-${skillName}`}
+                        className={cn(
+                          "flex cursor-pointer items-center gap-3 rounded-lg border p-3",
+                          isSelected ? "border-primary bg-primary/5" : "border-border",
+                        )}
+                      >
+                        <Checkbox
+                          id={`skill-${skillName}`}
+                          checked={isSelected}
+                          onCheckedChange={() => toggleSkill(skillName)}
+                        />
+                        <span>{skillName}</span>
+                      </label>
+                    )
+                  })}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quyền lợi</CardTitle>
+                  <CardDescription>Farmer có thể tự thêm quyền lợi (bao ăn, nghỉ 15 phút, hỗ trợ đi lại...).</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    {benefits.map((item, index) => (
+                      <Badge key={`${item}-${index}`} variant="secondary" className="gap-1">
+                        {item}
+                        <button
+                          type="button"
+                          onClick={() => setBenefits((current) => current.filter((_, i) => i !== index))}
+                          className="ml-1 rounded-full hover:text-destructive"
+                          aria-label={`Xóa quyền lợi ${item}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={newBenefit}
+                      onChange={(event) => setNewBenefit(event.target.value)}
+                      onKeyDown={handleBenefitKeyDown}
+                      placeholder="Thêm quyền lợi mới..."
+                    />
+                    <Button type="button" variant="outline" onClick={addBenefit}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Thời gian làm việc</CardTitle>
+                  <CardDescription>Chọn theo khoán hoặc theo ngày theo đúng quy tắc bạn mô tả.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <RadioGroup
+                    value={scheduleType}
+                    onValueChange={(value) => setScheduleType(value as WorkScheduleType)}
+                    className="grid gap-3 sm:grid-cols-2"
                   >
-                    <div className="flex items-start gap-3">
-                      <RadioGroupItem id={`payment-mode-${option.value}`} value={option.value} className="mt-1" />
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          {option.value === "daily" ? (
-                            <TimerReset className="h-4 w-4 text-primary" />
-                          ) : (
-                            <BriefcaseBusiness className="h-4 w-4 text-primary" />
-                          )}
-                          <p className="font-semibold text-foreground">{option.title}</p>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{option.description}</p>
-                        <p className="text-sm text-foreground/80">{option.helper}</p>
+                    <label
+                      htmlFor="schedule-contract"
+                      className={cn(
+                        "flex cursor-pointer items-start gap-3 rounded-lg border p-3",
+                        scheduleType === "contract" ? "border-primary bg-primary/5" : "border-border",
+                      )}
+                    >
+                      <RadioGroupItem id="schedule-contract" value="contract" className="mt-1" />
+                      <div>
+                        <p className="font-medium">Theo khoán</p>
+                        <p className="text-sm text-muted-foreground">Chọn ngày bắt đầu và ngày kết thúc.</p>
+                      </div>
+                    </label>
+
+                    <label
+                      htmlFor="schedule-daily"
+                      className={cn(
+                        "flex cursor-pointer items-start gap-3 rounded-lg border p-3",
+                        scheduleType === "daily" ? "border-primary bg-primary/5" : "border-border",
+                      )}
+                    >
+                      <RadioGroupItem id="schedule-daily" value="daily" className="mt-1" />
+                      <div>
+                        <p className="font-medium">Theo ngày</p>
+                        <p className="text-sm text-muted-foreground">Có số ngày muốn thuê và khung giờ cố định.</p>
+                      </div>
+                    </label>
+                  </RadioGroup>
+
+                  {scheduleType === "contract" ? (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <Label htmlFor="contract-start">Ngày bắt đầu *</Label>
+                        <Input
+                          id="contract-start"
+                          type="text"
+                          value={contractStartDate}
+                          onChange={(event) => setContractStartDate(event.target.value)}
+                          placeholder="dd/mm/yyyy"
+                          className="mt-2"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="contract-end">Ngày kết thúc *</Label>
+                        <Input
+                          id="contract-end"
+                          type="text"
+                          value={contractEndDate}
+                          onChange={(event) => setContractEndDate(event.target.value)}
+                          placeholder="dd/mm/yyyy"
+                          className="mt-2"
+                        />
                       </div>
                     </div>
-                  </label>
-                )
-              })}
-            </RadioGroup>
-          </CardContent>
-        </Card>
+                  ) : (
+                    <div className="space-y-4 rounded-lg border p-4">
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <div>
+                          <Label htmlFor="days-to-hire">Số ngày muốn thuê *</Label>
+                          <Input
+                            id="days-to-hire"
+                            type="number"
+                            min="1"
+                            value={daysToHire}
+                            onChange={(event) => setDaysToHire(event.target.value)}
+                            className="mt-2"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="daily-start">Từ mấy giờ *</Label>
+                          <Input
+                            id="daily-start"
+                            type="time"
+                            value={dailyStartTime}
+                            onChange={(event) => setDailyStartTime(event.target.value)}
+                            className="mt-2"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="daily-end">Đến mấy giờ *</Label>
+                          <Input
+                            id="daily-end"
+                            type="time"
+                            value={dailyEndTime}
+                            onChange={(event) => setDailyEndTime(event.target.value)}
+                            className="mt-2"
+                          />
+                        </div>
+                      </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Thông tin cơ bản</CardTitle>
-            <CardDescription>Mô tả đầu việc mà worker sẽ thực hiện.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            <div>
-              <Label htmlFor="title">Tiêu đề công việc *</Label>
-              <Input
-                id="title"
-                placeholder={paymentMode === "daily" ? "VD: Cắt cỏ vườn xoài 2 ngày" : "VD: Khoán thu hoạch 2 công lúa"}
-                className="mt-2"
-              />
-            </div>
+                      {hasDailyRuleError ? (
+                        <p className="text-sm font-medium text-destructive">
+                          Số lượng nhân công luôn phải lớn hơn hoặc bằng số ngày muốn thuê.
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
-            <div>
-              <Label htmlFor="type">Loại công việc *</Label>
-              <Select>
-                <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Chọn loại công việc" />
-                </SelectTrigger>
-                <SelectContent>
-                  {jobTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              {submitError ? <p className="text-sm font-medium text-destructive">{submitError}</p> : null}
 
-            <div>
-              <Label htmlFor="description">Mô tả chi tiết *</Label>
-              <Textarea
-                id="description"
-                placeholder="Mô tả rõ công việc, khu vực làm, lưu ý an toàn, cách nghiệm thu..."
-                className="mt-2 min-h-[120px]"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Lịch làm việc & địa điểm</CardTitle>
-            <CardDescription>
-              Chỉ dùng để hẹn lịch làm việc. Hệ thống không dùng số giờ để tính lương cho tin tuyển này.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            <div>
-              <Label htmlFor="location">Địa điểm làm việc *</Label>
-              <Input id="location" placeholder="VD: Ấp 3, Xã Mỹ Khánh, Cần Thơ" className="mt-2" />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="startDate">Ngày làm việc đầu tiên *</Label>
-                <Input id="startDate" type="date" className="mt-2" />
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <Button variant="outline" asChild>
+                  <Link href="/farmer/jobs">Hủy</Link>
+                </Button>
+                <Button type="button" onClick={goToPreview}>
+                  Tiếp tục
+                </Button>
               </div>
-              <div>
-                <Label htmlFor="workDays">Số ngày làm dự kiến *</Label>
-                <Input
-                  id="workDays"
-                  type="number"
-                  min="1"
-                  value={workDays}
-                  onChange={(event) => setWorkDays(event.target.value)}
-                  className="mt-2"
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="startTime">Làm từ mấy giờ</Label>
-                <Input
-                  id="startTime"
-                  type="time"
-                  value={startTime}
-                  onChange={(event) => setStartTime(event.target.value)}
-                  className="mt-2"
-                />
-              </div>
-              <div>
-                <Label htmlFor="endTime">Đến mấy giờ</Label>
-                <Input
-                  id="endTime"
-                  type="time"
-                  value={endTime}
-                  onChange={(event) => setEndTime(event.target.value)}
-                  className="mt-2"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Mức lương & ngân sách</CardTitle>
-            <CardDescription>
-              {paymentMode === "daily"
-                ? "Thiết lập đơn giá theo ngày rồi nhập số người để hệ thống ước tính chi phí."
-                : "Thiết lập tiền khoán trọn gói cho toàn bộ đầu việc, không nhân theo giờ làm."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-            <div className="grid gap-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="slots">Số worker cần tuyển *</Label>
-                  <Input
-                    id="slots"
-                    type="number"
-                    min="1"
-                    value={workersNeeded}
-                    onChange={(event) => setWorkersNeeded(event.target.value)}
-                    placeholder="5"
-                    className="mt-2"
-                  />
+            </>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Sơ lược tin sẽ đăng</CardTitle>
+                <CardDescription>Kiểm tra lại thông tin trước khi tiến hành đăng bài.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="grid gap-4 rounded-lg border p-4 text-sm sm:grid-cols-2">
+                  <p>
+                    <span className="font-medium">Tiêu đề:</span> {title}
+                  </p>
+                  <p>
+                    <span className="font-medium">Thu nhập:</span> {formatCurrency(incomeNumber)}
+                  </p>
+                  <p>
+                    <span className="font-medium">Số nhân công cần:</span> {workersNeededNumber}
+                  </p>
+                  <p>
+                    <span className="font-medium">Địa điểm:</span> {location}
+                  </p>
                 </div>
+
                 <div>
-                  <Label htmlFor="amount">{paymentCopy.amountLabel}</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    min="0"
-                    value={amount}
-                    onChange={(event) => setAmount(event.target.value)}
-                    placeholder={paymentCopy.amountPlaceholder}
-                    className="mt-2"
-                  />
-                  <p className="mt-2 text-sm text-muted-foreground">{paymentCopy.amountHint}</p>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="scope">{paymentCopy.extraLabel}</Label>
-                <Textarea
-                  id="scope"
-                  placeholder={paymentCopy.extraPlaceholder}
-                  className="mt-2 min-h-[110px]"
-                />
-                <p className="mt-2 text-sm text-muted-foreground">{paymentCopy.extraHint}</p>
-              </div>
-
-              <div className="rounded-lg bg-primary/5 p-4">
-                <div className="flex items-start gap-2">
-                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <div className="text-sm">
-                    <p className="font-medium text-card-foreground">Phí dịch vụ & giữ tiền</p>
-                    <p className="text-muted-foreground">
-                      Hệ thống thu phí 5% trên tổng giá trị đăng tin. Khoản tiền này được giữ trong escrow và chỉ giải ngân
-                      cho worker khi công việc đã hoàn thành theo thỏa thuận.
-                    </p>
+                  <p className="mb-2 text-sm font-medium">Yêu cầu</p>
+                  <div className="flex flex-wrap gap-2">
+                    {requirements.map((item, index) => (
+                      <Badge key={`${item}-${index}`} variant="secondary">
+                        {item}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="rounded-2xl border bg-muted/30 p-5">
-              <p className="text-sm font-medium text-muted-foreground">{paymentCopy.summaryTitle}</p>
-              <div className="mt-4 space-y-3">
-                <div className="flex items-center justify-between gap-4 text-sm">
-                  <span className="text-muted-foreground">Cách tính</span>
-                  <span className="text-right font-medium text-foreground">{paymentCopy.summaryFormula}</span>
+                <div>
+                  <p className="mb-2 text-sm font-medium">Kinh nghiệm</p>
+                  <div className="flex flex-wrap gap-2">
+                    {skills.map((item) => (
+                      <Badge key={item} variant="outline">
+                        {item}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex items-center justify-between gap-4 text-sm">
-                  <span className="text-muted-foreground">Tạm tính công trả worker</span>
-                  <span className="font-semibold text-foreground">{formatCurrency(subtotal)}</span>
+
+                <div>
+                  <p className="mb-2 text-sm font-medium">Quyền lợi</p>
+                  <div className="flex flex-wrap gap-2">
+                    {benefits.map((item, index) => (
+                      <Badge key={`${item}-${index}`} variant="secondary">
+                        {item}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex items-center justify-between gap-4 text-sm">
-                  <span className="text-muted-foreground">Phí nền tảng (5%)</span>
-                  <span className="font-semibold text-foreground">{formatCurrency(fee)}</span>
+
+                <div className="rounded-lg border p-4 text-sm">
+                  <p className="font-medium">Thời gian làm việc</p>
+                  {scheduleType === "contract" ? (
+                    <p className="mt-2 text-muted-foreground">
+                      Theo khoán từ {formatDateDDMMYYYY(contractStartDate)} đến {formatDateDDMMYYYY(contractEndDate)}.
+                    </p>
+                  ) : (
+                    <div className="mt-2 space-y-1 text-muted-foreground">
+                      <p>Theo ngày, thuê {daysToHireNumber} ngày.</p>
+                      <p>
+                        Khung giờ cố định: {dailyStartTime} - {dailyEndTime}
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <div className="h-px bg-border" />
-                <div className="flex items-center justify-between gap-4">
-                  <span className="font-medium text-foreground">Tổng ngân sách cần chuẩn bị</span>
-                  <span className="text-lg font-bold text-primary">{formatCurrency(total)}</span>
+
+                {submitError ? <p className="text-sm font-medium text-destructive">{submitError}</p> : null}
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <Button type="button" variant="outline" onClick={() => setStep(1)}>
+                    Quay lại chỉnh sửa
+                  </Button>
+                  <Button type="button" onClick={postFakeJob}>
+                    Xác nhận đăng bài
+                  </Button>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {paymentMode === "daily"
-                    ? "Ngân sách tăng theo số worker và số ngày làm dự kiến."
-                    : "Ngân sách khoán là số tiền trọn gói cho cả đầu việc, dù thời gian làm kéo dài nhiều ngày."}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Yêu cầu công việc</CardTitle>
-            <CardDescription>Các tiêu chí giúp lọc đúng worker phù hợp.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="flex flex-wrap gap-2">
-              {requirements.map((req, index) => (
-                <Badge key={index} variant="secondary" className="gap-1">
-                  {req}
-                  <button
-                    type="button"
-                    onClick={() => removeRequirement(index)}
-                    className="ml-1 rounded-full hover:text-destructive"
-                    aria-label={`Xóa yêu cầu ${req}`}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Thêm yêu cầu mới..."
-                value={newRequirement}
-                onChange={(event) => setNewRequirement(event.target.value)}
-                onKeyDown={handleRequirementKeyDown}
-              />
-              <Button type="button" variant="outline" onClick={addRequirement}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Quyền lợi</CardTitle>
-            <CardDescription>Các hỗ trợ thêm để tin tuyển hấp dẫn hơn.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="flex flex-wrap gap-2">
-              {benefits.map((benefit, index) => (
-                <Badge key={index} variant="secondary" className="gap-1">
-                  {benefit}
-                  <button
-                    type="button"
-                    onClick={() => removeBenefit(index)}
-                    className="ml-1 rounded-full hover:text-destructive"
-                    aria-label={`Xóa quyền lợi ${benefit}`}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Thêm quyền lợi mới..."
-                value={newBenefit}
-                onChange={(event) => setNewBenefit(event.target.value)}
-                onKeyDown={handleBenefitKeyDown}
-              />
-              <Button type="button" variant="outline" onClick={addBenefit}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Tùy chọn khác</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="flex items-center gap-2">
-              <Checkbox id="urgent" />
-              <Label htmlFor="urgent" className="font-normal">
-                Đánh dấu là công việc <span className="font-medium text-destructive">GẤP</span>
-              </Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox id="tools" />
-              <Label htmlFor="tools" className="font-normal">
-                Nông trại cung cấp dụng cụ làm việc
-              </Label>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-          <Button variant="outline" asChild>
-            <Link href="/farmer/jobs">Hủy bỏ</Link>
-          </Button>
-          <Button variant="secondary" type="button">
-            Lưu nháp
-          </Button>
-          <Button type="button">Đăng tin tuyển dụng</Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
-      </div>
+      )}
     </div>
   )
 }
