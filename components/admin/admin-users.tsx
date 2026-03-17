@@ -27,6 +27,12 @@ import type { GetUserResponse } from "@/libs/api/types"
 import { useToast } from "@/hooks/use-toast"
 import { handleApiError } from "@/lib/utils/error-handler"
 
+type UserWithRoleMetadata = GetUserResponse & {
+  roleId?: number | string
+  roleName?: string
+  role?: string | { name?: string; roleName?: string }
+}
+
 export function AdminUsers() {
   const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
@@ -65,11 +71,46 @@ export function AdminUsers() {
     loadUsers()
   }, [toast])
 
-  const getRoleLabel = (role: string) => {
+  const getNormalizedRole = (user: GetUserResponse): "farmer" | "worker" | "admin" | "unknown" => {
+    const currentUser = user as UserWithRoleMetadata
+    const roleValue =
+      typeof currentUser.role === "string"
+        ? currentUser.role
+        : currentUser.role?.name || currentUser.role?.roleName || currentUser.roleName || ""
+    const normalized = roleValue.trim().toLowerCase()
+    const roleId = Number(currentUser.roleId)
+
+    if (normalized === "farmer" || normalized.includes("farmer") || normalized.includes("nông")) {
+      return "farmer"
+    }
+
+    if (normalized === "worker" || normalized.includes("worker") || normalized.includes("lao")) {
+      return "worker"
+    }
+
+    if (normalized === "admin" || normalized.includes("admin")) {
+      return "admin"
+    }
+
+    if (roleId === 2) return "farmer"
+    if (roleId === 3) return "worker"
+    if (roleId === 1) return "admin"
+
+    return "unknown"
+  }
+
+  const getRoleLabel = (user: GetUserResponse) => {
+    const role = getNormalizedRole(user)
     if (role === "farmer") return "Nông dân"
     if (role === "worker") return "Người lao động"
     if (role === "admin") return "Quản trị"
-    return role
+
+    const currentUser = user as UserWithRoleMetadata
+    if (typeof currentUser.role === "string" && currentUser.role.trim()) {
+      return currentUser.role
+    }
+
+    return "Chưa xác định"
   }
 
   const getDisplayName = (user: GetUserResponse) => {
@@ -184,8 +225,8 @@ export function AdminUsers() {
       user.email.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesTab =
       activeTab === "all" ||
-      (activeTab === "farmers" && user.role === "farmer") ||
-      (activeTab === "workers" && user.role === "worker") ||
+      (activeTab === "farmers" && getNormalizedRole(user) === "farmer") ||
+      (activeTab === "workers" && getNormalizedRole(user) === "worker") ||
       (activeTab === "suspended" && !user.isActive)
     return matchesSearch && matchesTab
   })
@@ -193,8 +234,8 @@ export function AdminUsers() {
   const userStats = useMemo(() => {
     return {
       total: users.length,
-      farmers: users.filter((user) => user.role === "farmer").length,
-      workers: users.filter((user) => user.role === "worker").length,
+      farmers: users.filter((user) => getNormalizedRole(user) === "farmer").length,
+      workers: users.filter((user) => getNormalizedRole(user) === "worker").length,
       suspended: users.filter((user) => !user.isActive).length,
     }
   }, [users])
@@ -359,7 +400,7 @@ export function AdminUsers() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{getRoleLabel(user.role)}</Badge>
+                    <Badge variant="outline">{getRoleLabel(user)}</Badge>
                   </TableCell>
                   <TableCell>{getStatusBadge(user)}</TableCell>
                   <TableCell>
