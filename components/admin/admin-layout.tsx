@@ -3,7 +3,9 @@
 import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { authService } from "@/libs/api"
+import { useAuth } from "@/stores/auth.store"
 import {
   LayoutDashboard,
   Users,
@@ -39,17 +41,28 @@ interface AdminLayoutProps {
 
 export function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { logout } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const navItems = [
+  const handleLogout = async () => {
+    try {
+      await authService.logout()
+    } catch {
+      // ignore API errors — still clear local state
+    } finally {
+      logout()
+      router.push("/auth/login")
+    }
+  }
+
+  const navItems: { icon: React.ElementType; label: string; href: string; badge?: number }[] = [
     { icon: LayoutDashboard, label: "Tổng quan", href: "/admin" },
     { icon: Users, label: "Người dùng", href: "/admin/users" },
     { icon: Briefcase, label: "Công việc", href: "/admin/jobs" },
-    { icon: AlertTriangle, label: "Khiếu nại", href: "/admin/disputes", badge: 5 },
+    { icon: AlertTriangle, label: "Khiếu nại", href: "/admin/disputes" },
     { icon: Banknote, label: "Tài chính", href: "/admin/finance" },
-    { icon: Shield, label: "Xác minh", href: "/admin/verification", badge: 8 },
-    { icon: BarChart3, label: "Báo cáo", href: "/admin/reports" },
-    { icon: Settings, label: "Cài đặt", href: "/admin/settings" },
+    { icon: Shield, label: "Xác minh", href: "/admin/verification" },
   ]
 
   return (
@@ -192,10 +205,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                     Cài đặt
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-destructive">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Đăng xuất
-                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
+                                      <span className="flex items-center">
+                                        <LogOut className="h-4 w-4 mr-2" />
+                                        Đăng xuất
+                                      </span>
+                                    </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

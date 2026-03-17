@@ -27,7 +27,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { FarmerProfile, farmerService } from "@/libs/api";
+import { FarmerProfile, farmerService, authService } from "@/libs/api"
 import { useAuth } from "@/stores/auth.store";
 import { AnimatedBubbles } from "@/components/farmer/animated-bubbles";
 
@@ -71,10 +71,15 @@ export default function FarmerLayout({
       }
     }, [isAuthenticated])
 
-  const handleLogout = () => {
-    logout();
-    localStorage.clear();
-    router.push("/auth/login");
+  const handleLogout = async () => {
+    try {
+      await authService.logout()
+    } catch {
+      // ignore API errors — still clear local state
+    } finally {
+      logout()
+      router.push("/auth/login")
+    }
   };
 
   // Show loading state while checking authentication
