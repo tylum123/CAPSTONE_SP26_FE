@@ -144,7 +144,7 @@ export function AdminDisputes() {
         )
       case "resolved":
         return (
-          <Badge className="bg-primary/10 text-primary">
+          <Badge className="bg-agro-green/10 text-agro-green">
             <CheckCircle className="mr-1 h-3 w-3" />
             Đã giải quyết
           </Badge>
@@ -179,19 +179,19 @@ export function AdminDisputes() {
       <div className="grid gap-4 sm:grid-cols-4">
         <Card>
           <CardContent className="p-4">
-            <p className="text-2xl font-bold text-destructive">5</p>
+            <p className="text-2xl font-bold text-agro-orange">5</p>
             <p className="text-sm text-muted-foreground">Chờ xử lý</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-2xl font-bold text-accent-foreground">3</p>
+            <p className="text-2xl font-bold text-agro-green-dark">3</p>
             <p className="text-sm text-muted-foreground">Đang điều tra</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-2xl font-bold text-primary">127</p>
+            <p className="text-2xl font-bold text-agro-green">127</p>
             <p className="text-sm text-muted-foreground">Đã giải quyết</p>
           </CardContent>
         </Card>
@@ -242,7 +242,7 @@ export function AdminDisputes() {
                       <span className="text-muted-foreground">Công việc:</span>{" "}
                       <span className="font-medium">{dispute.job}</span>
                       <span className="text-muted-foreground"> • Giá trị:</span>{" "}
-                      <span className="font-medium text-primary">{dispute.amount.toLocaleString()}đ</span>
+                      <span className="font-medium text-agro-green">{dispute.amount.toLocaleString()}đ</span>
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -307,19 +307,19 @@ export function AdminDisputes() {
                                 <Label>Ghi chú xử lý</Label>
                                 <Textarea placeholder="Nhập ghi chú về quyết định..." className="mt-2" />
                               </div>
-                              <Button>Xác nhận xử lý</Button>
+                              <Button className="bg-agro-green text-white hover:bg-agro-green-dark">Xác nhận xử lý</Button>
                             </>
                           )}
                           {dispute.resolution && (
-                            <div className="rounded-lg bg-primary/5 p-4">
-                              <p className="text-sm font-medium text-primary">Đã giải quyết</p>
+                            <div className="rounded-lg bg-agro-green/10 p-4">
+                              <p className="text-sm font-medium text-agro-green">Đã giải quyết</p>
                               <p className="mt-1 text-sm text-muted-foreground">{dispute.resolution}</p>
                             </div>
                           )}
                         </div>
                       </DialogContent>
                     </Dialog>
-                    <Button size="sm">
+                    <Button size="sm" className="bg-agro-green text-white hover:bg-agro-green-dark">
                       <MessageSquare className="mr-2 h-4 w-4" />
                       Liên hệ
                     </Button>

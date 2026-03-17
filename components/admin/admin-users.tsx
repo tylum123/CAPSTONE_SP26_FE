@@ -100,7 +100,7 @@ export function AdminUsers() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
-        return <Badge className="bg-primary/10 text-primary">Hoạt động</Badge>
+        return <Badge className="bg-agro-green/10 text-agro-green">Hoạt động</Badge>
       case "pending":
         return <Badge variant="secondary">Chờ duyệt</Badge>
       case "suspended":
@@ -135,7 +135,7 @@ export function AdminUsers() {
             <Download className="mr-2 h-4 w-4" />
             Xuất Excel
           </Button>
-          <Button>
+          <Button className="bg-agro-green text-white hover:bg-agro-green-dark">
             <UserPlus className="mr-2 h-4 w-4" />
             Thêm người dùng
           </Button>
@@ -146,7 +146,7 @@ export function AdminUsers() {
       <div className="grid gap-4 sm:grid-cols-4">
         <Card>
           <CardContent className="p-4">
-            <p className="text-2xl font-bold text-primary">15,234</p>
+            <p className="text-2xl font-bold text-agro-green">15,234</p>
             <p className="text-sm text-muted-foreground">Tổng người dùng</p>
           </CardContent>
         </Card>
@@ -164,7 +164,7 @@ export function AdminUsers() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-2xl font-bold text-destructive">45</p>
+            <p className="text-2xl font-bold text-agro-orange">45</p>
             <p className="text-sm text-muted-foreground">Bị khóa</p>
           </CardContent>
         </Card>
@@ -255,7 +255,7 @@ export function AdminUsers() {
                   <TableCell>{getStatusBadge(user.status)}</TableCell>
                   <TableCell>
                     {user.verified ? (
-                      <Badge className="bg-primary/10 text-primary">
+                      <Badge className="bg-agro-green/10 text-agro-green">
                         <Shield className="mr-1 h-3 w-3" />
                         Đã xác minh
                       </Badge>
@@ -296,7 +296,7 @@ export function AdminUsers() {
                             Khóa tài khoản
                           </DropdownMenuItem>
                         ) : (
-                          <DropdownMenuItem className="text-primary">
+                          <DropdownMenuItem className="text-agro-green">
                             <CheckCircle className="mr-2 h-4 w-4" />
                             Mở khóa
                           </DropdownMenuItem>

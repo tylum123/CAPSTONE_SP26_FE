@@ -32,6 +32,16 @@ export function GoogleLoginButton({ roleId, showDivider = false, onSuccess, onEr
     return null;
   }
 
+  const normalizeRole = (role: string | undefined): "admin" | "farmer" | "worker" | null => {
+    const normalized = String(role || '').trim().toLowerCase();
+
+    if (normalized === 'admin') return 'admin';
+    if (normalized === 'farmer') return 'farmer';
+    if (normalized === 'worker') return 'worker';
+
+    return null;
+  };
+
   const handleGoogleLogin = async (credentialResponse: any) => {
     try {
       if (!credentialResponse.credential) {
@@ -48,13 +58,39 @@ export function GoogleLoginButton({ roleId, showDivider = false, onSuccess, onEr
         const userData = response.data;
         const accessToken = userData.token || '';
         const refreshToken = userData.refresh_token || '';
+        const role = normalizeRole(userData.role);
+
+        if (!role) {
+          toast({
+            title: "Lỗi",
+            description: "Không xác định được vai trò tài khoản",
+            variant: "destructive",
+          });
+          onError?.(new Error('Unknown role'));
+          return;
+        }
+
+        if (role === 'worker') {
+          toast({
+            title: "Thông báo",
+            description: "Vui lòng chuyển sang ứng dụng điện thoại AgroTemp nếu bạn là người tìm việc.",
+            variant: "destructive",
+          });
+
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('user');
+
+          onError?.(new Error('Worker role is mobile-only'));
+          return;
+        }
         
         // Create user object for auth context
         const user = {
           id: userData.id || '',
           email: userData.email || '',
           fullName: userData.fullName || '',
-          role: 'farmer' as const,
+          role,
         };
 
         // Update auth context
@@ -66,7 +102,7 @@ export function GoogleLoginButton({ roleId, showDivider = false, onSuccess, onEr
         });
         
         onSuccess?.();
-        router.push("/farmer/dashboard");
+        router.push(role === 'admin' ? '/admin' : '/farmer/dashboard');
       } else {
         toast({
           title: "Lỗi",
