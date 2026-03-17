@@ -33,6 +33,16 @@ export default function LoginPage() {
   const [farmerEmail, setFarmerEmail] = useState("");
   const [farmerPassword, setFarmerPassword] = useState("");
 
+  const normalizeRole = (role: string | undefined): "admin" | "farmer" | "worker" | null => {
+    const normalized = String(role || "").trim().toLowerCase();
+
+    if (normalized === "admin") return "admin";
+    if (normalized === "farmer") return "farmer";
+    if (normalized === "worker") return "worker";
+
+    return null;
+  };
+
   const handleFarmerLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -45,36 +55,64 @@ export default function LoginPage() {
 
       if (response.status_code === 200 || response.status_code === 0) {
         // Extract user data and tokens from response
-        const userData = response.data;
+        const userData = response.data as typeof response.data & {
+          id?: string;
+          fullName?: string;
+          refresh_token?: string;
+        };
         const accessToken = userData.token || '';
         const refreshToken = userData.refresh_token || '';
+        const role = normalizeRole(userData.role);
+
+        if (!role) {
+          toast({
+            title: "Đăng nhập thất bại",
+            description: "Không xác định được vai trò tài khoản",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (role === "worker") {
+          toast({
+            title: "Thông báo",
+            description: "Vui lòng chuyển sang ứng dụng điện thoại AgroTemp nếu bạn là người tìm việc.",
+            variant: "default",
+          });
+
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+          localStorage.removeItem("user");
+
+          return;
+        }
         
         // Create user object for auth context
         const user = {
           id: userData.id || '',
           email: userData.email || farmerEmail,
           fullName: userData.fullName || userData.email || '',
-          role: 'farmer' as const,
+          role,
         };
 
         // Update auth context
         login(user, accessToken, refreshToken);
 
         toast({
-          title: "✅ Thành công",
-          description: response.message || "Đăng nhập thành công! Đang chuyển hướng...",
+          title: "Thành công",
+          description: response.message || "Đăng nhập thành công. Đang chuyển hướng...",
           variant: "default",
         });
         
-        // Redirect to farmer dashboard after a short delay
+        // Redirect by role after a short delay
         setTimeout(() => {
-          router.push("/farmer/dashboard");
+          router.push(role === "admin" ? "/admin" : "/farmer/dashboard");
         }, 1000);
       } else {
         // Handle error response from API
         const errorMessage = handleAuthError({ response: { data: response } });
         toast({
-          title: "❌ Đăng nhập thất bại",
+          title: "Đăng nhập thất bại",
           description: errorMessage,
           variant: "destructive",
         });
@@ -84,7 +122,7 @@ export default function LoginPage() {
       console.error("Login error:", error);
       const errorMessage = handleAuthError(error);
       toast({
-        title: "❌ Đăng nhập thất bại",
+        title: "Đăng nhập thất bại",
         description: errorMessage,
         variant: "destructive",
       });
@@ -94,7 +132,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-agro-cream via-white to-agro-green/5 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-linear-to-br from-agro-cream via-white to-agro-green/5 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <Link
           href="/"

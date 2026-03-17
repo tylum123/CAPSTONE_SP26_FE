@@ -39,6 +39,7 @@ export interface LoginResponse {
   token: string;
   expiresAt: string;
   email: string;
+  role: string;
 }
 
 
@@ -67,21 +68,51 @@ export interface UpdateFarmerRequest {
   avatarUrl?: string;
 }
 
+export interface UpdateFarmRequest {
+  address: string,
+  latitude: number,
+  longitude: number,
+  locationName: string,
+  isPrimary: boolean
+}
+
+export interface GetFarmResponse {
+  farmId: string,
+  farmerProfileId?: string,
+  address: string,
+  latitude: number,
+  longitude: number,
+  locationName: string,
+  isPrimary: boolean,
+  createdAt: string,
+  updatedAt: string
+}
+
 export interface GoogleLoginRequest {
   googleToken: string;
   roleId: number;
 }
 
 // User Types
-export interface User {
+export interface GetUserResponse {
   id: string;
   email: string;
-  fullName: string;
   phoneNumber: string;
-  role: 'farmer' | 'worker' | 'admin';
-  avatar?: string;
+  address: string;
+  passwordHash: string;
+  role: string;
   createdAt: string;
-  updatedAt: string;
+  isActive: boolean;
+  isVerified: boolean;
+}
+
+export interface UpdateUserRequest {
+  email?: string;
+  phoneNumber?: string;
+  address?: string;
+  roleId: number;
+  isActive: boolean;
+  isVerified: boolean;
 }
 
 export interface UpdateProfileRequest {

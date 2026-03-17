@@ -161,10 +161,10 @@ export function AdminDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-muted">
-                  <stat.icon className="h-6 w-6 text-muted-foreground" />
+                  <stat.icon className="h-6 w-6 text-agro-green" />
                 </div>
                 <div
-                  className={`flex items-center gap-1 text-sm ${stat.trend === "up" ? "text-primary" : "text-destructive"}`}
+                  className={`flex items-center gap-1 text-sm ${stat.trend === "up" ? "text-agro-green" : "text-agro-orange"}`}
                 >
                   {stat.trend === "up" ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
                   {stat.change}
@@ -248,7 +248,7 @@ export function AdminDashboard() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
+                <AlertTriangle className="h-5 w-5 text-agro-orange" />
                 Khiếu nại cần xử lý
               </CardTitle>
               <CardDescription>Các vụ tranh chấp đang chờ</CardDescription>
@@ -285,7 +285,7 @@ export function AdminDashboard() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-primary" />
+                <Shield className="h-5 w-5 text-agro-green" />
                 Chờ xác minh
               </CardTitle>
               <CardDescription>Người dùng đợi duyệt danh tính</CardDescription>
@@ -311,7 +311,7 @@ export function AdminDashboard() {
                       <p className="text-xs text-muted-foreground">{user.submittedAt}</p>
                     </div>
                   </div>
-                  <Button size="sm">Xem xét</Button>
+                  <Button size="sm" className="bg-agro-green text-white hover:bg-agro-green-dark">Xem xét</Button>
                 </div>
               ))}
             </div>

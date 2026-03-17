@@ -117,6 +117,8 @@ export const farmerService = {
     return response.data;
   },
 
+
+
   /**
    * Get all applicants for farmer's jobs
    */

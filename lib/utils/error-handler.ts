@@ -14,6 +14,67 @@ export interface ErrorHandlerOptions {
   customMessages?: Record<number, string>;
 }
 
+const NETWORK_STATUS_CODE = 0;
+
+const DEFAULT_ERROR_MESSAGES: Record<number, string> = {
+  [NETWORK_STATUS_CODE]: "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng",
+  400: "Thông tin không hợp lệ. Vui lòng kiểm tra lại",
+  401: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại",
+  403: "Bạn không có quyền thực hiện thao tác này",
+  404: "Không tìm thấy tài nguyên yêu cầu",
+  409: "Dữ liệu đã tồn tại",
+  422: "Dữ liệu không hợp lệ",
+  429: "Quá nhiều yêu cầu. Vui lòng thử lại sau",
+  500: "Lỗi server. Vui lòng thử lại sau",
+  502: "Lỗi server. Vui lòng thử lại sau",
+  503: "Lỗi server. Vui lòng thử lại sau",
+  504: "Lỗi server. Vui lòng thử lại sau",
+};
+
+const AUTH_ERROR_MESSAGES: Record<number, string> = {
+  [NETWORK_STATUS_CODE]: "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng",
+  400: "Thông tin đăng nhập không hợp lệ",
+  401: "Email hoặc mật khẩu không đúng",
+  403: "Tài khoản của bạn đã bị khóa",
+  404: "Không tìm thấy tài khoản",
+  409: "Tài khoản đã tồn tại",
+};
+
+const REGISTRATION_ERROR_MESSAGES: Record<number, string> = {
+  [NETWORK_STATUS_CODE]: "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng",
+  400: "Thông tin đăng ký không hợp lệ. Vui lòng kiểm tra lại",
+  409: "Tài khoản đã tồn tại. Vui lòng sử dụng thông tin khác",
+  422: "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin",
+};
+
+function getStatusCode(error: any): number | undefined {
+  if (!error) {
+    return undefined;
+  }
+
+  if (error.response) {
+    return error.response.data?.status_code || error.response.status;
+  }
+
+  if (error.request) {
+    return NETWORK_STATUS_CODE;
+  }
+
+  return undefined;
+}
+
+function getMessageByStatusCode(
+  statusCode: number | undefined,
+  messages: Record<number, string>,
+  fallbackMessage: string
+): string {
+  if (typeof statusCode === "number" && messages[statusCode]) {
+    return messages[statusCode];
+  }
+
+  return fallbackMessage;
+}
+
 /**
  * Extract and format error message from API response
  * @param error - The error object from axios or API response
@@ -25,55 +86,13 @@ export function handleApiError(error: any, options: ErrorHandlerOptions = {}): s
     defaultMessage = "Đã xảy ra lỗi. Vui lòng thử lại sau",
     customMessages = {},
   } = options;
+  const statusCode = getStatusCode(error);
 
-  // If error is from axios response
-  if (error.response) {
-    const statusCode = error.response.data?.status_code || error.response.status;
-    const message = error.response.data?.message;
-
-    // Check custom messages first
-    if (customMessages[statusCode]) {
-      return customMessages[statusCode];
-    }
-
-    // Return API message if available
-    if (message) {
-      return message;
-    }
-
-    // Default messages based on status code
-    switch (statusCode) {
-      case 400:
-        return "Thông tin không hợp lệ. Vui lòng kiểm tra lại";
-      case 401:
-        return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại";
-      case 403:
-        return "Bạn không có quyền thực hiện thao tác này";
-      case 404:
-        return "Không tìm thấy tài nguyên yêu cầu";
-      case 409:
-        return "Dữ liệu đã tồn tại";
-      case 422:
-        return "Dữ liệu không hợp lệ";
-      case 429:
-        return "Quá nhiều yêu cầu. Vui lòng thử lại sau";
-      case 500:
-      case 502:
-      case 503:
-      case 504:
-        return "Lỗi server. Vui lòng thử lại sau";
-      default:
-        return defaultMessage;
-    }
+  if (typeof statusCode === "number" && customMessages[statusCode]) {
+    return customMessages[statusCode];
   }
 
-  // If request was made but no response
-  if (error.request) {
-    return "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng";
-  }
-
-  // Something else happened
-  return error.message || defaultMessage;
+  return getMessageByStatusCode(statusCode, DEFAULT_ERROR_MESSAGES, defaultMessage);
 }
 
 /**
@@ -82,71 +101,8 @@ export function handleApiError(error: any, options: ErrorHandlerOptions = {}): s
  * @returns User-friendly error message for auth errors
  */
 export function handleAuthError(error: any): string {
-  if (error.response) {
-    const statusCode = error.response.data?.status_code || error.response.status;
-    const message = error.response.data?.message || '';
-    const errors = error.response.data?.errors;
-
-    // Handle validation errors with field-specific messages
-    if (errors && typeof errors === 'object') {
-      const errorMessages = Object.values(errors).flat();
-      if (errorMessages.length > 0) {
-        return errorMessages[0] as string;
-      }
-    }
-
-    // Check for specific error messages (with null safety)
-    const msgLower = message && typeof message === 'string' ? message.toLowerCase() : '';
-    
-    if (msgLower && (msgLower.includes('phone') || msgLower.includes('số điện thoại'))) {
-      return "Số điện thoại này đã được đăng ký";
-    }
-    
-    if (msgLower && msgLower.includes('email')) {
-      return "Email này đã được đăng ký";
-    }
-
-    if (msgLower && (msgLower.includes('password') || msgLower.includes('mật khẩu'))) {
-      return "Mật khẩu không đúng";
-    }
-
-    if (msgLower && (msgLower.includes('not found') || msgLower.includes('không tìm thấy'))) {
-      return "Không tìm thấy tài khoản";
-    }
-
-    if (msgLower && (msgLower.includes('invalid credentials') || msgLower.includes('thông tin đăng nhập'))) {
-      return "Email hoặc mật khẩu không đúng";
-    }
-
-    // Return API message if available
-    if (message) {
-      return message;
-    }
-
-    // Status code based messages
-    switch (statusCode) {
-      case 400:
-        return "Thông tin đăng nhập không hợp lệ";
-      case 401:
-        return "Email hoặc mật khẩu không đúng";
-      case 403:
-        return "Tài khoản của bạn đã bị khóa";
-      case 404:
-        return "Không tìm thấy tài khoản";
-      case 409:
-        return "Tài khoản đã tồn tại";
-      default:
-        return "Đã xảy ra lỗi trong quá trình xác thực";
-    }
-  }
-
-  // Handle network errors
-  if (error.request && !error.response) {
-    return "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng";
-  }
-
-  // Handle other errors
-  return error.message || "Đã xảy ra lỗi trong quá trình xác thực";
+  const statusCode = getStatusCode(error);
+  return getMessageByStatusCode(statusCode, AUTH_ERROR_MESSAGES, "Đã xảy ra lỗi trong quá trình xác thực");
 }
 
 /**
@@ -155,58 +111,12 @@ export function handleAuthError(error: any): string {
  * @returns User-friendly error message for registration errors
  */
 export function handleRegistrationError(error: any): string {
-  // Handle direct API response errors
-  if (error.response) {
-    const statusCode = error.response.data?.status_code || error.response.status;
-    const message = error.response.data?.message || '';
-    const errors = error.response.data?.errors;
-
-    // Handle validation errors with field-specific messages
-    if (errors && typeof errors === 'object') {
-      const errorMessages = Object.values(errors).flat();
-      if (errorMessages.length > 0) {
-        return errorMessages[0] as string;
-      }
-    }
-
-    // Check for specific duplicate errors
-    if (message.toLowerCase().includes('phone') || message.toLowerCase().includes('số điện thoại')) {
-      return "Số điện thoại này đã được đăng ký. Vui lòng sử dụng số điện thoại khác";
-    }
-    
-    if (message.toLowerCase().includes('email')) {
-      return "Email này đã được đăng ký. Vui lòng sử dụng email khác";
-    }
-
-    if (message.toLowerCase().includes('already exists') || message.toLowerCase().includes('đã tồn tại')) {
-      return "Tài khoản đã tồn tại. Vui lòng sử dụng thông tin khác";
-    }
-
-    // Return specific API message if available
-    if (message) {
-      return message;
-    }
-
-    // Handle by status code
-    switch (statusCode) {
-      case 400:
-        return "Thông tin đăng ký không hợp lệ. Vui lòng kiểm tra lại";
-      case 409:
-        return "Tài khoản đã tồn tại. Vui lòng sử dụng thông tin khác";
-      case 422:
-        return "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin";
-      default:
-        return "Đã xảy ra lỗi trong quá trình đăng ký. Vui lòng thử lại";
-    }
-  }
-
-  // Handle network errors
-  if (error.request && !error.response) {
-    return "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng";
-  }
-
-  // Handle other errors
-  return error.message || "Đã xảy ra lỗi trong quá trình đăng ký. Vui lòng thử lại";
+  const statusCode = getStatusCode(error);
+  return getMessageByStatusCode(
+    statusCode,
+    REGISTRATION_ERROR_MESSAGES,
+    "Đã xảy ra lỗi trong quá trình đăng ký. Vui lòng thử lại"
+  );
 }
 
 /**
@@ -224,8 +134,8 @@ export function isNetworkError(error: any): boolean {
  * @returns True if it's a server error
  */
 export function isServerError(error: any): boolean {
-  const statusCode = error.response?.data?.status_code || error.response?.status;
-  return statusCode >= 500 && statusCode < 600;
+  const statusCode = getStatusCode(error);
+  return typeof statusCode === "number" && statusCode >= 500 && statusCode < 600;
 }
 
 /**
@@ -234,6 +144,6 @@ export function isServerError(error: any): boolean {
  * @returns True if it's a validation error
  */
 export function isValidationError(error: any): boolean {
-  const statusCode = error.response?.data?.status_code || error.response?.status;
+  const statusCode = getStatusCode(error);
   return statusCode === 400 || statusCode === 422;
 }

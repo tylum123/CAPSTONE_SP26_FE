@@ -1,116 +1,258 @@
 "use client"
 
-import { useState } from "react"
-import { Search, MoreHorizontal, Eye, Ban, CheckCircle, Shield, Download, UserPlus, Mail } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Search, MoreHorizontal, Eye, Ban, CheckCircle, Shield, Download, UserPlus, Mail, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Checkbox } from "@/components/ui/checkbox"
+import { adminService } from "@/libs/api/services/admin.service"
+import type { GetUserResponse } from "@/libs/api/types"
+import { useToast } from "@/hooks/use-toast"
+import { handleApiError } from "@/lib/utils/error-handler"
+
+type UserWithRoleMetadata = GetUserResponse & {
+  roleId?: number | string
+  roleName?: string
+  role?: string | { name?: string; roleName?: string }
+}
 
 export function AdminUsers() {
+  const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("all")
-  const [selectedUsers, setSelectedUsers] = useState<number[]>([])
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+  const [users, setUsers] = useState<GetUserResponse[]>([])
+  const [loading, setLoading] = useState(true)
+  const [actionUserId, setActionUserId] = useState<string | null>(null)
+  const [pendingDeleteUser, setPendingDeleteUser] = useState<GetUserResponse | null>(null)
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
+  const [selectedUserDetail, setSelectedUserDetail] = useState<GetUserResponse | null>(null)
+  const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
 
-  const users = [
-    {
-      id: 1,
-      name: "Nguyễn Văn A",
-      email: "nguyenvana@email.com",
-      phone: "0901 234 567",
-      type: "farmer",
-      status: "active",
-      verified: true,
-      joinedAt: "15/06/2025",
-      totalJobs: 45,
-      totalSpent: 15500000,
-      avatar: "/farmer1.jpg",
-    },
-    {
-      id: 2,
-      name: "Trần Minh Đức",
-      email: "tranminhduc@email.com",
-      phone: "0912 345 678",
-      type: "worker",
-      status: "active",
-      verified: true,
-      joinedAt: "20/07/2025",
-      totalJobs: 78,
-      totalEarned: 19500000,
-      avatar: "/worker1.jpg",
-    },
-    {
-      id: 3,
-      name: "Lê Thị Hoa",
-      email: "lethihoa@email.com",
-      phone: "0923 456 789",
-      type: "worker",
-      status: "pending",
-      verified: false,
-      joinedAt: "05/01/2026",
-      totalJobs: 0,
-      totalEarned: 0,
-      avatar: "/worker2.jpg",
-    },
-    {
-      id: 4,
-      name: "Phạm Văn Farmer",
-      email: "phamvanfarmer@email.com",
-      phone: "0934 567 890",
-      type: "farmer",
-      status: "suspended",
-      verified: true,
-      joinedAt: "10/08/2025",
-      totalJobs: 12,
-      totalSpent: 3200000,
-      avatar: "/farmer2.jpg",
-    },
-    {
-      id: 5,
-      name: "Hoàng Thị Worker",
-      email: "hoangthiworker@email.com",
-      phone: "0945 678 901",
-      type: "worker",
-      status: "active",
-      verified: true,
-      joinedAt: "01/09/2025",
-      totalJobs: 56,
-      totalEarned: 14000000,
-      avatar: "/worker3.jpg",
-    },
-  ]
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        setLoading(true)
+        const response = await adminService.getUsers()
+        const data = response.data
+        const items = Array.isArray(data) ? data : data?.data || []
+        setUsers(Array.isArray(items) ? items : [])
+      } catch (error: any) {
+        toast({
+          title: "Lỗi",
+          description: handleApiError(error, {
+            defaultMessage: "Không thể tải danh sách người dùng",
+          }),
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesTab =
-      activeTab === "all" ||
-      (activeTab === "farmers" && user.type === "farmer") ||
-      (activeTab === "workers" && user.type === "worker") ||
-      (activeTab === "suspended" && user.status === "suspended")
-    return matchesSearch && matchesTab
-  })
+    loadUsers()
+  }, [toast])
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Badge className="bg-primary/10 text-primary">Hoạt động</Badge>
-      case "pending":
-        return <Badge variant="secondary">Chờ duyệt</Badge>
-      case "suspended":
-        return <Badge variant="destructive">Bị khóa</Badge>
-      default:
-        return null
+  const getNormalizedRole = (user: GetUserResponse): "farmer" | "worker" | "admin" | "unknown" => {
+    const currentUser = user as UserWithRoleMetadata
+    const roleValue =
+      typeof currentUser.role === "string"
+        ? currentUser.role
+        : currentUser.role?.name || currentUser.role?.roleName || currentUser.roleName || ""
+    const normalized = roleValue.trim().toLowerCase()
+    const roleId = Number(currentUser.roleId)
+
+    if (normalized === "farmer" || normalized.includes("farmer") || normalized.includes("nông")) {
+      return "farmer"
+    }
+
+    if (normalized === "worker" || normalized.includes("worker") || normalized.includes("lao")) {
+      return "worker"
+    }
+
+    if (normalized === "admin" || normalized.includes("admin")) {
+      return "admin"
+    }
+
+    if (roleId === 2) return "farmer"
+    if (roleId === 3) return "worker"
+    if (roleId === 1) return "admin"
+
+    return "unknown"
+  }
+
+  const getRoleLabel = (user: GetUserResponse) => {
+    const role = getNormalizedRole(user)
+    if (role === "farmer") return "Nông dân"
+    if (role === "worker") return "Người lao động"
+    if (role === "admin") return "Quản trị"
+
+    const currentUser = user as UserWithRoleMetadata
+    if (typeof currentUser.role === "string" && currentUser.role.trim()) {
+      return currentUser.role
+    }
+
+    return "Chưa xác định"
+  }
+
+  const getDisplayName = (user: GetUserResponse) => {
+    return user.email?.split("@")[0] || "Người dùng"
+  }
+
+  const updateUserInState = (nextUser: GetUserResponse) => {
+    setUsers((current) => current.map((user) => (user.id === nextUser.id ? nextUser : user)))
+  }
+
+  const handleToggleActive = async (user: GetUserResponse) => {
+    try {
+      setActionUserId(user.id)
+      const response = await adminService.setUserActiveStatus(user, !user.isActive)
+      updateUserInState(response.data)
+
+      toast({
+        title: "Thành công",
+        description: response.data.isActive ? "Đã mở khóa tài khoản" : "Đã khóa tài khoản",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: handleApiError(error, {
+          defaultMessage: "Không thể cập nhật trạng thái tài khoản",
+        }),
+        variant: "destructive",
+      })
+    } finally {
+      setActionUserId(null)
     }
   }
 
-  const toggleUserSelection = (userId: number) => {
+  const handleToggleVerified = async (user: GetUserResponse) => {
+    try {
+      setActionUserId(user.id)
+      const response = await adminService.setUserVerificationStatus(user, !user.isVerified)
+      updateUserInState(response.data)
+
+      toast({
+        title: "Thành công",
+        description: response.data.isVerified ? "Đã xác minh người dùng" : "Đã hủy xác minh người dùng",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: handleApiError(error, {
+          defaultMessage: "Không thể cập nhật trạng thái xác minh",
+        }),
+        variant: "destructive",
+      })
+    } finally {
+      setActionUserId(null)
+    }
+  }
+
+  const handleDeleteUser = async () => {
+    if (!pendingDeleteUser) {
+      return
+    }
+
+    try {
+      setDeletingUserId(pendingDeleteUser.id)
+      await adminService.deleteUser(pendingDeleteUser.id)
+
+      setUsers((current) => current.filter((user) => user.id !== pendingDeleteUser.id))
+      setSelectedUsers((current) => current.filter((id) => id !== pendingDeleteUser.id))
+
+      toast({
+        title: "Thành công",
+        description: "Đã xóa người dùng",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: handleApiError(error, {
+          defaultMessage: "Không thể xóa người dùng",
+        }),
+        variant: "destructive",
+      })
+    } finally {
+      setDeletingUserId(null)
+      setPendingDeleteUser(null)
+    }
+  }
+
+  const handleViewUserDetail = async (user: GetUserResponse) => {
+    try {
+      setDetailLoading(true)
+      const response = await adminService.getUserDetail(user.id)
+      setSelectedUserDetail(response.data)
+      setIsDetailOpen(true)
+    } catch (error: any) {
+      setSelectedUserDetail(user)
+      setIsDetailOpen(true)
+
+      toast({
+        title: "Lỗi",
+        description: handleApiError(error, {
+          defaultMessage: "Không thể tải chi tiết người dùng, đang hiển thị dữ liệu hiện có",
+        }),
+        variant: "destructive",
+      })
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  const filteredUsers = users.filter((user) => {
+    const matchesSearch =
+      getDisplayName(user).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesTab =
+      activeTab === "all" ||
+      (activeTab === "farmers" && getNormalizedRole(user) === "farmer") ||
+      (activeTab === "workers" && getNormalizedRole(user) === "worker") ||
+      (activeTab === "suspended" && !user.isActive)
+    return matchesSearch && matchesTab
+  })
+
+  const userStats = useMemo(() => {
+    return {
+      total: users.length,
+      farmers: users.filter((user) => getNormalizedRole(user) === "farmer").length,
+      workers: users.filter((user) => getNormalizedRole(user) === "worker").length,
+      suspended: users.filter((user) => !user.isActive).length,
+    }
+  }, [users])
+
+  const getStatusBadge = (user: GetUserResponse) => {
+    if (!user.isActive) {
+      return <Badge variant="destructive">Bị khóa</Badge>
+    }
+
+    if (!user.isVerified) {
+      return <Badge variant="secondary">Chờ duyệt</Badge>
+    }
+
+    return <Badge className="bg-agro-green/10 text-agro-green">Hoạt động</Badge>
+  }
+
+  const toggleUserSelection = (userId: string) => {
     setSelectedUsers((prev) => (prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]))
   }
 
@@ -120,6 +262,14 @@ export function AdminUsers() {
     } else {
       setSelectedUsers(filteredUsers.map((u) => u.id))
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <Loader2 className="h-7 w-7 animate-spin text-agro-green" />
+      </div>
+    )
   }
 
   return (
@@ -135,7 +285,7 @@ export function AdminUsers() {
             <Download className="mr-2 h-4 w-4" />
             Xuất Excel
           </Button>
-          <Button>
+          <Button className="bg-agro-green text-white hover:bg-agro-green-dark">
             <UserPlus className="mr-2 h-4 w-4" />
             Thêm người dùng
           </Button>
@@ -146,25 +296,25 @@ export function AdminUsers() {
       <div className="grid gap-4 sm:grid-cols-4">
         <Card>
           <CardContent className="p-4">
-            <p className="text-2xl font-bold text-primary">15,234</p>
+            <p className="text-2xl font-bold text-agro-green">{userStats.total}</p>
             <p className="text-sm text-muted-foreground">Tổng người dùng</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-2xl font-bold text-card-foreground">5,120</p>
+            <p className="text-2xl font-bold text-card-foreground">{userStats.farmers}</p>
             <p className="text-sm text-muted-foreground">Nông dân</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-2xl font-bold text-card-foreground">10,114</p>
+            <p className="text-2xl font-bold text-card-foreground">{userStats.workers}</p>
             <p className="text-sm text-muted-foreground">Người lao động</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-2xl font-bold text-destructive">45</p>
+            <p className="text-2xl font-bold text-agro-orange">{userStats.suspended}</p>
             <p className="text-sm text-muted-foreground">Bị khóa</p>
           </CardContent>
         </Card>
@@ -224,7 +374,7 @@ export function AdminUsers() {
                 <TableHead>Trạng thái</TableHead>
                 <TableHead>Xác minh</TableHead>
                 <TableHead>Ngày tham gia</TableHead>
-                <TableHead>Hoạt động</TableHead>
+                <TableHead>Liên hệ</TableHead>
                 <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
@@ -240,22 +390,22 @@ export function AdminUsers() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar>
-                        <AvatarImage src={user.avatar || "/placeholder.svg"} />
-                        <AvatarFallback>{user.name[0]}</AvatarFallback>
+                        <AvatarImage src="/placeholder.svg" />
+                        <AvatarFallback>{getDisplayName(user)[0]?.toUpperCase() || "U"}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium">{user.name}</p>
+                        <p className="font-medium">{getDisplayName(user)}</p>
                         <p className="text-sm text-muted-foreground">{user.email}</p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{user.type === "farmer" ? "Nông dân" : "Người lao động"}</Badge>
+                    <Badge variant="outline">{getRoleLabel(user)}</Badge>
                   </TableCell>
-                  <TableCell>{getStatusBadge(user.status)}</TableCell>
+                  <TableCell>{getStatusBadge(user)}</TableCell>
                   <TableCell>
-                    {user.verified ? (
-                      <Badge className="bg-primary/10 text-primary">
+                    {user.isVerified ? (
+                      <Badge className="bg-agro-green/10 text-agro-green">
                         <Shield className="mr-1 h-3 w-3" />
                         Đã xác minh
                       </Badge>
@@ -263,16 +413,9 @@ export function AdminUsers() {
                       <Badge variant="secondary">Chưa xác minh</Badge>
                     )}
                   </TableCell>
-                  <TableCell>{user.joinedAt}</TableCell>
+                  <TableCell>{new Date(user.createdAt).toLocaleDateString("vi-VN")}</TableCell>
                   <TableCell>
-                    <p className="text-sm">
-                      {user.totalJobs} việc
-                      {user.type === "farmer" ? (
-                        <span className="text-muted-foreground"> • {user.totalSpent?.toLocaleString()}đ chi</span>
-                      ) : (
-                        <span className="text-muted-foreground"> • {user.totalEarned?.toLocaleString()}đ thu</span>
-                      )}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{user.phoneNumber || "-"}</p>
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -282,25 +425,49 @@ export function AdminUsers() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleViewUserDetail(user)}>
                           <Eye className="mr-2 h-4 w-4" />
                           Xem chi tiết
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Mail className="mr-2 h-4 w-4" />
-                          Gửi email
+                        <DropdownMenuItem onClick={() => handleToggleVerified(user)} disabled={actionUserId === user.id}>
+                          {actionUserId === user.id ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Shield className="mr-2 h-4 w-4" />
+                          )}
+                          {user.isVerified ? "Hủy xác minh" : "Xác minh tài khoản"}
                         </DropdownMenuItem>
-                        {user.status !== "suspended" ? (
-                          <DropdownMenuItem className="text-destructive">
+                        {user.isActive ? (
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleToggleActive(user)}
+                            disabled={actionUserId === user.id}
+                          >
                             <Ban className="mr-2 h-4 w-4" />
                             Khóa tài khoản
                           </DropdownMenuItem>
                         ) : (
-                          <DropdownMenuItem className="text-primary">
+                          <DropdownMenuItem
+                            className="text-agro-green"
+                            onClick={() => handleToggleActive(user)}
+                            disabled={actionUserId === user.id}
+                          >
                             <CheckCircle className="mr-2 h-4 w-4" />
                             Mở khóa
                           </DropdownMenuItem>
                         )}
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => setPendingDeleteUser(user)}
+                          disabled={deletingUserId === user.id}
+                        >
+                          {deletingUserId === user.id ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Ban className="mr-2 h-4 w-4" />
+                          )}
+                          Xóa người dùng
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -310,6 +477,90 @@ export function AdminUsers() {
           </Table>
         </CardContent>
       </Card>
+
+      <AlertDialog open={Boolean(pendingDeleteUser)} onOpenChange={(open) => !open && setPendingDeleteUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xóa người dùng?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDeleteUser
+                ? `Bạn sắp xóa tài khoản ${getDisplayName(pendingDeleteUser)} (${pendingDeleteUser.email}). Hành động này không thể hoàn tác.`
+                : "Hành động này không thể hoàn tác."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(deletingUserId)}>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              disabled={Boolean(deletingUserId)}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {deletingUserId ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xóa...
+                </>
+              ) : (
+                "Xóa người dùng"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Chi tiết người dùng</DialogTitle>
+            <DialogDescription>Thông tin tài khoản chi tiết</DialogDescription>
+          </DialogHeader>
+
+          {detailLoading ? (
+            <div className="flex min-h-24 items-center justify-center">
+              <Loader2 className="h-5 w-5 animate-spin text-agro-green" />
+            </div>
+          ) : selectedUserDetail ? (
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center gap-3 rounded-lg border p-3">
+                <Avatar>
+                  <AvatarImage src="/placeholder.svg" />
+                  <AvatarFallback>{getDisplayName(selectedUserDetail)[0]?.toUpperCase() || "U"}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium">{getDisplayName(selectedUserDetail)}</p>
+                  <p className="text-muted-foreground">{selectedUserDetail.email}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border p-3">
+                  <p className="text-muted-foreground">Vai trò</p>
+                  <p className="font-medium">{getRoleLabel(selectedUserDetail.role)}</p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-muted-foreground">Số điện thoại</p>
+                  <p className="font-medium">{selectedUserDetail.phoneNumber || "-"}</p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-muted-foreground">Ngày tham gia</p>
+                  <p className="font-medium">{new Date(selectedUserDetail.createdAt).toLocaleDateString("vi-VN")}</p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-muted-foreground">Trạng thái</p>
+                  <p className="font-medium">{selectedUserDetail.isActive ? "Hoạt động" : "Bị khóa"}</p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-3">
+                <p className="text-muted-foreground">Địa chỉ</p>
+                <p className="font-medium">{selectedUserDetail.address || "-"}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Không có dữ liệu người dùng.</p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

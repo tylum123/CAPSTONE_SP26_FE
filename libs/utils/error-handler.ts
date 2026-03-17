@@ -98,24 +98,13 @@ export function handleAuthError(error: any): string {
     // Check for specific error messages (with null safety)
     const msgLower = message && typeof message === 'string' ? message.toLowerCase() : '';
     
-    if (msgLower && (msgLower.includes('phone') || msgLower.includes('số điện thoại'))) {
-      return "Số điện thoại này đã được đăng ký";
+    if (msgLower && (msgLower.includes('email/phone') || msgLower.includes('password'))) {
+      return "Email hoặc mật khẩu không đúng";
     }
     
-    if (msgLower && msgLower.includes('email')) {
-      return "Email này đã được đăng ký";
-    }
-
-    if (msgLower && (msgLower.includes('password') || msgLower.includes('mật khẩu'))) {
-      return "Mật khẩu không đúng";
-    }
 
     if (msgLower && (msgLower.includes('not found') || msgLower.includes('không tìm thấy'))) {
       return "Không tìm thấy tài khoản";
-    }
-
-    if (msgLower && (msgLower.includes('invalid credentials') || msgLower.includes('thông tin đăng nhập'))) {
-      return "Email hoặc mật khẩu không đúng";
     }
 
     // Return API message if available

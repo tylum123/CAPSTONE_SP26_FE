@@ -18,10 +18,10 @@ export const API_ENDPOINTS = {
     FORGOT_PASSWORD: '/forget',
     RESET_PASSWORD: '/reset',
   },
-  
+
   // Farmer
   FARMER: {
-    PROFILE: '/farmer', 
+    PROFILE: '/farmer',
     UPDATEPROFILE: '/farmer',
     UPDATEAVATAR: '/farmer/upload-avatar',
     DASHBOARD: '/farmer/dashboard',
@@ -37,19 +37,30 @@ export const API_ENDPOINTS = {
     PAYMENTS: '/farmer/payments',
     PAYMENT_DETAIL: (id: string) => `/farmer/payments/${id}`,
   },
-  
+
+  // Farm
+  FARM: {
+    FARMS: '/farm',
+    FARM: (id: string) => `/farm/${id}`,
+    ADD_FARM: '/farm',
+    UPDATE_FARM: (id: string) => `/farm/${id}`,
+    REMOVE_FARM: (id: string) => `/farm/${id}`,
+  },
+
   // Admin
   ADMIN: {
     DASHBOARD: '/admin/dashboard',
-    USERS: '/admin/users',
-    USER_DETAIL: (id: string) => `/admin/users/${id}`,
-    DISPUTES: '/admin/disputes',
-    DISPUTE_DETAIL: (id: string) => `/admin/disputes/${id}`,
-    RESOLVE_DISPUTE: (id: string) => `/admin/disputes/${id}/resolve`,
-    SETTINGS: '/admin/settings',
-    STATISTICS: '/admin/statistics',
+    USERS: '/user',
+    USER_DETAIL: (id: string) => `/user/${id}`,
+    UPDATE_USER: (id: string) => `/user/${id}`,
+    DELETE_USER: (id: string) => `/user/${id}`,
+    // DISPUTES: '/admin/disputes',
+    // DISPUTE_DETAIL: (id: string) => `/admin/disputes/${id}`,
+    // RESOLVE_DISPUTE: (id: string) => `/admin/disputes/${id}/resolve`,
+    // SETTINGS: '/admin/settings',
+    // STATISTICS: '/admin/statistics',
   },
-  
+
   // Common
   MEDIA: {
     UPLOAD_IMAGE: '/media/upload/image',

@@ -53,15 +53,15 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   ]
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-agro-cream">
       {/* Desktop Sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-50 hidden w-64 border-r border-border bg-card lg:block">
+      <aside className="fixed inset-y-0 left-0 z-50 hidden w-64 border-r border-border bg-white/90 backdrop-blur-sm lg:block">
         <div className="flex h-16 items-center gap-2 border-b border-border px-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-foreground">
-            <Leaf className="h-5 w-5 text-background" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-agro-green">
+            <Leaf className="h-5 w-5 text-white" />
           </div>
           <div>
-            <span className="text-lg font-bold text-foreground">AgroTemp</span>
+            <span className="text-lg font-bold text-agro-green">AgroTemp</span>
             <Badge variant="secondary" className="ml-2 text-xs">
               Admin
             </Badge>
@@ -78,8 +78,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 className={cn(
                   "flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-foreground text-background"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    ? "bg-agro-green text-white hover:bg-agro-green-dark"
+                    : "text-foreground hover:bg-agro-cream",
                 )}
               >
                 <div className="flex items-center gap-3">
@@ -103,14 +103,14 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       {/* Mobile Sidebar */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="fixed inset-0 bg-foreground/50" onClick={() => setSidebarOpen(false)} />
-          <aside className="fixed inset-y-0 left-0 w-64 border-r border-border bg-card">
+          <div className="fixed inset-0 bg-black/40" onClick={() => setSidebarOpen(false)} />
+          <aside className="fixed inset-y-0 left-0 w-64 border-r border-border bg-white/95 backdrop-blur-sm">
             <div className="flex h-16 items-center justify-between border-b border-border px-6">
               <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-foreground">
-                  <Leaf className="h-5 w-5 text-background" />
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-agro-green">
+                  <Leaf className="h-5 w-5 text-white" />
                 </div>
-                <span className="text-lg font-bold text-foreground">Admin</span>
+                <span className="text-lg font-bold text-agro-green">Admin</span>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)}>
                 <X className="h-5 w-5" />
@@ -127,8 +127,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                     className={cn(
                       "flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors",
                       isActive
-                        ? "bg-foreground text-background"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        ? "bg-agro-green text-white hover:bg-agro-green-dark"
+                        : "text-foreground hover:bg-agro-cream",
                     )}
                   >
                     <div className="flex items-center gap-3">
@@ -154,7 +154,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       {/* Main Content */}
       <div className="lg:pl-64">
         {/* Header */}
-        <header className="sticky top-0 z-40 border-b border-border bg-card">
+        <header className="sticky top-0 z-40 border-b border-border bg-white/90 backdrop-blur-sm shadow-sm">
           <div className="flex h-16 items-center justify-between px-4 lg:px-6">
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
@@ -166,7 +166,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="icon" className="relative">
                 <Bell className="h-5 w-5" />
-                <span className="absolute right-1 top-1 flex h-2 w-2 rounded-full bg-destructive" />
+                <span className="absolute right-1 top-1 flex h-2 w-2 rounded-full bg-agro-orange" />
               </Button>
 
               <DropdownMenu>
@@ -177,8 +177,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                       <AvatarFallback>AD</AvatarFallback>
                     </Avatar>
                     <div className="hidden text-left md:block">
-                      <p className="text-sm font-medium">Admin User</p>
-                      <p className="text-xs text-muted-foreground">Super Admin</p>
+                      <p className="text-sm font-medium">Quản trị viên</p>
                     </div>
                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
                   </Button>
