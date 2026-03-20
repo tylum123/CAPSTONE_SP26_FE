@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { AuthProvider } from "@/stores/auth.store"
 import { GoogleAuthProvider } from "@/components/auth/google-auth-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { IntroScreen } from "@/components/intro-screen"
 import "./globals.css"
 
 const _geist = Geist({ subsets: ["latin"] })
@@ -29,6 +30,7 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className={`font-sans antialiased`}>
+        <IntroScreen />
         <GoogleAuthProvider>
           <AuthProvider>
             {children}
