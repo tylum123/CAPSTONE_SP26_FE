@@ -140,40 +140,99 @@ export interface FarmerProfile {
 }
 
 // Job Types
-export interface Job {
+export interface JobSkillRequirement {
   id: string;
-  title: string;
-  description: string;
-  farmerId: string;
-  farmerName: string;
-  location: string;
-  salary: number;
-  startDate: string;
-  endDate: string;
-  workingHours: string;
-  requirements: string[];
-  numberOfWorkers: number;
-  appliedWorkers: number;
-  status: 'open' | 'in-progress' | 'completed' | 'cancelled';
-  createdAt: string;
-  updatedAt: string;
+  name: string;
 }
 
-export interface CreateJobRequest {
+export interface Job {
+  id: string;
+  farmerProfileId: string;
+  contactName: string;
+  jobSkillRequirements: JobSkillRequirement[];
+  farmId: string;
+  jobCategoryId: string;
   title: string;
   description: string;
-  location: string;
-  salary: number;
+  address: string;
   startDate: string;
   endDate: string;
-  workingHours: string;
-  requirements: string[];
-  numberOfWorkers: number;
+  estimatedHours: number;
+  workersNeeded: number;
+  workersAccepted: number;
+  wageTypeId: number;
+  wageAmount: number;
+  paymentMethodId: number;
+  requiredSkills?: string;
+  genderPreference: string;
+  publishedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  isUrgent: boolean;
+  status: string;
+}
+
+export interface JobCategory {
+  id: string;
+  name: string;
+  description: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateJobCategoryRequest {
+  name: string;
+  description: string;
+  isActive: boolean;
+}
+
+export interface UpdateJobCategoryRequest extends Partial<CreateJobCategoryRequest> {}
+
+export interface CreateJobRequest {
+  jobSkillRequirementIds: string[];
+  farmId: string;
+  jobCategoryId: string;
+  title: string;
+  description: string;
+  address: string;
+  startDate: string;
+  endDate: string;
+  estimatedHours: number;
+  workersNeeded: number;
+  workersAccepted?: number;
+  wageTypeId: number;
+  wageAmount: number;
+  paymentMethodId: number;
+  genderPreference: string;
+  publishedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  isUrgent: boolean;
+  statusId: number;
 }
 
 export interface UpdateJobRequest extends Partial<CreateJobRequest> {
-  status?: 'open' | 'in-progress' | 'completed' | 'cancelled';
+  id?: string;
 }
+
+// Skill Types
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  isActive: boolean;
+}
+
+export interface CreateSkillRequest {
+  name: string;
+  description: string;
+  category: string;
+  isActive: boolean;
+}
+
+export interface UpdateSkillRequest extends Partial<CreateSkillRequest> {}
 
 // Application Types
 export interface Application {

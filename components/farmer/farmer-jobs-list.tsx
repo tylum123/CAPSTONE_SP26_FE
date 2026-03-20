@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Users, Clock, Banknote, MapPin, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { farmerService } from "@/libs/api/services/farmer.service"
+import type { Job } from "@/libs/api/types"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,79 +22,100 @@ import { Progress } from "@/components/ui/progress"
 export function FarmerJobsList() {
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("active")
+  const [jobs, setJobs] = useState<Job[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const jobs = [
-    {
-      id: 1,
-      title: "Thu hoạch lúa mùa đông",
-      description: "Cần tuyển người thu hoạch lúa cho vụ đông xuân",
-      location: "Xã Mỹ Khánh, Cần Thơ",
-      wage: "250,000",
-      duration: "1 ngày",
-      slots: 5,
-      filled: 3,
-      applicants: 8,
-      status: "active",
-      createdAt: "10/01/2026",
-      deadline: "15/01/2026",
-      type: "Thu hoạch",
-    },
-    {
-      id: 2,
-      title: "Chăm sóc vườn cam Vinh",
-      description: "Tưới nước, bón phân và cắt tỉa cành cho vườn cam",
-      location: "Xã Bình Hòa, Vĩnh Long",
-      wage: "200,000",
-      duration: "3 ngày",
-      slots: 3,
-      filled: 1,
-      applicants: 4,
-      status: "active",
-      createdAt: "08/01/2026",
-      deadline: "20/01/2026",
-      type: "Chăm sóc",
-    },
-    {
-      id: 3,
-      title: "Phun thuốc trừ sâu",
-      description: "Phun thuốc bảo vệ thực vật cho ruộng lúa",
-      location: "Xã Tân Hưng, An Giang",
-      wage: "350,000",
-      duration: "1 ngày",
-      slots: 4,
-      filled: 4,
-      applicants: 6,
-      status: "filled",
-      createdAt: "05/01/2026",
-      deadline: "12/01/2026",
-      type: "Phun thuốc",
-    },
-    {
-      id: 4,
-      title: "Gieo mạ vụ xuân",
-      description: "Gieo mạ và chuẩn bị ruộng cho vụ xuân hè",
-      location: "Xã Mỹ Khánh, Cần Thơ",
-      wage: "280,000",
-      duration: "2 ngày",
-      slots: 6,
-      filled: 6,
-      applicants: 10,
-      status: "completed",
-      createdAt: "01/01/2026",
-      deadline: "05/01/2026",
-      type: "Gieo trồng",
-    },
-  ]
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+      maximumFractionDigits: 0,
+    }).format(value)
 
-  const filteredJobs = jobs.filter((job) => {
-    const matchesSearch = job.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const formatDate = (value: string) => {
+    if (!value) {
+      return "-"
+    }
+
+    const date = new Date(value)
+
+    if (Number.isNaN(date.getTime())) {
+      return value
+    }
+
+    return new Intl.DateTimeFormat("vi-VN").format(date)
+  }
+
+  const normalizeStatus = (status?: string) => {
+    const normalized = (status ?? "").toLowerCase()
+
+    if (["open", "active", "published", "recruiting"].includes(normalized)) {
+      return "active"
+    }
+
+    if (["filled", "full"].includes(normalized)) {
+      return "filled"
+    }
+
+    if (["completed", "closed", "done"].includes(normalized)) {
+      return "completed"
+    }
+
+    return "active"
+  }
+
+  useEffect(() => {
+    const loadJobs = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        const response = await farmerService.getJobs()
+        const payload = response.data as Job[] | { data?: Job[]; items?: Job[] }
+
+        if (Array.isArray(payload)) {
+          setJobs(payload)
+          return
+        }
+
+        if (Array.isArray(payload?.data)) {
+          setJobs(payload.data)
+          return
+        }
+
+        if (Array.isArray(payload?.items)) {
+          setJobs(payload.items)
+          return
+        }
+
+        setJobs([])
+      } catch (fetchError) {
+        console.error(fetchError)
+        setError("Không thể tải danh sách công việc. Vui lòng thử lại.")
+        setJobs([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    void loadJobs()
+  }, [])
+
+  const filteredJobs = useMemo(() => jobs.filter((job) => {
+    const matchesSearch = [job.title, job.address, job.description]
+      .filter(Boolean)
+      .some((value) => value.toLowerCase().includes(searchQuery.toLowerCase()))
+
+    const status = normalizeStatus(job.status)
     const matchesTab =
       activeTab === "all" ||
-      (activeTab === "active" && job.status === "active") ||
-      (activeTab === "filled" && job.status === "filled") ||
-      (activeTab === "completed" && job.status === "completed")
+      (activeTab === "active" && status === "active") ||
+      (activeTab === "filled" && status === "filled") ||
+      (activeTab === "completed" && status === "completed")
+
     return matchesSearch && matchesTab
-  })
+  }), [activeTab, jobs, searchQuery])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -150,6 +173,13 @@ export function FarmerJobsList() {
 
       {/* Jobs List */}
       <div className="flex flex-col gap-4">
+        {isLoading ? <p className="text-sm text-muted-foreground">Đang tải danh sách công việc...</p> : null}
+        {error ? <p className="text-sm font-medium text-destructive">{error}</p> : null}
+
+        {!isLoading && !error && filteredJobs.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Chưa có tin tuyển dụng nào.</p>
+        ) : null}
+
         {filteredJobs.map((job) => (
           <Card key={job.id}>
             <CardContent className="p-6">
@@ -157,39 +187,42 @@ export function FarmerJobsList() {
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-lg font-semibold text-card-foreground">{job.title}</h3>
-                    {getStatusBadge(job.status)}
-                    <Badge variant="outline">{job.type}</Badge>
+                    {getStatusBadge(normalizeStatus(job.status))}
+                    <Badge variant="outline">{job.jobSkillRequirements?.[0]?.name ?? job.requiredSkills ?? "Công việc"}</Badge>
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">{job.description}</p>
 
                   <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <MapPin className="h-4 w-4" />
-                      {job.location}
+                      {job.address}
                     </span>
                     <span className="flex items-center gap-1">
                       <Banknote className="h-4 w-4" />
-                      {job.wage}đ/ngày
+                      {formatCurrency(job.wageAmount)}
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
-                      {job.duration}
+                      {job.estimatedHours} giờ
                     </span>
                     <span className="flex items-center gap-1">
                       <Users className="h-4 w-4" />
-                      {job.applicants} ứng viên
+                      {job.workersAccepted}/{job.workersNeeded} đã nhận
                     </span>
                   </div>
 
-                  {job.status !== "completed" && (
+                  {normalizeStatus(job.status) !== "completed" && (
                     <div className="mt-4 max-w-xs">
                       <div className="mb-2 flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Tiến độ tuyển dụng</span>
                         <span className="font-medium">
-                          {job.filled}/{job.slots}
+                          {job.workersAccepted}/{job.workersNeeded}
                         </span>
                       </div>
-                      <Progress value={(job.filled / job.slots) * 100} className="h-2" />
+                      <Progress
+                        value={job.workersNeeded > 0 ? (job.workersAccepted / job.workersNeeded) * 100 : 0}
+                        className="h-2"
+                      />
                     </div>
                   )}
                 </div>
@@ -227,8 +260,8 @@ export function FarmerJobsList() {
               </div>
 
               <div className="mt-4 flex items-center justify-between border-t border-border pt-4 text-xs text-muted-foreground">
-                <span>Đăng ngày: {job.createdAt}</span>
-                <span>Hạn tuyển: {job.deadline}</span>
+                <span>Đăng ngày: {formatDate(job.createdAt)}</span>
+                <span>Hạn tuyển: {formatDate(job.endDate)}</span>
               </div>
             </CardContent>
           </Card>

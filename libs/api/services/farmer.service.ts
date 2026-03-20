@@ -80,7 +80,7 @@ export const farmerService = {
     page?: number;
     limit?: number;
     status?: string;
-  }): Promise<ApiResponse<PaginatedResponse<Job>>> => {
+  }): Promise<ApiResponse<Job[]>> => {
     const response = await axiosInstance.get(API_ENDPOINTS.FARMER.JOBS, { params });
     return response.data;
   },

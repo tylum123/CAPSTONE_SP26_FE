@@ -25,11 +25,11 @@ export const API_ENDPOINTS = {
     UPDATEPROFILE: '/farmer',
     UPDATEAVATAR: '/farmer/upload-avatar',
     DASHBOARD: '/farmer/dashboard',
-    JOBS: '/farmer/jobs',
-    JOB_DETAIL: (id: string) => `/farmer/jobs/${id}`,
-    CREATE_JOB: '/farmer/jobs',
-    UPDATE_JOB: (id: string) => `/farmer/jobs/${id}`,
-    DELETE_JOB: (id: string) => `/farmer/jobs/${id}`,
+    JOBS: '/job/post',
+    JOB_DETAIL: (id: string) => `/job/post/${id}`,
+    CREATE_JOB: '/job/post',
+    UPDATE_JOB: (id: string) => `/job/post/${id}`,
+    DELETE_JOB: (id: string) => `/job/post/${id}`,
     APPLICANTS: '/farmer/applicants',
     APPLICANT_DETAIL: (id: string) => `/farmer/applicants/${id}`,
     APPROVE_APPLICANT: (id: string) => `/farmer/applicants/${id}/approve`,
@@ -62,6 +62,20 @@ export const API_ENDPOINTS = {
   },
 
   // Common
+  SKILL: {
+    SKILLS: '/skills',
+    SKILL_DETAIL: (id: string) => `/skills/${id}`,
+    CREATE_SKILL: '/skills',
+    UPDATE_SKILL: (id: string) => `/skills/${id}`,
+    DELETE_SKILL: (id: string) => `/skills/${id}`,
+  },
+  JOB_CATEGORY: {
+    LIST: '/job/category',
+    DETAIL: (id: string) => `/job/category/${id}`,
+    CREATE: '/job/category',
+    UPDATE: (id: string) => `/job/category/${id}`,
+    DELETE: (id: string) => `/job/category/${id}`,
+  },
   MEDIA: {
     UPLOAD_IMAGE: '/media/upload/image',
     UPLOAD_IMAGES: '/media/upload/images',
