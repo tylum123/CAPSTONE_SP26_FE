@@ -1,17 +1,15 @@
 import { useState, useEffect } from 'react';
 import { weatherService } from '@/libs/api/services/weather.service';
-import type { WeatherData, DailyWeather } from '@/types/weather.types';
+import type { BeWeatherData, DailyWeather } from '@/types/weather.types';
 
 interface UseWeatherOptions {
   city?: string;
-  country?: string;
   lat?: number;
   lon?: number;
-  enableForecast?: boolean;
 }
 
 interface UseWeatherReturn {
-  currentWeather: WeatherData | null;
+  currentWeather: BeWeatherData | null;
   dailyForecast: Map<string, DailyWeather>;
   loading: boolean;
   error: string | null;
@@ -20,12 +18,10 @@ interface UseWeatherReturn {
 
 export function useWeather({
   city = 'Hanoi',
-  country = 'VN',
   lat,
   lon,
-  enableForecast = true,
 }: UseWeatherOptions = {}): UseWeatherReturn {
-  const [currentWeather, setCurrentWeather] = useState<WeatherData | null>(null);
+  const [currentWeather, setCurrentWeather] = useState<BeWeatherData | null>(null);
   const [dailyForecast, setDailyForecast] = useState<Map<string, DailyWeather>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,25 +31,13 @@ export function useWeather({
       setLoading(true);
       setError(null);
 
-      if (lat !== undefined && lon !== undefined) {
-        const [weather, forecast] = await Promise.all([
-          weatherService.getWeatherByCoords(lat, lon),
-          enableForecast ? weatherService.getForecastByCoords(lat, lon) : null,
-        ]);
-        setCurrentWeather(weather);
-        if (forecast) {
-          setDailyForecast(weatherService.processForecastData(forecast));
-        }
-      } else {
-        const [weather, forecast] = await Promise.all([
-          weatherService.getCurrentWeather(city, country),
-          enableForecast ? weatherService.getForecast(city, country) : null,
-        ]);
-        setCurrentWeather(weather);
-        if (forecast) {
-          setDailyForecast(weatherService.processForecastData(forecast));
-        }
-      }
+      const weather =
+        lat !== undefined && lon !== undefined
+          ? await weatherService.getWeatherByCoords(lat, lon)
+          : await weatherService.getCurrentWeather(city);
+
+      setCurrentWeather(weather);
+      setDailyForecast(weatherService.buildDailyForecastFromCurrent(weather));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu thời tiết');
       console.error('Weather fetch error:', err);
@@ -64,7 +48,7 @@ export function useWeather({
 
   useEffect(() => {
     fetchWeather();
-  }, [city, country, lat, lon, enableForecast]);
+  }, [city, lat, lon]);
 
   return {
     currentWeather,

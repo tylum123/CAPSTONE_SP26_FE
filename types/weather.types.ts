@@ -1,3 +1,22 @@
+export interface BeWeatherData {
+  city: string;
+  country: string;
+  latitude: number;
+  longitude: number;
+  temperature: number;
+  feelsLike: number;
+  tempMin: number;
+  tempMax: number;
+  humidity: number;
+  windSpeed: number;
+  description: string;
+  icon: string;
+  iconUrl: string;
+  sunrise: string;
+  sunset: string;
+  fetchedAt: string;
+}
+
 export interface WeatherData {
   coord: {
     lon: number;

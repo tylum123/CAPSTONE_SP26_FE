@@ -1,90 +1,41 @@
-import axios from 'axios';
-import type { WeatherData, WeatherForecast, DailyWeather } from '@/types/weather.types';
+import { axiosInstance } from '@/libs/api/axios-instance';
+import type { BeWeatherData, DailyWeather } from '@/types/weather.types';
 
-const OPENWEATHER_API_KEY = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
-const OPENWEATHER_BASE_URL = 'https://api.openweathermap.org/data/2.5';
+const WEATHER_BASE = '/weather';
 
 class WeatherService {
-  async getCurrentWeather(city: string = 'Hanoi', country: string = 'VN'): Promise<WeatherData> {
-    const response = await axios.get<WeatherData>(`${OPENWEATHER_BASE_URL}/weather`, {
-      params: {
-        q: `${city},${country}`,
-        appid: OPENWEATHER_API_KEY,
-        units: 'metric',
-        lang: 'vi',
-      },
+  async getCurrentWeather(city: string = 'Hanoi'): Promise<BeWeatherData> {
+    const response = await axiosInstance.get<{ data: BeWeatherData }>(`${WEATHER_BASE}/city`, {
+      params: { city },
     });
-    return response.data;
+    return response.data.data;
   }
 
-  async getWeatherByCoords(lat: number, lon: number): Promise<WeatherData> {
-    const response = await axios.get<WeatherData>(`${OPENWEATHER_BASE_URL}/weather`, {
-      params: {
-        lat,
-        lon,
-        appid: OPENWEATHER_API_KEY,
-        units: 'metric',
-        lang: 'vi',
-      },
+  async getWeatherByCoords(lat: number, lon: number): Promise<BeWeatherData> {
+    const response = await axiosInstance.get<{ data: BeWeatherData }>(`${WEATHER_BASE}/coordinates`, {
+      params: { lat, lon },
     });
-    return response.data;
-  }
-
-  async getForecast(city: string = 'Hanoi', country: string = 'VN'): Promise<WeatherForecast> {
-    const response = await axios.get<WeatherForecast>(`${OPENWEATHER_BASE_URL}/forecast`, {
-      params: {
-        q: `${city},${country}`,
-        appid: OPENWEATHER_API_KEY,
-        units: 'metric',
-        lang: 'vi',
-      },
-    });
-    return response.data;
-  }
-
-  async getForecastByCoords(lat: number, lon: number): Promise<WeatherForecast> {
-    const response = await axios.get<WeatherForecast>(`${OPENWEATHER_BASE_URL}/forecast`, {
-      params: {
-        lat,
-        lon,
-        appid: OPENWEATHER_API_KEY,
-        units: 'metric',
-        lang: 'vi',
-      },
-    });
-    return response.data;
-  }
-
-  processForecastData(forecast: WeatherForecast): Map<string, DailyWeather> {
-    const dailyMap = new Map<string, DailyWeather>();
-
-    forecast.list.forEach((item) => {
-      const date = new Date(item.dt * 1000);
-      const dateKey = date.toISOString().split('T')[0];
-
-      if (!dailyMap.has(dateKey)) {
-        dailyMap.set(dateKey, {
-          date: new Date(dateKey),
-          temp: item.main.temp,
-          tempMin: item.main.temp_min,
-          tempMax: item.main.temp_max,
-          description: item.weather[0].description,
-          icon: item.weather[0].icon,
-          humidity: item.main.humidity,
-          windSpeed: item.wind.speed,
-        });
-      } else {
-        const existing = dailyMap.get(dateKey)!;
-        existing.tempMin = Math.min(existing.tempMin, item.main.temp_min);
-        existing.tempMax = Math.max(existing.tempMax, item.main.temp_max);
-      }
-    });
-
-    return dailyMap;
+    return response.data.data;
   }
 
   getWeatherIconUrl(iconCode: string): string {
     return `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
+  }
+
+  buildDailyForecastFromCurrent(weather: BeWeatherData): Map<string, DailyWeather> {
+    const dailyMap = new Map<string, DailyWeather>();
+    const dateKey = new Date().toISOString().split('T')[0];
+    dailyMap.set(dateKey, {
+      date: new Date(dateKey),
+      temp: weather.temperature,
+      tempMin: weather.tempMin,
+      tempMax: weather.tempMax,
+      description: weather.description,
+      icon: weather.icon,
+      humidity: weather.humidity,
+      windSpeed: weather.windSpeed,
+    });
+    return dailyMap;
   }
 }
 
