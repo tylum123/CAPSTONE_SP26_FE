@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Upload, Save, Loader2 } from "lucide-react"
+import { Upload, Save, Loader2, RotateCcw } from "lucide-react"
 import { handleApiError } from "@/lib/utils/error-handler"
 import { FarmerProfile, UpdateFarmerRequest } from "@/libs/api/types"
 import { farmerService } from "@/libs/api/services/farmer.service"
@@ -51,8 +51,8 @@ export default function SettingsPage() {
           setAvatarPreview(initialAvatar)
           setFormData({
             contactName: response.data.contactName || "",
-            contactNumber: response.data.contactNumber || "",
-            farmType: response.data.farmType || "",
+            contactNumber: response.data.user?.phoneNumber || "",
+            farmType: "", // Removed from new response type
             avatarUrl: initialAvatar,
           })
         }
@@ -177,8 +177,9 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="account" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:w-fit">
+        <TabsList className="grid w-full grid-cols-3 md:w-fit">
           <TabsTrigger value="account">Tài khoản</TabsTrigger>
+          <TabsTrigger value="notifications">Thông báo</TabsTrigger>
           <TabsTrigger value="farm">Quản lý địa điểm</TabsTrigger>
         </TabsList>
 
@@ -189,10 +190,10 @@ export default function SettingsPage() {
               <CardDescription>Cập nhật thông tin tài khoản của bạn</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-20 w-20">
-                  <AvatarImage src={avatarPreview || "/placeholder.svg"} />
-                  <AvatarFallback className="bg-agro-green text-white text-2xl">
+              <div className="flex flex-col items-center justify-center gap-4 py-4 border-b border-muted/50 mb-6">
+                <Avatar className="h-32 w-32 md:h-40 md:w-40 shadow-sm border border-muted/50">
+                  <AvatarImage className="object-cover" src={avatarPreview || "/placeholder.svg"} />
+                  <AvatarFallback className="bg-agro-green text-white text-5xl">
                     {profile?.contactName?.charAt(0).toUpperCase() || "NA"}
                   </AvatarFallback>
                 </Avatar>
@@ -205,7 +206,7 @@ export default function SettingsPage() {
                 />
                 <Button
                   variant="outline"
-                  className="gap-2 bg-transparent"
+                  className="gap-2 bg-transparent w-full max-w-[200px]"
                   onClick={() => avatarInputRef.current?.click()}
                   disabled={uploadingAvatar}
                 >
@@ -220,19 +221,11 @@ export default function SettingsPage() {
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Họ và tên</Label>
-                  <Input
-                    id="name"
-                    value={formData.contactName || ""}
-                    onChange={(e) => handleInputChange("contactName", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
-                    value={profile?.email || ""}
+                    value={profile?.user?.email || ""}
                     disabled
                   />
                 </div>
@@ -240,23 +233,55 @@ export default function SettingsPage() {
                   <Label htmlFor="phone">Số điện thoại</Label>
                   <Input
                     id="phone"
-                    value={formData.contactNumber || ""}
-                    onChange={(e) => handleInputChange("contactNumber", e.target.value)}
+                    value={profile?.user?.phoneNumber || ""}
+                    disabled
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="farmType">Loại nông trại</Label>
-                  <Input
-                    id="farmType"
-                    value={formData.farmType || ""}
-                    onChange={(e) => handleInputChange("farmType", e.target.value)}
-                    placeholder="vd: Rau, Lúa, Chăn nuôi..."
-                  />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="name">Họ và tên</Label>
+                  {profile && formData.contactName !== (profile.contactName || "") && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 text-muted-foreground hover:text-agro-green"
+                      onClick={() => handleInputChange("contactName", profile.contactName || "")}
+                    >
+                      <RotateCcw className="mr-1 h-3 w-3" />
+                      <span className="text-xs">Hoàn tác</span>
+                    </Button>
+                  )}
                 </div>
+                <Input
+                  id="name"
+                  value={formData.contactName || ""}
+                  onChange={(e) => handleInputChange("contactName", e.target.value)}
+                />
               </div>
             </CardContent>
           </Card>
 
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full bg-agro-green text-white hover:bg-agro-green-dark md:w-auto"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Đang lưu...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Lưu thay đổi
+              </>
+            )}
+          </Button>
+        </TabsContent>
+
+        <TabsContent value="notifications" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Thông báo</CardTitle>
@@ -305,24 +330,6 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
-
-          <Button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full bg-agro-green text-white hover:bg-agro-green-dark md:w-auto"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Đang lưu...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                Lưu thay đổi
-              </>
-            )}
-          </Button>
         </TabsContent>
 
         <TabsContent value="farm" className="space-y-6">

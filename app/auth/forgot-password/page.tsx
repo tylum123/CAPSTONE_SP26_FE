@@ -37,6 +37,28 @@ export default function ForgotPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{
+    newPassword?: string;
+    confirmPassword?: string;
+  }>({});
+
+  const validatePassword = (value: string) => {
+    if (!value) return "Mật khẩu là bắt buộc";
+    if (value.length < 8) return "Mật khẩu phải có ít nhất 8 ký tự";
+
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/;
+    if (!passwordRegex.test(value)) {
+      return "Mật khẩu phải có ít nhất 1 chữ hoa, 1 số và 1 ký tự đặc biệt";
+    }
+
+    return undefined;
+  };
+
+  const validateConfirmPassword = (password: string, confirmPassword: string) => {
+    if (!confirmPassword) return "Vui lòng xác nhận mật khẩu";
+    if (password !== confirmPassword) return "Mật khẩu xác nhận không khớp";
+    return undefined;
+  };
 
   // ── Step 1: send OTP ──────────────────────────────────────────────────────
   const handleRequestOtp = async (e: React.FormEvent) => {
@@ -70,19 +92,18 @@ export default function ForgotPasswordPage() {
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: "❌ Mật khẩu không khớp",
-        description: "Mật khẩu xác nhận không trùng với mật khẩu mới.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const nextErrors = {
+      newPassword: validatePassword(newPassword),
+      confirmPassword: validateConfirmPassword(newPassword, confirmPassword),
+    };
 
-    if (newPassword.length < 6) {
+    setFieldErrors(nextErrors);
+
+    const firstError = Object.values(nextErrors).find(Boolean);
+    if (firstError) {
       toast({
-        title: "❌ Mật khẩu quá ngắn",
-        description: "Mật khẩu phải có ít nhất 6 ký tự.",
+        title: "❌ Lỗi",
+        description: firstError,
         variant: "destructive",
       });
       return;
@@ -233,8 +254,27 @@ export default function ForgotPasswordPage() {
                       type={showPassword ? "text" : "password"}
                       placeholder="Nhập mật khẩu mới"
                       value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="border-agro-green/30 focus:border-agro-green pr-10"
+                      onChange={(e) => {
+                        const nextPassword = e.target.value;
+                        setNewPassword(nextPassword);
+                        setFieldErrors((prev) => ({
+                          ...prev,
+                          newPassword: validatePassword(nextPassword),
+                          confirmPassword: validateConfirmPassword(
+                            nextPassword,
+                            confirmPassword
+                          ),
+                        }));
+                      }}
+                      onBlur={() =>
+                        setFieldErrors((prev) => ({
+                          ...prev,
+                          newPassword: validatePassword(newPassword),
+                        }))
+                      }
+                      className={`border-agro-green/30 focus:border-agro-green pr-10 ${
+                        fieldErrors.newPassword ? "border-red-500 focus:border-red-500" : ""
+                      }`}
                       required
                     />
                     <button
@@ -249,6 +289,9 @@ export default function ForgotPasswordPage() {
                       )}
                     </button>
                   </div>
+                  {fieldErrors.newPassword && (
+                    <p className="text-sm text-red-600">{fieldErrors.newPassword}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -260,8 +303,29 @@ export default function ForgotPasswordPage() {
                       type={showConfirm ? "text" : "password"}
                       placeholder="Nhập lại mật khẩu mới"
                       value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="border-agro-green/30 focus:border-agro-green pr-10"
+                      onChange={(e) => {
+                        const nextConfirm = e.target.value;
+                        setConfirmPassword(nextConfirm);
+                        setFieldErrors((prev) => ({
+                          ...prev,
+                          confirmPassword: validateConfirmPassword(
+                            newPassword,
+                            nextConfirm
+                          ),
+                        }));
+                      }}
+                      onBlur={() =>
+                        setFieldErrors((prev) => ({
+                          ...prev,
+                          confirmPassword: validateConfirmPassword(
+                            newPassword,
+                            confirmPassword
+                          ),
+                        }))
+                      }
+                      className={`border-agro-green/30 focus:border-agro-green pr-10 ${
+                        fieldErrors.confirmPassword ? "border-red-500 focus:border-red-500" : ""
+                      }`}
                       required
                     />
                     <button
@@ -276,6 +340,9 @@ export default function ForgotPasswordPage() {
                       )}
                     </button>
                   </div>
+                  {fieldErrors.confirmPassword && (
+                    <p className="text-sm text-red-600">{fieldErrors.confirmPassword}</p>
+                  )}
                 </div>
 
                 <div className="flex gap-3">

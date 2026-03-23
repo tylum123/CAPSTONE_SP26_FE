@@ -20,14 +20,19 @@ import { useToast } from "@/hooks/use-toast"
 import { handleApiError } from "@/lib/utils/error-handler"
 import { FarmService } from "@/libs/api/services/farm.service"
 import type { GetFarmResponse, UpdateFarmRequest } from "@/libs/api/types"
-import { Loader2, MapPin, Pencil, Plus, Star, Trash2 } from "lucide-react"
+import { Loader2, MapPin, Pencil, Plus, Star, Trash2, X, UploadCloud } from "lucide-react"
+import Image from "next/image"
 
 type FarmFormState = {
   address: string
   latitude: number | null
   longitude: number | null
   locationName: string
+  farmType: number
+  livestockCount: number
+  areaSize: number
   isPrimary: boolean
+  images: string[]
 }
 
 type OSMPlace = {
@@ -46,7 +51,11 @@ const EMPTY_FORM: FarmFormState = {
   latitude: null,
   longitude: null,
   locationName: "",
+  farmType: 2, // 2 = Crop by default
+  livestockCount: 0,
+  areaSize: 0,
   isPrimary: false,
+  images: [],
 }
 
 function toFormState(farm: GetFarmResponse): FarmFormState {
@@ -58,7 +67,11 @@ function toFormState(farm: GetFarmResponse): FarmFormState {
     latitude: Number.isFinite(latitude) ? latitude : null,
     longitude: Number.isFinite(longitude) ? longitude : null,
     locationName: farm.locationName,
+    farmType: farm.farmType || 2,
+    livestockCount: farm.livestockCount || 0,
+    areaSize: farm.areaSize || 0,
     isPrimary: farm.isPrimary,
+    images: farm.images || [],
   }
 }
 
@@ -189,11 +202,38 @@ export function FarmerFarmManager() {
     }
   }, [formData.address])
 
-  const handleFieldChange = (field: keyof FarmFormState, value: string | boolean) => {
+  const handleFieldChange = (field: keyof FarmFormState, value: string | boolean | number | string[]) => {
     setFormData((current) => ({
       ...current,
       [field]: value,
     }))
+  }
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return
+    const newFiles = Array.from(e.target.files)
+    
+    if (formData.images.length + newFiles.length > 3) {
+      toast({
+        title: "Lỗi",
+        description: "Chỉ được upload tối đa 3 hình ảnh.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const newImageUrls = newFiles.map((file) => URL.createObjectURL(file))
+    handleFieldChange("images", [...formData.images, ...newImageUrls])
+    
+    // Reset file input
+    e.target.value = ""
+  }
+
+  const removeImage = (indexToRemove: number) => {
+    handleFieldChange(
+      "images",
+      formData.images.filter((_, index) => index !== indexToRemove)
+    )
   }
 
   const resetForm = () => {
@@ -322,7 +362,11 @@ export function FarmerFarmManager() {
       latitude,
       longitude,
       locationName: formData.locationName.trim(),
+      farmType: formData.farmType,
+      livestockCount: Number(formData.livestockCount) || 0,
+      areaSize: Number(formData.areaSize) || 0,
       isPrimary: formData.isPrimary,
+      images: formData.images,
     }
 
     try {
@@ -372,6 +416,63 @@ export function FarmerFarmManager() {
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Loại nông trại</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={formData.farmType === 2 ? "default" : "outline"}
+                      className={`flex-1 ${formData.farmType === 2 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
+                      onClick={() => {
+                        handleFieldChange("farmType", 2)
+                        handleFieldChange("livestockCount", 0) // Reset livestock count when switching to crop
+                      }}
+                    >
+                      Trồng trọt
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={formData.farmType === 1 ? "default" : "outline"}
+                      className={`flex-1 ${formData.farmType === 1 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
+                      onClick={() => {
+                        handleFieldChange("farmType", 1)
+                        handleFieldChange("areaSize", 0) // Reset area size when switching to livestock
+                      }}
+                    >
+                      Chăn nuôi
+                    </Button>
+                  </div>
+                </div>
+
+                {formData.farmType === 2 ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="areaSize">Diện tích (m²)</Label>
+                    <Input
+                      id="areaSize"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.areaSize || ""}
+                      onChange={(event) => handleFieldChange("areaSize", Number(event.target.value))}
+                      placeholder="vd: 1000"
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="livestockCount">Số lượng vật nuôi (con)</Label>
+                    <Input
+                      id="livestockCount"
+                      type="number"
+                      min="0"
+                      value={formData.livestockCount || ""}
+                      onChange={(event) => handleFieldChange("livestockCount", Number(event.target.value))}
+                      placeholder="vd: 500"
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="address">Địa chỉ</Label>
                 <div className="relative">
@@ -415,12 +516,50 @@ export function FarmerFarmManager() {
                 </div>
                 {formData.latitude !== null && formData.longitude !== null ? (
                   <p className="text-xs text-muted-foreground">
-                    Tọa độ OSM: {Number(formData.latitude).toFixed(6)}, {Number(formData.longitude).toFixed(6)}
+                    Tọa độ: {Number(formData.latitude).toFixed(6)}, {Number(formData.longitude).toFixed(6)}
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Chọn một địa chỉ từ danh sách gợi ý để tự động lấy tọa độ.
+                    Chọn một địa chỉ từ danh sách gợi ý.
                   </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Hình ảnh (Tối đa 3 ảnh)</Label>
+                  <span className="text-xs text-muted-foreground">
+                    {formData.images.length}/3
+                  </span>
+                </div>
+                {formData.images.length > 0 && (
+                  <div className="flex gap-4 overflow-x-auto pb-2">
+                    {formData.images.map((img, index) => (
+                      <div key={index} className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border">
+                        <Image src={img} alt={`Farm image ${index + 1}`} fill className="object-cover" unoptimized />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          className="absolute right-1 top-1 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {formData.images.length < 3 && (
+                  <label className="flex h-24 w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed hover:bg-muted/50">
+                    <UploadCloud className="h-6 w-6 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Nhấn để tải ảnh lên</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={handleImageUpload}
+                    />
+                  </label>
                 )}
               </div>
 
@@ -495,10 +634,33 @@ export function FarmerFarmManager() {
                           ) : null}
                         </div>
                         <p className="text-sm text-muted-foreground">{farm.address}</p>
-                        <div className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
+                        <div className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-2 mt-1">
+                          <span className="flex items-center gap-1.5 line-clamp-1">
+                            <span className="font-medium text-foreground">Loại:</span> {farm.farmTypeName || (farm.farmType === 1 ? "Chăn nuôi" : "Trồng trọt")}
+                          </span>
+                          {farm.farmType === 2 ? (
+                            <span className="flex items-center gap-1.5 line-clamp-1">
+                              <span className="font-medium text-foreground">Diện tích:</span> {farm.areaSize ? `${farm.areaSize} m²` : "Không có"}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1.5 line-clamp-1">
+                              <span className="font-medium text-foreground">Vật nuôi:</span> {farm.livestockCount ? `${farm.livestockCount} con` : "0 con"}
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid gap-1 text-xs text-muted-foreground/70 sm:grid-cols-2 mt-2 pt-2 border-t">
                           <span>Vĩ độ: {farm.latitude}</span>
                           <span>Kinh độ: {farm.longitude}</span>
                         </div>
+                        {farm.images && farm.images.length > 0 && (
+                          <div className="flex gap-2 mt-2">
+                            {farm.images.map((img, index) => (
+                              <div key={index} className="relative h-12 w-12 overflow-hidden rounded-md border">
+                                <Image src={img} alt={`Farm image ${index + 1}`} fill className="object-cover" unoptimized />
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex gap-2">

@@ -71,7 +71,11 @@ export interface UpdateFarmRequest {
   latitude: number,
   longitude: number,
   locationName: string,
-  isPrimary: boolean
+  farmType: number,
+  livestockCount: number,
+  areaSize: number,
+  isPrimary: boolean,
+  images?: string[] // Mock up for image upload
 }
 
 export interface GetFarmResponse {
@@ -81,7 +85,12 @@ export interface GetFarmResponse {
   latitude: number,
   longitude: number,
   locationName: string,
+  farmType: number,
+  farmTypeName: string,
+  livestockCount: number,
+  areaSize: number,
   isPrimary: boolean,
+  images?: string[], // Mock up for image upload
   createdAt: string,
   updatedAt: string
 }
@@ -91,48 +100,36 @@ export interface GoogleLoginRequest {
   roleId: number;
 }
 
-// User Types
-export interface GetUserResponse {
-  id: string;
-  email: string;
-  phoneNumber: string;
-  address: string;
-  passwordHash: string;
-  role: string;
-  createdAt: string;
-  isActive: boolean;
-  isVerified: boolean;
-}
-
-export interface UpdateUserRequest {
-  email?: string;
-  phoneNumber?: string;
-  address?: string;
-  roleId: number;
-  isActive: boolean;
-  isVerified: boolean;
-}
-
-export interface UpdateProfileRequest {
-  fullName?: string;
-  phoneNumber?: string;
-  avatar?: string;
-}
 
 // Farmer Types
+
+export interface UpdateFarmerRequest {
+  organizationName?: string;
+  contactName?: string;
+  cooperativeName?: string;
+  avatarUrl?: string;
+}
 export interface FarmerProfile {
   id: string;
   userId: string;
-  email: string;
-  avatarUrl?: string;
   contactName: string;
-  contactNumber: string;
-  farmType?: string;
   averageRating: number;
   totalJobsPosted: number;
   totalJobsCompleted: number;
   createdAt: string;
   updatedAt: string;
+  avatarUrl?: string;
+  user?: {
+    id: string;
+    email: string;
+    phoneNumber: string;
+    address: string;
+    passwordHash: string;
+    role: string;
+    createdAt: string;
+    isActive: boolean;
+    isVerified: boolean;
+  };
 }
 
 // Job Types
