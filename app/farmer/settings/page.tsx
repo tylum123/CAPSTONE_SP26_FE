@@ -238,6 +238,16 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="address">Địa chỉ chính</Label>
+                <Input
+                  id="address"
+                  value={profile?.user?.address || ""}
+                  disabled
+                />
+              </div>  
+              
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="name">Họ và tên</Label>
@@ -316,16 +326,6 @@ export default function SettingsPage() {
                 <Switch
                   checked={notifications.paymentReminders}
                   onCheckedChange={(v) => setNotifications({ ...notifications, paymentReminders: v })}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Khuyến mãi</p>
-                  <p className="text-sm text-muted-foreground">Nhận thông tin khuyến mãi từ AgroTemp</p>
-                </div>
-                <Switch
-                  checked={notifications.promotions}
-                  onCheckedChange={(v) => setNotifications({ ...notifications, promotions: v })}
                 />
               </div>
             </CardContent>

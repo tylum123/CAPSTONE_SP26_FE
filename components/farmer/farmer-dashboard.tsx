@@ -38,41 +38,6 @@ export function FarmerDashboard() {
     fetchProfile()
   }, [])
 
-  const stats = [
-    {
-      title: "Tin đang tuyển",
-      value: "5",
-      change: "+2 tuần này",
-      icon: Briefcase,
-      color: "text-primary",
-      bgColor: "bg-primary/10",
-    },
-    {
-      title: "Ứng viên chờ duyệt",
-      value: "12",
-      change: "3 mới hôm nay",
-      icon: Users,
-      color: "text-accent-foreground",
-      bgColor: "bg-accent/20",
-    },
-    {
-      title: "Tổng chi phí tháng",
-      value: "15.5M",
-      change: "+12% so với tháng trước",
-      icon: Banknote,
-      color: "text-chart-3",
-      bgColor: "bg-chart-3/10",
-    },
-    {
-      title: "Việc hoàn thành",
-      value: "28",
-      change: "Tỷ lệ thành công 95%",
-      icon: TrendingUp,
-      color: "text-chart-4",
-      bgColor: "bg-chart-4/10",
-    },
-  ]
-
   const recentApplicants = [
     {
       id: 1,
@@ -155,26 +120,6 @@ export function FarmerDashboard() {
             Đăng tin mới
           </Link>
         </Button>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, index) => (
-          <Card key={index}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${stat.bgColor}`}>
-                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-card-foreground">{stat.value}</p>
-                  <p className="text-xs text-muted-foreground">{stat.change}</p>
-                </div>
-              </div>
-              <p className="mt-3 text-sm font-medium text-muted-foreground">{stat.title}</p>
-            </CardContent>
-          </Card>
-        ))}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

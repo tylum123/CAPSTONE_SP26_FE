@@ -143,21 +143,21 @@ export interface Job {
   farmerProfileId: string;
   contactName: string;
   jobSkillRequirements: JobSkillRequirement[];
-  farmId: string;
-  jobCategoryId: string;
+  jobCategory: JobCategory;
   title: string;
   description: string;
+  farm: GetFarmResponse;
   address: string;
   startDate: string;
   endDate: string;
-  estimatedHours: number;
+  selectedDays: string[];
   workersNeeded: number;
   workersAccepted: number;
-  wageTypeId: number;
+  jobTypeId: number;
   wageAmount: number;
-  paymentMethodId: number;
-  requiredSkills?: string;
-  genderPreference: string;
+  requiredSkills?: string[];
+  requirements: string[];
+  privileges: string[];
   publishedAt: string;
   createdAt: string;
   updatedAt: string;
@@ -183,26 +183,22 @@ export interface CreateJobCategoryRequest {
 export interface UpdateJobCategoryRequest extends Partial<CreateJobCategoryRequest> {}
 
 export interface CreateJobRequest {
-  jobSkillRequirementIds: string[];
-  farmId: string;
-  jobCategoryId: string;
+  jobTypeId: string;
   title: string;
   description: string;
+  jobCategoryId: string;
+  farmId: string;
   address: string;
-  startDate: string;
-  endDate: string;
-  estimatedHours: number;
-  workersNeeded: number;
-  workersAccepted?: number;
-  wageTypeId: number;
+  startDate: string; // khoán (jobType = 2)
+  endDate: string; // khoán (jobType = 2)
+  selectedDays: string[]; // ngày (jobType = 1) 
+  jobSkillRequirementIds: string[];
+  workersNeeded: number; // ngày (jobType = 1) 
   wageAmount: number;
-  paymentMethodId: number;
-  genderPreference: string;
   publishedAt?: string;
   createdAt?: string;
   updatedAt?: string;
   isUrgent: boolean;
-  statusId: number;
 }
 
 export interface UpdateJobRequest extends Partial<CreateJobRequest> {

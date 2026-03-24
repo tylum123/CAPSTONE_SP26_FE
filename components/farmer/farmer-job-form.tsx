@@ -1,9 +1,10 @@
 "use client"
 
-import { type KeyboardEvent, useEffect, useState } from "react"
+import { type KeyboardEvent, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, Check, CheckCheck, ChevronsUpDown, MapPinned, Plus, X, Calendar as CalendarIcon } from "lucide-react"
-import { format } from "date-fns"
+import { eachDayOfInterval, format, isSameDay, startOfDay } from "date-fns"
+import { vi } from "date-fns/locale"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -124,6 +125,34 @@ const buildOSMEmbedUrl = (lat: number, lng: number) => {
   return `https://www.openstreetmap.org/export/embed.html?bbox=${left},${bottom},${right},${top}&layer=mapnik&marker=${lat},${lng}`
 }
 
+const normalizeDay = (date: Date) => startOfDay(date)
+
+const mergeAndSortDates = (dates: Date[]) => {
+  const unique = new Map<number, Date>()
+
+  dates.forEach((date) => {
+    const normalized = normalizeDay(date)
+    unique.set(normalized.getTime(), normalized)
+  })
+
+  return Array.from(unique.values()).sort((a, b) => a.getTime() - b.getTime())
+}
+
+const getSelectionSpanInDays = (sortedDates: Date[]) => {
+  if (!sortedDates.length) {
+    return 0
+  }
+
+  const first = sortedDates[0]
+  const last = sortedDates[sortedDates.length - 1]
+  const millisecondsPerDay = 1000 * 60 * 60 * 24
+
+  return Math.floor((last.getTime() - first.getTime()) / millisecondsPerDay) + 1
+}
+
+const MAX_DAILY_RANGE_DAYS = 4
+const DAILY_RANGE_WARNING = `Khoảng giữa những ngày được chọn không được dài hơn ${MAX_DAILY_RANGE_DAYS} ngày.`
+
 export function FarmerJobForm() {
   const [step, setStep] = useState<1 | 2>(1)
   const [title, setTitle] = useState("")
@@ -158,11 +187,12 @@ export function FarmerJobForm() {
   const [contractStartDate, setContractStartDate] = useState("")
   const [contractEndDate, setContractEndDate] = useState("")
 
-  const [dailyStartDate, setDailyStartDate] = useState("")
-  const [daysToHire, setDaysToHire] = useState("1")
   const [dailyStartTime, setDailyStartTime] = useState("06:00")
   const [dailyEndTime, setDailyEndTime] = useState("17:00")
   const [selectedDailyDates, setSelectedDailyDates] = useState<Date[]>([])
+  const [isRangePicking, setIsRangePicking] = useState(false)
+  const [rangeSelectionAnchor, setRangeSelectionAnchor] = useState<Date | null>(null)
+  const [dailySelectionNotice, setDailySelectionNotice] = useState<string | null>(null)
 
   const [locationSuggestions, setLocationSuggestions] = useState<OSMPlace[]>([])
   const [isSearchingLocation, setIsSearchingLocation] = useState(false)
@@ -171,12 +201,28 @@ export function FarmerJobForm() {
   const [postedJob, setPostedJob] = useState<PostedJobPreview | null>(null)
 
   const workersNeededNumber = Number.parseInt(workersNeeded, 10) || 0
-  const daysToHireNumber = Number.parseInt(daysToHire, 10) || 0
   const incomeNumber = Number.parseInt(income, 10) || 0
 
   const selectedContractStartDate = contractStartDate ? parseDDMMYYYYToDate(contractStartDate) ?? undefined : undefined
   const selectedContractEndDate = contractEndDate ? parseDDMMYYYYToDate(contractEndDate) ?? undefined : undefined
-  const selectedDailyStartDate = dailyStartDate ? parseDDMMYYYYToDate(dailyStartDate) ?? undefined : undefined
+  const normalizedSelectedDailyDates = useMemo(() => mergeAndSortDates(selectedDailyDates), [selectedDailyDates])
+  const calendarSelectedDates = useMemo(
+    () => normalizedSelectedDailyDates.map((date) => new Date(date)),
+    [normalizedSelectedDailyDates],
+  )
+  const calendarSelectionSignature = useMemo(() => {
+    if (!calendarSelectedDates.length) {
+      return "empty"
+    }
+    return calendarSelectedDates.map((date) => date.toISOString()).join("|")
+  }, [calendarSelectedDates])
+  const selectedDailyDaysCount = normalizedSelectedDailyDates.length
+  const selectedDailyRange = selectedDailyDaysCount
+    ? {
+        first: normalizedSelectedDailyDates[0],
+        last: normalizedSelectedDailyDates[selectedDailyDaysCount - 1],
+      }
+    : null
 
   const tomorrow = new Date()
   tomorrow.setHours(0, 0, 0, 0)
@@ -420,21 +466,6 @@ export function FarmerJobForm() {
     }
   }
 
-  const updateSelectedDailyDates = (startStr: string, numDays: number) => {
-    const parsed = parseDDMMYYYYToDate(startStr)
-    if (parsed && numDays > 0) {
-      const dates: Date[] = []
-      for (let i = 0; i < Math.min(numDays, 60); i++) { // limit to 60 days to prevent freeze
-        const d = new Date(parsed)
-        d.setDate(d.getDate() + i)
-        dates.push(d)
-      }
-      setSelectedDailyDates(dates)
-    } else {
-      setSelectedDailyDates([])
-    }
-  }
-
   const handleContractStartSelect = (date?: Date) => {
     if (!date) {
       setContractStartDate("")
@@ -459,40 +490,110 @@ export function FarmerJobForm() {
     setContractEndDate(format(date, "dd/MM/yyyy"))
   }
 
-  const handleDailyStartSelect = (date?: Date) => {
-    if (!date) {
-      setDailyStartDate("")
-      updateSelectedDailyDates("", daysToHireNumber)
+  const tryUpdateSelectedDailyDates = (computeCandidate: (current: Date[]) => Date[] | null) => {
+    let didUpdate = false
+
+    setSelectedDailyDates((current) => {
+      const candidate = computeCandidate(current)
+
+      if (!candidate) {
+        return current
+      }
+
+      const next = mergeAndSortDates(candidate)
+
+      if (next.length && getSelectionSpanInDays(next) > MAX_DAILY_RANGE_DAYS) {
+        setDailySelectionNotice(DAILY_RANGE_WARNING)
+        return current
+      }
+
+      setDailySelectionNotice(null)
+      didUpdate = true
+      return next
+    })
+
+    return didUpdate
+  }
+
+  const toggleRangeSelectionMode = () => {
+    setIsRangePicking((prev) => {
+      if (prev) {
+        setRangeSelectionAnchor(null)
+      }
+      return !prev
+    })
+  }
+
+  const handleDailyCalendarDayClick = (
+    day: Date,
+    modifiers: { disabled?: boolean },
+  ) => {
+    if (modifiers.disabled) {
       return
     }
 
-    const dateStr = format(date, "dd/MM/yyyy")
-    setDailyStartDate(dateStr)
-    updateSelectedDailyDates(dateStr, daysToHireNumber)
-  }
+    const normalizedDay = normalizeDay(day)
 
-  const handleDailyStartDateChange = (val: string) => {
-    setDailyStartDate(val)
-    updateSelectedDailyDates(val, daysToHireNumber)
-  }
+    if (isRangePicking) {
+      if (!rangeSelectionAnchor) {
+        const isAlreadySelected = normalizedSelectedDailyDates.some((date) => isSameDay(date, normalizedDay))
 
-  const handleDaysToHireChange = (val: string) => {
-    setDaysToHire(val)
-    const num = Number.parseInt(val, 10) || 0
-    updateSelectedDailyDates(dailyStartDate, num)
-  }
+        if (!isAlreadySelected) {
+          const didAdd = tryUpdateSelectedDailyDates((current) => {
+            if (current.some((date) => isSameDay(date, normalizedDay))) {
+              return null
+            }
+            return [...current, normalizedDay]
+          })
 
-  const handleCalendarSelect = (dates: Date[] | undefined) => {
-    const newDates = dates || []
-    setSelectedDailyDates(newDates)
-    
-    if (newDates.length > 0) {
-      const sorted = [...newDates].sort((a, b) => a.getTime() - b.getTime())
-      setDailyStartDate(format(sorted[0], "dd/MM/yyyy"))
-      setDaysToHire(newDates.length.toString())
-    } else {
-      setDaysToHire("0")
+          if (!didAdd) {
+            return
+          }
+        }
+
+        setRangeSelectionAnchor(normalizedDay)
+        return
+      }
+
+      const [rangeStart, rangeEnd] =
+        rangeSelectionAnchor.getTime() <= normalizedDay.getTime()
+          ? [rangeSelectionAnchor, normalizedDay]
+          : [normalizedDay, rangeSelectionAnchor]
+
+      const rangeDates = eachDayOfInterval({ start: rangeStart, end: rangeEnd })
+      const didApplyRange = tryUpdateSelectedDailyDates((current) => [...current, ...rangeDates])
+
+      if (didApplyRange) {
+        setRangeSelectionAnchor(null)
+        setIsRangePicking(false)
+      }
+      return
     }
+
+    tryUpdateSelectedDailyDates((current) => {
+      const alreadySelected = current.some((date) => isSameDay(date, normalizedDay))
+      if (alreadySelected) {
+        return current.filter((date) => !isSameDay(date, normalizedDay))
+      }
+      return [...current, normalizedDay]
+    })
+  }
+
+  const removeSelectedDailyDate = (dateToRemove: Date) => {
+    tryUpdateSelectedDailyDates((current) => {
+      if (!current.some((date) => isSameDay(date, dateToRemove))) {
+        return null
+      }
+
+      return current.filter((date) => !isSameDay(date, dateToRemove))
+    })
+  }
+
+  const clearAllSelectedDailyDates = () => {
+    setSelectedDailyDates([])
+    setRangeSelectionAnchor(null)
+    setIsRangePicking(false)
+    setDailySelectionNotice(null)
   }
 
   const validateBeforePreview = () => {
@@ -509,7 +610,7 @@ export function FarmerJobForm() {
     }
 
     if (!selectedFarmId) {
-      return "Vui lòng chọn nông trại."
+      return "Vui lòng chọn địa điểm."
     }
 
     if (!selectedJobCategoryId) {
@@ -546,17 +647,8 @@ export function FarmerJobForm() {
     }
 
     if (scheduleType === "daily") {
-      if (!dailyStartDate) {
-        return "Vui lòng chọn ngày bắt đầu cho công việc theo ngày."
-      }
-
-      const parsedDailyStartDate = parseDDMMYYYYToDate(dailyStartDate)
-      if (!parsedDailyStartDate) {
-        return "Ngày bắt đầu không hợp lệ. Vui lòng nhập theo định dạng dd/mm/yyyy."
-      }
-
-      if (!daysToHireNumber || daysToHireNumber < 1) {
-        return "Vui lòng nhập số ngày muốn thuê hợp lệ."
+      if (selectedDailyDaysCount < 1) {
+        return "Vui lòng chọn ít nhất một ngày làm việc trên lịch."
       }
 
       if (!workersNeededNumber || workersNeededNumber < 1) {
@@ -610,27 +702,25 @@ export function FarmerJobForm() {
       endDate = endISO
       estimatedHours = toContractEstimatedHours(startISO, endISO)
     } else {
-      const parsedDailyStartDate = parseDDMMYYYYToDate(dailyStartDate)
-      if (!parsedDailyStartDate) {
-        setSubmitError("Ngày bắt đầu không hợp lệ. Vui lòng nhập theo định dạng dd/mm/yyyy.")
+      if (!normalizedSelectedDailyDates.length) {
+        setSubmitError("Vui lòng chọn ít nhất một ngày làm việc trên lịch.")
         return
       }
 
-      const start = new Date(parsedDailyStartDate)
-      const end = new Date()
-      end.setTime(start.getTime())
-      end.setDate(end.getDate() + Math.max(0, daysToHireNumber - 1))
+      const sortedDates = normalizedSelectedDailyDates
+      const start = sortedDates[0]
+      const end = sortedDates[sortedDates.length - 1]
 
       startDate = start.toISOString()
       endDate = end.toISOString()
-      estimatedHours = toDailyEstimatedHours(dailyStartTime, dailyEndTime, daysToHireNumber)
+      estimatedHours = toDailyEstimatedHours(dailyStartTime, dailyEndTime, sortedDates.length)
     }
 
     const descriptionParts = [
       requirements.length ? `Yêu cầu: ${requirements.join(", ")}` : "",
       benefits.length ? `Quyền lợi: ${benefits.join(", ")}` : "",
       scheduleType === "daily"
-        ? `Lịch làm: ${daysToHireNumber} ngày, ${dailyStartTime} - ${dailyEndTime}`
+        ? `Lịch làm: ${selectedDailyDaysCount} ngày, ${dailyStartTime} - ${dailyEndTime}`
         : `Lịch làm: ${formatDateDDMMYYYY(contractStartDate)} - ${formatDateDDMMYYYY(contractEndDate)}`,
     ].filter(Boolean)
 
@@ -677,7 +767,7 @@ export function FarmerJobForm() {
         scheduleType,
         contractStartDate: scheduleType === "contract" ? contractStartDate : undefined,
         contractEndDate: scheduleType === "contract" ? contractEndDate : undefined,
-        daysToHire: scheduleType === "daily" ? daysToHireNumber : undefined,
+        daysToHire: scheduleType === "daily" ? selectedDailyDaysCount : undefined,
         dailyStartTime: scheduleType === "daily" ? dailyStartTime : undefined,
         dailyEndTime: scheduleType === "daily" ? dailyEndTime : undefined,
       }
@@ -709,10 +799,9 @@ export function FarmerJobForm() {
     setScheduleType("contract")
     setContractStartDate("")
     setContractEndDate("")
-    setDailyStartDate("")
-    setDaysToHire("1")
     setDailyStartTime("06:00")
     setDailyEndTime("17:00")
+    clearAllSelectedDailyDates()
     setSubmitError(null)
     setPostedJob(null)
   }
@@ -810,7 +899,7 @@ export function FarmerJobForm() {
                       <div>
                         <p className="font-medium">Ngày</p>
                         <p className="text-sm text-muted-foreground">
-                          Nhập số ngày, ngày bắt đầu, khung giờ và số lượng nhân công.
+                          Chọn những ngày bạn muốn thuê và giờ làm việc cụ thể cho từng ngày.
                         </p>
                       </div>
                     </label>
@@ -849,6 +938,8 @@ export function FarmerJobForm() {
                                   selected={selectedContractStartDate}
                                   onSelect={handleContractStartSelect}
                                   disabled={(date) => date < tomorrow}
+                                  locale={vi}
+                                  className="[--cell-size:2.5rem]"
                                   initialFocus
                                 />
                               </PopoverContent>
@@ -880,6 +971,8 @@ export function FarmerJobForm() {
                                   disabled={(date) =>
                                     date < tomorrow || (selectedContractStartDate ? date < selectedContractStartDate : false)
                                   }
+                                  locale={vi}
+                                  className="[--cell-size:2.5rem]"
                                   initialFocus
                                 />
                               </PopoverContent>
@@ -889,64 +982,79 @@ export function FarmerJobForm() {
                       </div>
                     ) : (
                       <div className="space-y-4 rounded-lg border p-4">
-                        <div className="grid gap-4">
-                          <div>
-                            <Label htmlFor="daily-start-date">Ngày bắt đầu *</Label>
-                            <div className="mt-2 flex gap-2">
-                              <Input
-                                id="daily-start-date"
-                                type="text"
-                                value={dailyStartDate}
-                                onChange={(event) => handleDailyStartDateChange(event.target.value)}
-                                placeholder="dd/mm/yyyy"
-                                className="flex-1"
-                              />
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button type="button" variant="outline" size="icon" aria-label="Chọn ngày bắt đầu theo ngày">
-                                    <CalendarIcon className="h-4 w-4" />
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="end">
-                                  <Calendar
-                                    mode="single"
-                                    selected={selectedDailyStartDate}
-                                    onSelect={handleDailyStartSelect}
-                                    disabled={(date) => date < tomorrow}
-                                    initialFocus
-                                  />
-                                </PopoverContent>
-                              </Popover>
+                        <div className="space-y-3">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <Label className="text-sm font-medium">Chọn ngày làm việc *</Label>
+                            <div className="flex flex-wrap gap-2">
+                              <Button type="button" size="sm" variant={isRangePicking ? "default" : "outline"} onClick={toggleRangeSelectionMode}>
+                                {isRangePicking
+                                  ? rangeSelectionAnchor
+                                    ? "Chọn ngày kết thúc"
+                                    : "Chọn ngày bắt đầu"
+                                  : "Chọn nhanh theo khoảng"}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={clearAllSelectedDailyDates}
+                                disabled={!selectedDailyDaysCount}
+                              >
+                                Xóa tất cả
+                              </Button>
                             </div>
                           </div>
-                        </div>
-                        <div>
-                            <Label htmlFor="days-to-hire">Số ngày muốn thuê *</Label>
-                            <Input
-                              id="days-to-hire"
-                              type="number"
-                              min="1"
-                              value={daysToHire}
-                              onChange={(event) => handleDaysToHireChange(event.target.value)}
-                              className="mt-2"
+                          <p className="text-sm text-muted-foreground">
+                            Bấm từng ngày để thêm/bỏ. Dùng nút trên để chọn nhanh một khoảng liên tiếp.
+                          </p>
+                          {dailySelectionNotice ? (
+                            <p className="text-sm text-destructive">{dailySelectionNotice}</p>
+                          ) : null}
+                          {isRangePicking && rangeSelectionAnchor ? (
+                            <p className="text-xs text-primary">Đã chọn ngày bắt đầu: {format(rangeSelectionAnchor, "dd/MM/yyyy")}</p>
+                          ) : null}
+                          <div className="flex justify-center rounded-lg border bg-card p-3 shadow-sm">
+                            <Calendar
+                              key={calendarSelectionSignature}
+                              mode="multiple"
+                              selected={calendarSelectedDates}
+                              onDayClick={handleDailyCalendarDayClick}
+                              disabled={(date) => date < tomorrow}
+                              locale={vi}
+                              className="pointer-events-auto w-full max-w-[520px] [--cell-size:2.75rem]"
                             />
                           </div>
-                        
-                        {selectedDailyDates.length > 0 || (dailyStartDate && daysToHireNumber > 0) ? (
-                          <div className="mt-4 animate-in fade-in slide-in-from-bottom-2">
-                            <Label className="mb-2 block">Chọn các ngày cần thuê</Label>
-                            <p className="mb-2 text-sm text-muted-foreground">Bạn có thể chọn hoặc bỏ chọn các ngày trên lịch.</p>
-                            <div className="flex justify-center rounded-lg border bg-card p-3 shadow-sm">
-                              <Calendar
-                                mode="multiple"
-                                selected={selectedDailyDates}
-                                onSelect={handleCalendarSelect as any}
-                                disabled={(date) => date < tomorrow}
-                                className="pointer-events-auto"
-                              />
+                          {selectedDailyDaysCount > 0 ? (
+                            <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+                              <span>
+                                {selectedDailyRange
+                                  ? `Đã chọn ${selectedDailyDaysCount} ngày, từ ${format(selectedDailyRange.first, "dd/MM")} đến ${format(selectedDailyRange.last, "dd/MM")}.`
+                                  : `Đã chọn ${selectedDailyDaysCount} ngày.`}
+                              </span>
+                              <div className="flex flex-wrap gap-2">
+                                {normalizedSelectedDailyDates.map((date) => (
+                                  <Badge key={date.toISOString()} variant="secondary" className="flex items-center gap-1">
+                                    {format(date, "dd/MM")}
+                                    <button
+                                      type="button"
+                                      className="rounded-full p-0.5 text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+                                      onClick={(event) => {
+                                        event.preventDefault()
+                                        event.stopPropagation()
+                                        removeSelectedDailyDate(date)
+                                      }}
+                                      aria-label="Bỏ ngày"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </Badge>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        ) : null}
+                          ) : (
+                            <p className="text-sm text-muted-foreground">Chưa chọn ngày nào.</p>
+                          )}
+                        </div>
 
                         <div className="grid gap-4 sm:grid-cols-2">
                           <div>
@@ -969,16 +1077,16 @@ export function FarmerJobForm() {
                           </div>
                         </div>
                         <div>
-                            <Label htmlFor="workers-needed-daily">Số người cần thuê *</Label>
-                            <Input
-                              id="workers-needed-daily"
-                              type="number"
-                              min="1"
-                              value={workersNeeded}
-                              onChange={(event) => setWorkersNeeded(event.target.value)}
-                              className="mt-2"
-                            />
-                          </div>
+                          <Label htmlFor="workers-needed-daily">Số người cần thuê *</Label>
+                          <Input
+                            id="workers-needed-daily"
+                            type="number"
+                            min="1"
+                            value={workersNeeded}
+                            onChange={(event) => setWorkersNeeded(event.target.value)}
+                            className="mt-2"
+                          />
+                        </div>
                       </div>
                     )}
                   </CardContent>
@@ -1076,7 +1184,7 @@ export function FarmerJobForm() {
                     </div>
 
                     <div className="space-y-2 pt-2">
-                      <Label htmlFor="farm-select">Nông trại *</Label>
+                      <Label htmlFor="farm-select">Chọn địa điểm *</Label>
                       <Popover open={isFarmPopoverOpen} onOpenChange={setIsFarmPopoverOpen}>
                         <PopoverTrigger asChild>
                           <Button
@@ -1088,20 +1196,20 @@ export function FarmerJobForm() {
                             className="w-full justify-between"
                             disabled={isLoadingFarms || farms.length === 0}
                           >
-                            <span>{selectedFarmLabel || (isLoadingFarms ? "Đang tải..." : "Chọn nông trại")}</span>
+                            <span>{selectedFarmLabel || (isLoadingFarms ? "Đang tải..." : "Chọn địa điểm")}</span>
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                           {isLoadingFarms ? (
-                            <div className="p-4 text-sm text-muted-foreground">Đang tải nông trại...</div>
+                            <div className="p-4 text-sm text-muted-foreground">Đang tải địa điểm...</div>
                           ) : farms.length === 0 ? (
-                            <div className="p-4 text-sm text-muted-foreground">Chưa có nông trại khả dụng.</div>
+                            <div className="p-4 text-sm text-muted-foreground">Chưa có địa điểm khả dụng.</div>
                           ) : (
                             <Command>
-                              <CommandInput placeholder="Tìm nông trại..." />
+                              <CommandInput placeholder="Tìm địa điểm..." />
                               <CommandList>
-                                <CommandEmpty>Không tìm thấy nông trại phù hợp.</CommandEmpty>
+                                <CommandEmpty>Không tìm thấy địa điểm phù hợp.</CommandEmpty>
                                 <CommandGroup>
                                   {farms.map((farm) => {
                                     const farmId = farm.farmId || (farm as any).id
@@ -1187,7 +1295,7 @@ export function FarmerJobForm() {
                         <div className="flex h-48 items-center justify-center bg-muted/10 p-4 text-center text-sm text-muted-foreground">
                           <div className="space-y-2">
                             <MapPinned className="mx-auto h-8 w-8 opacity-50" />
-                            <p>Chọn nông trại hoặc nhập địa điểm để xem bản đồ</p>
+                            <p>Chọn địa điểm hoặc nhập địa điểm để xem bản đồ</p>
                           </div>
                         </div>
                       )}
@@ -1235,7 +1343,7 @@ export function FarmerJobForm() {
                 <CardHeader>
                   <CardTitle>Yêu cầu</CardTitle>
                   <CardDescription>
-                    Farmer có thể tự thêm yêu cầu (dụng cụ, độ tuổi, giới tính, điều kiện khác...).
+                    Bạn có thể tự thêm yêu cầu (dụng cụ, độ tuổi, giới tính, điều kiện khác...).
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -1273,7 +1381,7 @@ export function FarmerJobForm() {
               <Card>
                 <CardHeader>
                   <CardTitle>Quyền lợi</CardTitle>
-                  <CardDescription>Farmer có thể tự thêm quyền lợi (bao ăn, nghỉ 15 phút, hỗ trợ đi lại...).</CardDescription>
+                  <CardDescription>Bạn có thể tự thêm quyền lợi (bao ăn, nghỉ 15 phút, hỗ trợ đi lại...).</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex flex-wrap gap-2">
@@ -1311,7 +1419,7 @@ export function FarmerJobForm() {
 
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <Button variant="outline" asChild>
-                  <Link href="/farmer/jobs">Hủy</Link>
+                  <Link href="/ /jobs">Hủy</Link>
                 </Button>
                 <Button type="button" onClick={goToPreview}>
                   Tiếp tục
@@ -1339,7 +1447,7 @@ export function FarmerJobForm() {
                     <span className="font-medium">Địa điểm:</span> {location}
                   </p>
                   <p>
-                    <span className="font-medium">Nông trại:</span> {selectedFarmLabel || "Chưa chọn"}
+                    <span className="font-medium">địa điểm:</span> {selectedFarmLabel || "Chưa chọn"}
                   </p>
                   <p>
                     <span className="font-medium">Danh mục:</span> {selectedJobCategoryLabel || "Chưa chọn"}
@@ -1387,7 +1495,14 @@ export function FarmerJobForm() {
                     </p>
                   ) : (
                     <div className="mt-2 space-y-1 text-muted-foreground">
-                      <p>Theo ngày từ {formatDateDDMMYYYY(dailyStartDate)}, thuê {daysToHireNumber} ngày.</p>
+                      <p>
+                        {selectedDailyRange
+                          ? `Theo ngày từ ${format(selectedDailyRange.first, "dd/MM/yyyy")} đến ${format(
+                              selectedDailyRange.last,
+                              "dd/MM/yyyy",
+                            )} (${selectedDailyDaysCount} ngày).`
+                          : "Chưa chọn ngày cụ thể."}
+                      </p>
                       <p>
                         Khung giờ cố định: {dailyStartTime} - {dailyEndTime}
                       </p>

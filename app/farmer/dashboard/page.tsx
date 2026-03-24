@@ -12,18 +12,6 @@ import type { FarmerProfile } from "@/libs/api/types"
 import { useWeather } from "@/hooks/use-weather"
 import Image from "next/image"
 
-const stats = [
-  { label: "Tin đang tuyển", value: "3", icon: Briefcase, color: "text-agro-green", bgColor: "bg-agro-green/10" },
-  { label: "Đã thuê hôm nay", value: "5", icon: Users, color: "text-agro-orange", bgColor: "bg-agro-orange/10" },
-  {
-    label: "Chi phí tháng này",
-    value: "4.2M",
-    icon: DollarSign,
-    color: "text-blue-600",
-    bgColor: "bg-blue-100",
-  },
-]
-
 const recentApplications = [
   {
     id: 1,
@@ -118,6 +106,18 @@ export default function FarmerDashboard() {
     fetchProfile()
   }, [])
 
+  const stats = [
+    { label: "Tổng việc đã đăng", value: profile?.totalJobsPosted?.toString() || "0", icon: Briefcase, color: "text-agro-green", bgColor: "bg-agro-green/10" },
+    { label: "Việc đã hoàn thành", value: profile?.totalJobsCompleted?.toString() || "0", icon: Users, color: "text-agro-orange", bgColor: "bg-agro-orange/10" },
+    {
+      label: "Đánh giá trung bình",
+      value: profile?.averageRating?.toFixed(1) || "0.0",
+      icon: Star,
+      color: "text-blue-600",
+      bgColor: "bg-blue-100",
+    },
+  ]
+
   return (
     <div className="p-4 lg:p-6 space-y-6">
       {/* Welcome Section */}
@@ -129,7 +129,7 @@ export default function FarmerDashboard() {
           <p className="text-muted-foreground">Đây là tổng quan hoạt động của nông trại.</p>
         </div>
         <Link href="/farmer/create-job">
-          <Button className="bg-agro-green hover:bg-agro-green-dark text-white">+ Đăng tin tuyển dụng</Button>
+          <Button className="bg-agro-green hover:bg-agro-green-dark text-white">Tạo bài đăng mới</Button>
         </Link>
       </div>
 
