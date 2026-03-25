@@ -59,12 +59,6 @@ export interface ResetPasswordRequest {
   otp: string;
   newPassword: string;
 }
-export interface UpdateFarmerRequest {
-  contactName?: string;
-  contactNumber?: string;
-  farmType?: string;
-  avatarUrl?: string;
-}
 
 export interface UpdateFarmRequest {
   address: string,
@@ -107,7 +101,9 @@ export interface GoogleLoginRequest {
 export interface UpdateFarmerRequest {
   organizationName?: string;
   contactName?: string;
+  contactNumber?: string;
   cooperativeName?: string;
+  farmType?: string;
   avatarUrl?: string;
 }
 export interface FarmerProfile {
@@ -184,22 +180,34 @@ export interface CreateJobCategoryRequest {
 export interface UpdateJobCategoryRequest extends Partial<CreateJobCategoryRequest> {}
 
 export interface CreateJobRequest {
-  jobTypeId: string;
+  jobTypeId: number;
   title: string;
   description: string;
   jobCategoryId: string;
   farmId: string;
   address: string;
-  startDate: string; // khoán (jobType = 2)
-  endDate: string; // khoán (jobType = 2)
-  selectedDays: string[]; // ngày (jobType = 1) 
-  jobSkillRequirementIds: string[];
-  workersNeeded: number; // ngày (jobType = 1) 
+  startDate: string; 
+  endDate: string; 
+  selectedDays?: string[]; 
+  skillIds: string[];
+  workersNeeded: number;  
+  workersAccepted: number;
   wageAmount: number;
+  requirements: string[];
+  privileges: string[];
   publishedAt?: string;
   createdAt?: string;
   updatedAt?: string;
   isUrgent: boolean;
+  statusId: number;
+  
+  // Keep these just in case the backend alias is different
+  requiredSkills?: string[];
+  jobSkillRequirementIds?: string[];
+  estimatedHours?: number;
+  wageTypeId?: number;
+  paymentMethodId?: number;
+  genderPreference?: string;
 }
 
 export interface UpdateJobRequest extends Partial<CreateJobRequest> {

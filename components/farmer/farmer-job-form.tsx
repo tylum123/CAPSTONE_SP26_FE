@@ -2,7 +2,7 @@
 
 import { type KeyboardEvent, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Check, CheckCheck, ChevronsUpDown, MapPinned, Plus, X, Calendar as CalendarIcon } from "lucide-react"
+import { ArrowLeft, Check, CheckCheck, ChevronsUpDown, MapPin, MapPinned, Plus, X, Calendar as CalendarIcon, Briefcase, Banknote, Users, FileText, CalendarRange, CheckSquare, Award, Gift, AlignLeft } from "lucide-react"
 import { eachDayOfInterval, format, isSameDay, startOfDay } from "date-fns"
 import { vi } from "date-fns/locale"
 import { Badge } from "@/components/ui/badge"
@@ -156,6 +156,7 @@ const DAILY_RANGE_WARNING = `Khoảng giữa những ngày được chọn khôn
 export function FarmerJobForm() {
   const [step, setStep] = useState<1 | 2>(1)
   const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
   const [income, setIncome] = useState("")
   const [workersNeeded, setWorkersNeeded] = useState("1")
   const [location, setLocation] = useState("")
@@ -601,6 +602,10 @@ export function FarmerJobForm() {
       return "Vui lòng nhập tiêu đề công việc."
     }
 
+    if (!description.trim()) {
+      return "Vui lòng nhập mô tả chi tiết."
+    }
+
     if (!incomeNumber || incomeNumber < 1) {
       return "Vui lòng nhập thu nhập hợp lệ."
     }
@@ -717,6 +722,7 @@ export function FarmerJobForm() {
     }
 
     const descriptionParts = [
+      description.trim(),
       requirements.length ? `Yêu cầu: ${requirements.join(", ")}` : "",
       benefits.length ? `Quyền lợi: ${benefits.join(", ")}` : "",
       scheduleType === "daily"
@@ -725,7 +731,8 @@ export function FarmerJobForm() {
     ].filter(Boolean)
 
     const payload: CreateJobRequest = {
-      jobSkillRequirementIds: selectedSkillIds,
+      skillIds: selectedSkillIds,
+      requiredSkills: selectedSkillIds,
       farmId: selectedFarmId || DEFAULT_FARM_ID,
       jobCategoryId: selectedJobCategoryId || DEFAULT_JOB_CATEGORY_ID,
       title: title.trim(),
@@ -733,14 +740,20 @@ export function FarmerJobForm() {
       address: location.trim(),
       startDate,
       endDate,
+      selectedDays: normalizedSelectedDailyDates.map(date => date.toISOString()),
       estimatedHours,
       workersNeeded: scheduleType === "daily" ? workersNeededNumber : 1,
       workersAccepted: 0,
+      jobTypeId: scheduleType === "daily" ? 1 : 2,
       wageTypeId: DEFAULT_WAGE_TYPE_ID,
       wageAmount: incomeNumber,
+      requirements,
+      privileges: benefits,
       paymentMethodId: DEFAULT_PAYMENT_METHOD_ID,
       genderPreference: DEFAULT_GENDER_PREFERENCE,
       publishedAt: nowISO,
+      createdAt: nowISO,
+      updatedAt: nowISO,
       isUrgent: DEFAULT_IS_URGENT,
       statusId: DEFAULT_STATUS_ID,
     }
@@ -1110,6 +1123,17 @@ export function FarmerJobForm() {
                     </div>
 
                     <div className="space-y-2">
+                      <Label htmlFor="job-description">Mô tả chi tiết *</Label>
+                      <textarea
+                        id="job-description"
+                        value={description}
+                        onChange={(event) => setDescription(event.target.value)}
+                        className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        placeholder="Mô tả các công việc cần làm, môi trường làm việc..."
+                      />
+                    </div>
+
+                    <div className="space-y-2">
                       <Label htmlFor="job-category">Danh mục công việc *</Label>
                       <Popover open={isJobCategoryPopoverOpen} onOpenChange={setIsJobCategoryPopoverOpen}>
                         <PopoverTrigger asChild>
@@ -1432,83 +1456,142 @@ export function FarmerJobForm() {
                 <CardTitle>Sơ lược tin sẽ đăng</CardTitle>
                 <CardDescription>Kiểm tra lại thông tin trước khi tiến hành đăng bài.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-5">
-                <div className="grid gap-4 rounded-lg border p-4 text-sm sm:grid-cols-2">
-                  <p>
-                    <span className="font-medium">Tiêu đề:</span> {title}
-                  </p>
-                  <p>
-                    <span className="font-medium">Thu nhập:</span> {formatCurrency(incomeNumber)}
-                  </p>
-                  <p>
-                    <span className="font-medium">Số nhân công cần:</span> {scheduleType === "daily" ? workersNeededNumber : "Không bắt buộc"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Địa điểm:</span> {location}
-                  </p>
-                  <p>
-                    <span className="font-medium">địa điểm:</span> {selectedFarmLabel || "Chưa chọn"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Danh mục:</span> {selectedJobCategoryLabel || "Chưa chọn"}
-                  </p>
-                </div>
-
-                {/* <div>
-                  <p className="mb-2 text-sm font-medium">Yêu cầu</p>
-                  <div className="flex flex-wrap gap-2">
-                    {requirements.map((item, index) => (
-                      <Badge key={`${item}-${index}`} variant="secondary">
-                        {item}
-                      </Badge>
-                    ))}
-                  </div>
-                </div> */}
-
-                <div>
-                  <p className="mb-2 text-sm font-medium">Kinh nghiệm</p>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedSkillIds.map((skillId) => (
-                      <Badge key={skillId} variant="outline">
-                        {getSkillLabel(skillId)}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                {/* <div>
-                  <p className="mb-2 text-sm font-medium">Quyền lợi</p>
-                  <div className="flex flex-wrap gap-2">
-                    {benefits.map((item, index) => (
-                      <Badge key={`${item}-${index}`} variant="secondary">
-                        {item}
-                      </Badge>
-                    ))}
-                  </div>
-                </div> */}
-
-                <div className="rounded-lg border p-4 text-sm">
-                  <p className="font-medium">Thời gian làm việc</p>
-                  {scheduleType === "contract" ? (
-                    <p className="mt-2 text-muted-foreground">
-                      Theo khoán từ {formatDateDDMMYYYY(contractStartDate)} đến {formatDateDDMMYYYY(contractEndDate)}.
-                    </p>
-                  ) : (
-                    <div className="mt-2 space-y-1 text-muted-foreground">
-                      <p>
-                        {selectedDailyRange
-                          ? `Theo ngày từ ${format(selectedDailyRange.first, "dd/MM/yyyy")} đến ${format(
-                              selectedDailyRange.last,
-                              "dd/MM/yyyy",
-                            )} (${selectedDailyDaysCount} ngày).`
-                          : "Chưa chọn ngày cụ thể."}
-                      </p>
-                      <p>
-                        Khung giờ cố định: {dailyStartTime} - {dailyEndTime}
-                      </p>
-                      <p>Số lượng nhân công: {workersNeededNumber}</p>
+              <CardContent className="space-y-6">
+                <div className="grid gap-6 rounded-xl border bg-slate-50/50 p-6 text-sm sm:grid-cols-2 dark:bg-slate-900/50">
+                  <div className="col-span-1 space-y-1.5 sm:col-span-2">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <FileText className="h-4 w-4" />
+                      <span className="font-medium">Tiêu đề</span>
                     </div>
-                  )}
+                    <p className="pl-6 text-base font-semibold">{title}</p>
+                  </div>
+
+                  <div className="col-span-1 space-y-1.5 sm:col-span-2">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <AlignLeft className="h-4 w-4" />
+                      <span className="font-medium">Mô tả</span>
+                    </div>
+                    <p className="whitespace-pre-wrap pl-6 text-muted-foreground">{description}</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Banknote className="h-4 w-4" />
+                      <span className="font-medium">Thu nhập</span>
+                    </div>
+                    <p className="pl-6 font-semibold text-primary">{formatCurrency(incomeNumber)}</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Users className="h-4 w-4" />
+                      <span className="font-medium">Số nhân công cần</span>
+                    </div>
+                    <p className="pl-6 font-medium">{scheduleType === "daily" ? workersNeededNumber : "Không bắt buộc"}</p>
+                  </div>
+
+                  <div className="col-span-1 space-y-1.5 sm:col-span-2">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <MapPin className="h-4 w-4" />
+                      <span className="font-medium">Khu vực làm việc</span>
+                    </div>
+                    <p className="pl-6">
+                      <span className="font-medium">{selectedFarmLabel || "Chưa chọn"}</span>
+                      {location ? ` - ${location}` : ""}
+                    </p>
+                  </div>
+
+                  <div className="col-span-1 space-y-1.5 sm:col-span-2">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Briefcase className="h-4 w-4" />
+                      <span className="font-medium">Danh mục</span>
+                    </div>
+                    <p className="pl-6">{selectedJobCategoryLabel || "Chưa chọn"}</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-xl border bg-card p-4 shadow-sm">
+                    <div className="mb-3 flex items-center gap-2 font-medium text-muted-foreground">
+                      <CheckSquare className="h-4 w-4" />
+                      <p>Yêu cầu</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-sm">
+                      {requirements.length > 0 ? (
+                        requirements.map((item, index) => (
+                          <Badge key={`${item}-${index}`} variant="secondary">
+                            {item}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground">Không có</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border bg-card p-4 shadow-sm">
+                    <div className="mb-3 flex items-center gap-2 font-medium text-muted-foreground">
+                      <Award className="h-4 w-4" />
+                      <p>Kinh nghiệm</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-sm">
+                      {selectedSkillIds.length > 0 ? (
+                        selectedSkillIds.map((skillId) => (
+                          <Badge key={skillId} variant="outline">
+                            {getSkillLabel(skillId)}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground">Không yêu cầu</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border bg-card p-4 shadow-sm">
+                    <div className="mb-3 flex items-center gap-2 font-medium text-muted-foreground">
+                      <Gift className="h-4 w-4" />
+                      <p>Quyền lợi</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-sm">
+                      {benefits.length > 0 ? (
+                        benefits.map((item, index) => (
+                          <Badge key={`${item}-${index}`} variant="secondary">
+                            {item}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground">Không có</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border bg-slate-50/50 p-5 text-sm dark:bg-slate-900/50">
+                  <div className="mb-3 flex items-center gap-2 font-medium text-muted-foreground">
+                    <CalendarRange className="h-4 w-4" />
+                    <p>Thời gian làm việc</p>
+                  </div>
+                  <div className="pl-6">
+                    {scheduleType === "contract" ? (
+                      <p className="text-muted-foreground">
+                        Làm việc theo khoán từ <span className="font-medium text-foreground">{formatDateDDMMYYYY(contractStartDate)}</span> đến <span className="font-medium text-foreground">{formatDateDDMMYYYY(contractEndDate)}</span>.
+                      </p>
+                    ) : (
+                      <div className="space-y-1.5 text-muted-foreground">
+                        <p>
+                          {selectedDailyRange
+                            ? <>
+                                Làm việc theo ngày từ <span className="font-medium text-foreground">{format(selectedDailyRange.first, "dd/MM/yyyy")}</span> đến <span className="font-medium text-foreground">{format(selectedDailyRange.last, "dd/MM/yyyy")}</span> (<span className="font-medium text-foreground">{selectedDailyDaysCount}</span> ngày).
+                              </>
+                            : "Chưa chọn ngày cụ thể."}
+                        </p>
+                        <p>
+                          Khung giờ làm việc hàng ngày: <span className="font-medium text-foreground">{dailyStartTime} - {dailyEndTime}</span>
+                        </p>
+                        <p>Số lượng nhân công: <span className="font-medium text-foreground">{workersNeededNumber}</span></p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {submitError ? <p className="text-sm font-medium text-destructive">{submitError}</p> : null}
