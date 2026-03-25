@@ -15,13 +15,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { authService } from "@/libs/api/services/auth.service";
 import { useToast } from "@/hooks/use-toast";
 import { GoogleLoginButton } from "@/components/auth/google-login-button";
 import { handleRegistrationError } from "@/libs/utils/error-handler";
 import { useAuth } from "@/stores/auth.store";
+import { AddressForm } from "@/components/address-form";
 
 function RegisterContent() {
   const router = useRouter();
@@ -30,41 +30,110 @@ function RegisterContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{
+    email?: string;
+    phoneNumber?: string;
+    password?: string;
+    confirmPassword?: string;
+  }>({});
 
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     confirmPassword: "",
     phoneNumber: "",
-    address: "",
+    address: {
+      province: "",
+      ward: "",
+      detailedAddress: "",
+    },
   });
+
+  const validateEmail = (value: string) => {
+    const normalizedEmail = value.trim().toLowerCase();
+    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+    const [localPart = "", domainPart = ""] = normalizedEmail.split("@");
+
+    if (!normalizedEmail) return "Email là bắt buộc";
+
+    if (
+      !emailRegex.test(normalizedEmail) ||
+      normalizedEmail.includes("..") ||
+      localPart.length > 64 ||
+      normalizedEmail.length > 254 ||
+      domainPart.startsWith("-") ||
+      domainPart.endsWith("-")
+    ) {
+      return "Email không hợp lệ";
+    }
+
+    return undefined;
+  };
+
+  const validatePhoneNumber = (value: string) => {
+    const normalizedPhone = value.replace(/\D/g, "");
+    if (!normalizedPhone) return "Số điện thoại là bắt buộc";
+    if (!/^\d{10}$/.test(normalizedPhone)) {
+      return "Số điện thoại phải gồm đúng 10 chữ số";
+    }
+    return undefined;
+  };
+
+  const validatePassword = (value: string) => {
+    if (!value) return "Mật khẩu là bắt buộc";
+    if (value.length < 8) return "Mật khẩu phải có ít nhất 8 ký tự";
+
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/;
+    if (!passwordRegex.test(value)) {
+      return "Mật khẩu phải có ít nhất 1 chữ hoa, 1 số và 1 ký tự đặc biệt";
+    }
+
+    return undefined;
+  };
+
+  const validateConfirmPassword = (password: string, confirmPassword: string) => {
+    if (!confirmPassword) return "Vui lòng xác nhận mật khẩu";
+    if (password !== confirmPassword) return "Mật khẩu xác nhận không khớp";
+    return undefined;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (formData.password !== formData.confirmPassword) {
+    const normalizedEmail = formData.email.trim().toLowerCase();
+    const normalizedPhone = formData.phoneNumber.replace(/\D/g, "");
+
+    const nextErrors = {
+      email: validateEmail(formData.email),
+      phoneNumber: validatePhoneNumber(formData.phoneNumber),
+      password: validatePassword(formData.password),
+      confirmPassword: validateConfirmPassword(
+        formData.password,
+        formData.confirmPassword
+      ),
+    };
+
+    setFieldErrors(nextErrors);
+
+    const firstError = Object.values(nextErrors).find(Boolean);
+    if (firstError) {
       toast({
         title: "Lỗi",
-        description: "Mật khẩu xác nhận không khớp",
+        description: firstError,
         variant: "destructive",
       });
       return;
     }
 
-    if (formData.password.length < 6) {
+    // Validate address
+    if (
+      !formData.address.province ||
+      !formData.address.ward ||
+      !formData.address.detailedAddress
+    ) {
       toast({
         title: "Lỗi",
-        description: "Mật khẩu phải có ít nhất 6 ký tự",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      toast({
-        title: "Lỗi",
-        description: "Email không hợp lệ",
+        description: "Vui lòng điền đầy đủ thông tin địa chỉ",
         variant: "destructive",
       });
       return;
@@ -73,11 +142,14 @@ function RegisterContent() {
     setIsLoading(true);
 
     try {
+      // Construct full address string
+      const fullAddress = `${formData.address.detailedAddress}, ${formData.address.ward}, ${formData.address.province}`;
+
       const response = await authService.register({
-        email: formData.email,
+        email: normalizedEmail,
         password: formData.password,
-        phoneNumber: formData.phoneNumber,
-        address: formData.address,
+        phoneNumber: normalizedPhone,
+        address: fullAddress,
         roleId: 2,
       });
 
@@ -98,20 +170,26 @@ function RegisterContent() {
       }
 
       if (response.data?.token) {
-        localStorage.setItem("access_token", response.data.token);
-        localStorage.setItem("user_email", response.data.email);
-        localStorage.setItem("token_expires_at", response.data.expiresAt);
+        const userData = response.data as typeof response.data & {
+          id?: string;
+          fullName?: string;
+          refresh_token?: string;
+        };
+
+        localStorage.setItem("access_token", userData.token);
+        localStorage.setItem("user_email", userData.email);
+        localStorage.setItem("token_expires_at", userData.expiresAt);
 
         // Create user object for auth context
         const user = {
-          id: response.data.id || '',
-          email: response.data.email || formData.email,
-          fullName: response.data.fullName || '',
-          role: 'farmer' as const,
+          id: userData.id || "",
+          email: userData.email || normalizedEmail,
+          fullName: userData.fullName || userData.email || "",
+          role: "farmer" as const,
         };
 
         // Update auth context to auto-login user after registration
-        login(user, response.data.token, response.data.refresh_token || '');
+        login(user, userData.token, userData.refresh_token || "");
       }
 
       toast({
@@ -136,7 +214,7 @@ function RegisterContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-agro-cream via-white to-agro-green/5 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-linear-to-br from-agro-cream via-white to-agro-green/5 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <Link
           href="/"
@@ -173,15 +251,31 @@ function RegisterContent() {
                   type="email"
                   placeholder="email@example.com"
                   value={formData.email}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const nextEmail = e.target.value;
                     setFormData({
                       ...formData,
-                      email: e.target.value,
-                    })
+                      email: nextEmail,
+                    });
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      email: validateEmail(nextEmail),
+                    }));
+                  }}
+                  onBlur={() =>
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      email: validateEmail(formData.email),
+                    }))
                   }
-                  className="border-agro-green/30 focus:border-agro-green"
+                  className={`border-agro-green/30 focus:border-agro-green ${
+                    fieldErrors.email ? "border-red-500 focus:border-red-500" : ""
+                  }`}
                   required
                 />
+                {fieldErrors.email && (
+                  <p className="text-sm text-red-600">{fieldErrors.email}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -192,34 +286,45 @@ function RegisterContent() {
                   type="tel"
                   placeholder="0912 345 678"
                   value={formData.phoneNumber}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const nextPhone = e.target.value;
                     setFormData({
                       ...formData,
-                      phoneNumber: e.target.value,
-                    })
+                      phoneNumber: nextPhone,
+                    });
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      phoneNumber: validatePhoneNumber(nextPhone),
+                    }));
+                  }}
+                  onBlur={() =>
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      phoneNumber: validatePhoneNumber(formData.phoneNumber),
+                    }))
                   }
-                  className="border-agro-green/30 focus:border-agro-green"
+                  className={`border-agro-green/30 focus:border-agro-green ${
+                    fieldErrors.phoneNumber
+                      ? "border-red-500 focus:border-red-500"
+                      : ""
+                  }`}
                   required
                 />
+                {fieldErrors.phoneNumber && (
+                  <p className="text-sm text-red-600">{fieldErrors.phoneNumber}</p>
+                )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="address">Địa chỉ</Label>
-                <Textarea
-                  id="address"
-                  name="address"
-                  placeholder="Số nhà, đường, xã/phường, huyện/quận, tỉnh"
-                  value={formData.address}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      address: e.target.value,
-                    })
-                  }
-                  className="border-agro-green/30 focus:border-agro-green min-h-20"
-                  required
-                />
-              </div>
+              <AddressForm
+                value={formData.address}
+                onChange={(address) =>
+                  setFormData({
+                    ...formData,
+                    address,
+                  })
+                }
+                required
+              />
 
               <div className="space-y-2">
                 <Label htmlFor="password">Mật khẩu</Label>
@@ -230,13 +335,30 @@ function RegisterContent() {
                     type={showPassword ? "text" : "password"}
                     placeholder="Tối thiểu 8 ký tự"
                     value={formData.password}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const nextPassword = e.target.value;
                       setFormData({
                         ...formData,
-                        password: e.target.value,
-                      })
+                        password: nextPassword,
+                      });
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        password: validatePassword(nextPassword),
+                        confirmPassword: validateConfirmPassword(
+                          nextPassword,
+                          formData.confirmPassword
+                        ),
+                      }));
+                    }}
+                    onBlur={() =>
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        password: validatePassword(formData.password),
+                      }))
                     }
-                    className="border-agro-green/30 focus:border-agro-green pr-10"
+                    className={`border-agro-green/30 focus:border-agro-green pr-10 ${
+                      fieldErrors.password ? "border-red-500 focus:border-red-500" : ""
+                    }`}
                     required
                   />
                   <button
@@ -251,6 +373,9 @@ function RegisterContent() {
                     )}
                   </button>
                 </div>
+                {fieldErrors.password && (
+                  <p className="text-sm text-red-600">{fieldErrors.password}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -262,13 +387,34 @@ function RegisterContent() {
                     type={showConfirmPassword ? "text" : "password"}
                     placeholder="Nhập lại mật khẩu"
                     value={formData.confirmPassword}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const nextConfirmPassword = e.target.value;
                       setFormData({
                         ...formData,
-                        confirmPassword: e.target.value,
-                      })
+                        confirmPassword: nextConfirmPassword,
+                      });
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        confirmPassword: validateConfirmPassword(
+                          formData.password,
+                          nextConfirmPassword
+                        ),
+                      }));
+                    }}
+                    onBlur={() =>
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        confirmPassword: validateConfirmPassword(
+                          formData.password,
+                          formData.confirmPassword
+                        ),
+                      }))
                     }
-                    className="border-agro-green/30 focus:border-agro-green pr-10"
+                    className={`border-agro-green/30 focus:border-agro-green pr-10 ${
+                      fieldErrors.confirmPassword
+                        ? "border-red-500 focus:border-red-500"
+                        : ""
+                    }`}
                     required
                   />
                   <button
@@ -283,20 +429,23 @@ function RegisterContent() {
                     )}
                   </button>
                 </div>
+                {fieldErrors.confirmPassword && (
+                  <p className="text-sm text-red-600">{fieldErrors.confirmPassword}</p>
+                )}
               </div>
 
               <div className="p-4 bg-agro-cream rounded-lg">
                 <p className="text-sm text-muted-foreground">
                   Bằng việc đăng ký, bạn đồng ý với{" "}
                   <Link
-                    href="/terms"
+                    href="/terms#terms"
                     className="text-agro-green hover:underline"
                   >
                     Điều khoản sử dụng
                   </Link>{" "}
                   và{" "}
                   <Link
-                    href="/privacy"
+                    href="/terms#privacy"
                     className="text-agro-green hover:underline"
                   >
                     Chính sách bảo mật

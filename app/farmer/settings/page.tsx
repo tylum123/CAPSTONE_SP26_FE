@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Upload, Save, Loader2 } from "lucide-react"
+import { Upload, Save, Loader2, RotateCcw } from "lucide-react"
 import { handleApiError } from "@/lib/utils/error-handler"
 import { FarmerProfile, UpdateFarmerRequest } from "@/libs/api/types"
 import { farmerService } from "@/libs/api/services/farmer.service"
@@ -24,10 +24,8 @@ export default function SettingsPage() {
   const [avatarPreview, setAvatarPreview] = useState("")
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState<UpdateFarmerRequest>({
-    organizationName: "",
     contactName: "",
     contactNumber: "",
-    cooperativeAffiliation: "",
     farmType: "",
     avatarUrl: "",
   })
@@ -52,16 +50,30 @@ export default function SettingsPage() {
           const initialAvatar = response.data.avatarUrl || ""
           setAvatarPreview(initialAvatar)
           setFormData({
-            organizationName: response.data.organizationName || "",
             contactName: response.data.contactName || "",
-            contactNumber: response.data.contactNumber || "",
-            cooperativeAffiliation: response.data.cooperativeAffiliation || "",
-            farmType: response.data.farmType || "",
+            contactNumber: response.data.user?.phoneNumber || "",
+            farmType: "", // Removed from new response type
             avatarUrl: initialAvatar,
           })
         }
       } catch (error: any) {
         console.error("Failed to load profile:", error)
+
+        const statusCode = error?.response?.status
+        const backendMessage = error?.response?.data?.message
+        const isProfileMissing =
+          statusCode === 500 &&
+          typeof backendMessage === "string" &&
+          backendMessage.toLowerCase().includes("farmer profile not found")
+
+        if (isProfileMissing) {
+          toast({
+            title: "Thông báo",
+            description: "Vui lòng cập nhật thông tin cá nhân",
+          })
+          return
+        }
+
         toast({
           title: "Lỗi",
           description: handleApiError(error, {
@@ -160,14 +172,15 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 lg:p-6">
       <div>
-        <h1 className="text-2xl font-bold">Cài đặt tài khoản</h1>
-        <p className="text-muted-foreground">Quản lý thông tin cá nhân, hồ sơ nông trại và các địa điểm canh tác</p>
+        <h1 className="text-2xl font-bold">Thông tin</h1>
+        <p className="text-muted-foreground">Chỉnh sửa thông tin cá nhân và các địa điểm canh tác</p>
       </div>
 
       <Tabs defaultValue="account" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:w-fit">
+        <TabsList className="grid w-full grid-cols-3 md:w-fit">
           <TabsTrigger value="account">Tài khoản</TabsTrigger>
-          <TabsTrigger value="farm">Nông trại</TabsTrigger>
+          <TabsTrigger value="notifications">Thông báo</TabsTrigger>
+          <TabsTrigger value="farm">Quản lý địa điểm</TabsTrigger>
         </TabsList>
 
         <TabsContent value="account" className="space-y-6">
@@ -177,10 +190,10 @@ export default function SettingsPage() {
               <CardDescription>Cập nhật thông tin tài khoản của bạn</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-20 w-20">
-                  <AvatarImage src={avatarPreview || "/placeholder.svg"} />
-                  <AvatarFallback className="bg-agro-green text-white text-2xl">
+              <div className="flex flex-col items-center justify-center gap-4 py-4 border-b border-muted/50 mb-6">
+                <Avatar className="h-32 w-32 md:h-40 md:w-40 shadow-sm border border-muted/50">
+                  <AvatarImage className="object-cover" src={avatarPreview || "/placeholder.svg"} />
+                  <AvatarFallback className="bg-agro-green text-white text-5xl">
                     {profile?.contactName?.charAt(0).toUpperCase() || "NA"}
                   </AvatarFallback>
                 </Avatar>
@@ -193,7 +206,7 @@ export default function SettingsPage() {
                 />
                 <Button
                   variant="outline"
-                  className="gap-2 bg-transparent"
+                  className="gap-2 bg-transparent w-full max-w-[200px]"
                   onClick={() => avatarInputRef.current?.click()}
                   disabled={uploadingAvatar}
                 >
@@ -208,19 +221,11 @@ export default function SettingsPage() {
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Họ và tên</Label>
-                  <Input
-                    id="name"
-                    value={formData.contactName || ""}
-                    onChange={(e) => handleInputChange("contactName", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
-                    value={profile?.email || ""}
+                    value={profile?.user?.email || ""}
                     disabled
                   />
                 </div>
@@ -228,14 +233,65 @@ export default function SettingsPage() {
                   <Label htmlFor="phone">Số điện thoại</Label>
                   <Input
                     id="phone"
-                    value={formData.contactNumber || ""}
-                    onChange={(e) => handleInputChange("contactNumber", e.target.value)}
+                    value={profile?.user?.phoneNumber || ""}
+                    disabled
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="address">Địa chỉ chính</Label>
+                <Input
+                  id="address"
+                  value={profile?.user?.address || ""}
+                  disabled
+                />
+              </div>  
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="name">Họ và tên</Label>
+                  {profile && formData.contactName !== (profile.contactName || "") && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 text-muted-foreground hover:text-agro-green"
+                      onClick={() => handleInputChange("contactName", profile.contactName || "")}
+                    >
+                      <RotateCcw className="mr-1 h-3 w-3" />
+                      <span className="text-xs">Hoàn tác</span>
+                    </Button>
+                  )}
+                </div>
+                <Input
+                  id="name"
+                  value={formData.contactName || ""}
+                  onChange={(e) => handleInputChange("contactName", e.target.value)}
+                />
               </div>
             </CardContent>
           </Card>
 
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full bg-agro-green text-white hover:bg-agro-green-dark md:w-auto"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Đang lưu...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Lưu thay đổi
+              </>
+            )}
+          </Button>
+        </TabsContent>
+
+        <TabsContent value="notifications" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Thông báo</CardTitle>
@@ -272,94 +328,11 @@ export default function SettingsPage() {
                   onCheckedChange={(v) => setNotifications({ ...notifications, paymentReminders: v })}
                 />
               </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Khuyến mãi</p>
-                  <p className="text-sm text-muted-foreground">Nhận thông tin khuyến mãi từ AgroTemp</p>
-                </div>
-                <Switch
-                  checked={notifications.promotions}
-                  onCheckedChange={(v) => setNotifications({ ...notifications, promotions: v })}
-                />
-              </div>
             </CardContent>
           </Card>
-
-          <Button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full bg-agro-green text-white hover:bg-agro-green-dark md:w-auto"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Đang lưu...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                Lưu thay đổi
-              </>
-            )}
-          </Button>
         </TabsContent>
 
         <TabsContent value="farm" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Thông tin nông trại</CardTitle>
-              <CardDescription>Cập nhật hồ sơ nông trại sẽ hiển thị công khai trên tài khoản của bạn</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="farmName">Tên nông trại</Label>
-                  <Input
-                    id="farmName"
-                    value={formData.organizationName || ""}
-                    onChange={(e) => handleInputChange("organizationName", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="farmType">Loại nông trại</Label>
-                  <Input
-                    id="farmType"
-                    value={formData.farmType || ""}
-                    onChange={(e) => handleInputChange("farmType", e.target.value)}
-                    placeholder="vd: Rau, Lúa, Chăn nuôi..."
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="cooperative">Hiệp hội liên kết</Label>
-                  <Input
-                    id="cooperative"
-                    value={formData.cooperativeAffiliation || ""}
-                    onChange={(e) => handleInputChange("cooperativeAffiliation", e.target.value)}
-                    placeholder="vd: Hiệp hội nông dân xã..."
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full bg-agro-green text-white hover:bg-agro-green-dark md:w-auto"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Đang lưu...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                Lưu hồ sơ nông trại
-              </>
-            )}
-          </Button>
-
           <FarmerFarmManager />
         </TabsContent>
       </Tabs>

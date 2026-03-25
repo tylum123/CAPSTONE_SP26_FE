@@ -1,6 +1,19 @@
+import { id } from "date-fns/locale";
 import axiosInstance from "../axios-instance";
 import { API_ENDPOINTS } from "../config";
 import type { ApiResponse, GetFarmResponse, UpdateFarmRequest } from "../types";
+
+const createFormData = (field: string, files: File | File[]) => {
+  const formData = new FormData()
+
+  if (Array.isArray(files)) {
+    files.forEach((file) => formData.append(field, file))
+  } else {
+    formData.append(field, files)
+  }
+
+  return formData
+}
 
 export const FarmService = {
   getFarms: async (): Promise<ApiResponse<GetFarmResponse[]>> => {
@@ -28,6 +41,13 @@ export const FarmService = {
 
   removeFarm: async (id: string): Promise<ApiResponse<void>> => {
     const response = await axiosInstance.delete(API_ENDPOINTS.FARM.REMOVE_FARM(id));
+    return response.data;
+  },
+
+  uploadImage: async (id: string, file: File): Promise<ApiResponse<string>> => {
+    const formData = createFormData('file', file)
+    const response = await axiosInstance.post(API_ENDPOINTS.FARM.UPLOAD_IMAGE(id), formData, 
+  {     headers: { 'Content-Type': 'multipart/form-data' } });
     return response.data;
   },
 };

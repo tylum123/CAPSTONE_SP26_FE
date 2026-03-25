@@ -55,6 +55,16 @@ export const commonService = {
   },
 
   /**
+   * Mark messages from `senderId` to current user as read.
+   */
+  markConversationAsRead: async (senderId: string): Promise<ApiResponse<number>> => {
+    const response = await axiosInstance.patch(`${API_ENDPOINTS.MESSAGES}/read`, {
+      senderId,
+    });
+    return response.data;
+  },
+
+  /**
    * Upload file
    */
   uploadFile: async (file: File): Promise<ApiResponse<{ url: string }>> => {

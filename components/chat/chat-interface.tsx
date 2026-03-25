@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,13 +8,19 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Search, Send, MoreVertical, Phone, Video, Paperclip } from "lucide-react";
 import { cn } from "@/libs/utils";
+import { HubConnection, HubConnectionBuilder, HttpTransportType, LogLevel } from "@microsoft/signalr";
+import { commonService } from "@/libs/api/services";
+import { API_CONFIG } from "@/libs/api/config";
+import { STORAGE_KEYS } from "@/constants";
+import { useAuth } from "@/stores/auth.store";
 
 interface Message {
   id: string;
   senderId: string;
+  receiverId: string;
   content: string;
-  timestamp: string;
   read: boolean;
+  createdAt: string;
 }
 
 interface Conversation {
@@ -41,51 +47,152 @@ export function ChatInterface({
 }: ChatInterfaceProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [messageInput, setMessageInput] = useState("");
-  
-  // Mock messages for the selected conversation
-  const mockMessages: Message[] = currentConversationId
-    ? [
-        {
-          id: "1",
-          senderId: "other",
-          content: "Xin chào, tôi muốn hỏi về công việc này",
-          timestamp: "10:30 AM",
-          read: true,
-        },
-        {
-          id: "2",
-          senderId: "me",
-          content: "Chào bạn! Bạn cần biết thông tin gì ạ?",
-          timestamp: "10:32 AM",
-          read: true,
-        },
-        {
-          id: "3",
-          senderId: "other",
-          content: "Công việc bắt đầu lúc mấy giờ và kéo dài bao lâu?",
-          timestamp: "10:33 AM",
-          read: true,
-        },
-        {
-          id: "4",
-          senderId: "me",
-          content: "Công việc bắt đầu từ 6h sáng đến 4h chiều. Thời gian làm việc khoảng 2 tuần.",
-          timestamp: "10:35 AM",
-          read: true,
-        },
-      ]
-    : [];
 
   const currentConversation = conversations.find((c) => c.id === currentConversationId);
+
+  const { user } = useAuth();
+  const myUserId = user?.id;
+
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  const connectionRef = useRef<HubConnection | null>(null);
+  const otherUserIdRef = useRef<string | null>(null);
+  const myUserIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    myUserIdRef.current = myUserId ?? null;
+  }, [myUserId]);
+
+  const hubBaseUrl = useMemo(() => {
+    // API_CONFIG.BASE_URL is like: http://localhost:5057/api/v1
+    // Hub endpoint is: http://localhost:5057/hubs/chat
+    return API_CONFIG.BASE_URL.replace(/\/api\/v1\/?$/, "");
+  }, []);
+
+  useEffect(() => {
+    otherUserIdRef.current = currentConversation?.userId ?? null;
+    setMessages([]); // reset view when switching conversations
+  }, [currentConversationId, currentConversation?.userId]);
 
   const filteredConversations = conversations.filter((conv) =>
     conv.userName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleSendMessage = () => {
-    if (messageInput.trim()) {
-      // TODO: Implement send message logic
-      console.log("Sending message:", messageInput);
+  const formatCreatedAt = (value: string) => {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const ensureConnectionStarted = async () => {
+    if (connectionRef.current) return connectionRef.current;
+
+    const accessToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN) ?? "";
+    const hubUrl = `${hubBaseUrl}/hubs/chat`;
+
+    const connection = new HubConnectionBuilder()
+      .withUrl(hubUrl, {
+        accessTokenFactory: () => accessToken,
+        transport: HttpTransportType.WebSockets,
+      })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.Information)
+      .build();
+
+    connection.on("NewMessage", (incoming: any) => {
+      const myIdNow = myUserIdRef.current;
+      const otherIdNow = otherUserIdRef.current;
+      if (!myIdNow || !otherIdNow) return;
+
+      const isBetweenCurrentUsers =
+        (incoming.senderId === myIdNow && incoming.receiverId === otherIdNow) ||
+        (incoming.senderId === otherIdNow && incoming.receiverId === myIdNow);
+
+      if (!isBetweenCurrentUsers) return;
+
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === incoming.id)) return prev;
+
+        const next: Message = {
+          id: incoming.id,
+          senderId: incoming.senderId,
+          receiverId: incoming.receiverId,
+          content: incoming.content,
+          read: incoming.read,
+          createdAt: incoming.createdAt,
+        };
+
+        return [...prev, next];
+      });
+    });
+
+    connectionRef.current = connection;
+    await connection.start();
+    return connection;
+  };
+
+  useEffect(() => {
+    const loadMessages = async () => {
+      if (!currentConversation?.userId) return;
+
+      try {
+        // Mark unread messages from the other user as read when opening the conversation.
+        await commonService.markConversationAsRead(currentConversation.userId);
+
+        const res = await commonService.getMessages({
+          userId: currentConversation.userId,
+          page: 1,
+          limit: 100,
+        });
+
+        const payload = res.data; // ApiResponse.data => PaginatedResponse<Message>
+        const apiMessages = payload?.data ?? [];
+
+        setMessages(
+          apiMessages.map((m) => ({
+            id: m.id,
+            senderId: m.senderId,
+            receiverId: m.receiverId,
+            content: m.content,
+            read: m.read,
+            createdAt: m.createdAt,
+          }))
+        );
+      } catch (e) {
+        console.error("Failed to load messages:", e);
+        setMessages([]);
+      }
+    };
+
+    loadMessages();
+  }, [currentConversation?.userId]);
+
+  // Start SignalR connection so the UI can receive NewMessage events.
+  useEffect(() => {
+    ensureConnectionStarted().catch((e) => console.error("SignalR connect failed:", e));
+
+    return () => {
+      connectionRef.current?.stop().catch(() => {});
+      connectionRef.current = null;
+    };
+    // hubBaseUrl is stable (memoized). ensureConnectionStarted uses connectionRef + localStorage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hubBaseUrl]);
+
+  const handleSendMessage = async () => {
+    const content = messageInput.trim();
+    if (!content) return;
+    if (!currentConversation?.userId) return;
+
+    const receiverId = currentConversation.userId;
+
+    try {
+      const connection = await ensureConnectionStarted();
+      await connection.invoke("SendMessage", receiverId, content);
+    } catch (e) {
+      // Fallback to REST if SignalR fails (still creates the message on server).
+      await commonService.sendMessage(receiverId, content);
+    } finally {
       setMessageInput("");
     }
   };
@@ -194,18 +301,20 @@ export function ChatInterface({
           {/* Messages */}
           <ScrollArea className="flex-1 p-4">
             <div className="space-y-4">
-              {mockMessages.map((message) => (
+              {messages.map((message) => {
+                const isMine = !!myUserId && message.senderId === myUserId;
+                return (
                 <div
                   key={message.id}
                   className={cn(
                     "flex",
-                    message.senderId === "me" ? "justify-end" : "justify-start"
+                    isMine ? "justify-end" : "justify-start"
                   )}
                 >
                   <div
                     className={cn(
                       "max-w-[70%] rounded-lg px-4 py-2",
-                      message.senderId === "me"
+                      isMine
                         ? "bg-agro-green text-white"
                         : "bg-gray-100 text-foreground"
                     )}
@@ -214,16 +323,17 @@ export function ChatInterface({
                     <span
                       className={cn(
                         "text-xs mt-1 block",
-                        message.senderId === "me"
+                        isMine
                           ? "text-white/70"
                           : "text-muted-foreground"
                       )}
                     >
-                      {message.timestamp}
+                      {formatCreatedAt(message.createdAt)}
                     </span>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </ScrollArea>
 

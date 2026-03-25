@@ -22,3 +22,9 @@ export type {
   SelectOption,
   DateRange,
 } from "./common.types";
+
+// Farmer types
+export type {
+  FarmerProfile,
+  UpdateFarmerProfileData,
+} from "./farmer.types";

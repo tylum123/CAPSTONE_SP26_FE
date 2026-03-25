@@ -27,7 +27,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { FarmerProfile, farmerService } from "@/libs/api";
+import { FarmerProfile, farmerService, authService } from "@/libs/api"
 import { useAuth } from "@/stores/auth.store";
 import { AnimatedBubbles } from "@/components/farmer/animated-bubbles";
 
@@ -39,12 +39,14 @@ export default function FarmerLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { isAuthenticated, isLoading, logout } = useAuth();
+  const [checkingProfile, setCheckingProfile] = useState(false);
+  const [isProfileMissing, setIsProfileMissing] = useState(false);
 
   const navItems = [
     { icon: LayoutDashboard, label: "Tổng quan", href: "/farmer/dashboard" },
     { icon: Leaf, label: "Công việc", href: "/farmer/jobs" },
     { icon: PlusCircle, label: "Đăng tin", href: "/farmer/create-job" },
-    { icon: MessageCircle, label: "Tin nhắn", href: "/farmer/messages", badge: 3 },
+    { icon: MessageCircle, label: "Tin nhắn", href: "/farmer/messages"},
     { icon: Wallet, label: "Thanh toán", href: "/farmer/payments" },
   ];
   const [profile, setProfile] = useState<FarmerProfile | null>(null)
@@ -57,28 +59,54 @@ export default function FarmerLayout({
   }, [isAuthenticated, isLoading, router]);
 
   useEffect(() => {
-      const fetchProfile = async () => {
-        try {
-          const response = await farmerService.getProfile()
-          setProfile(response.data)
-        } catch (error) {
-          console.error('Failed to fetch farmer profile:', error)
-        }
-      }
-  
-      if (isAuthenticated) {
-        fetchProfile()
-      }
-    }, [isAuthenticated])
+    const fetchProfile = async () => {
+      if (!isAuthenticated) return;
 
-  const handleLogout = () => {
-    logout();
-    localStorage.clear();
-    router.push("/auth/login");
+      setCheckingProfile(true);
+      try {
+        const response = await farmerService.getProfile();
+        setProfile(response.data);
+        setIsProfileMissing(false);
+      } catch (error: any) {
+        const statusCode = error?.response?.status;
+        if (statusCode === 500) {
+          setIsProfileMissing(true);
+          setProfile(null);
+
+          // Force users with missing profile to complete settings first.
+          if (!pathname.startsWith("/farmer/settings")) {
+            router.replace("/farmer/settings?setup=required");
+          }
+        } else {
+          console.error("Failed to fetch farmer profile:", error);
+        }
+      } finally {
+        setCheckingProfile(false);
+      }
+    };
+
+    fetchProfile();
+  }, [isAuthenticated, pathname, router]);
+
+  useEffect(() => {
+    if (isAuthenticated && isProfileMissing && !pathname.startsWith("/farmer/settings")) {
+      router.replace("/farmer/settings?setup=required");
+    }
+  }, [isAuthenticated, isProfileMissing, pathname, router]);
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout()
+    } catch {
+      // ignore API errors — still clear local state
+    } finally {
+      logout()
+      router.push("/auth/login")
+    }
   };
 
   // Show loading state while checking authentication
-  if (isLoading) {
+  if (isLoading || checkingProfile) {
     return (
       <div className="min-h-screen bg-agro-cream flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-agro-green" />
