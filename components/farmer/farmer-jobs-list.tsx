@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Users, Clock, Banknote, MapPin, Copy, Calendar, Inbox, LayoutGrid, LayoutList, CalendarDays, CheckCircle2, FileText, Briefcase } from "lucide-react"
+import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Users, Clock, Banknote, MapPin, Copy, Calendar, Inbox, LayoutGrid, LayoutList } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -18,13 +18,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
 
 export function FarmerJobsList() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -33,10 +26,6 @@ export function FarmerJobsList() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
-  const [viewingJob, setViewingJob] = useState<Job | null>(null)
-  const [isViewingJob, setIsViewingJob] = useState(false)
-  const [isJobLoading, setIsJobLoading] = useState(false)
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("vi-VN", {
@@ -128,23 +117,6 @@ export function FarmerJobsList() {
 
     return matchesSearch && matchesTab
   }), [activeTab, jobs, searchQuery])
-
-  const handleViewJob = async (jobId: string) => {
-    setIsViewingJob(true)
-    setIsJobLoading(true)
-    setViewingJob(null)
-    try {
-      const response = await farmerService.getJobDetail(jobId)
-      setViewingJob(response.data)
-    } catch (err) {
-      console.error("Failed to fetch job detail:", err)
-      // If full detail fetch fails, we can fallback to the list item briefly
-      const fallbackJob = jobs.find((j) => j.id === jobId)
-      if (fallbackJob) setViewingJob(fallbackJob)
-    } finally {
-      setIsJobLoading(false)
-    }
-  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -270,9 +242,11 @@ export function FarmerJobsList() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => handleViewJob(job.id)} className="cursor-pointer">
-                              <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
-                              Xem chi tiết
+                            <DropdownMenuItem asChild className="cursor-pointer">
+                              <Link href={`/farmer/jobs/${job.id}`}>
+                                <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
+                                Xem chi tiết
+                              </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem className="cursor-pointer">
                               <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -299,7 +273,7 @@ export function FarmerJobsList() {
                   <div className={`grid gap-y-3 text-sm ${viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2" : "flex flex-wrap gap-x-6"}`}>
                     <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                       <MapPin className="h-4 w-4 shrink-0 text-emerald-500" />
-                      <span className={`truncate ${viewMode === "grid" ? "" : "max-w-[200px] sm:max-w-xs"}`} title={job.address}>{job.address}</span>
+                      <span className={`truncate ${viewMode === "grid" ? "" : "max-w-50 sm:max-w-xs"}`} title={job.address}>{job.address}</span>
                     </div>
                     <div className="flex items-center gap-2 font-medium text-primary">
                       <Banknote className="h-4 w-4 shrink-0" />
@@ -333,9 +307,11 @@ export function FarmerJobsList() {
 
                 {viewMode === "list" && (
                   <div className="flex items-center gap-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 mt-4 lg:mt-0 lg:pl-4 border-slate-100 dark:border-slate-800">
-                    <Button variant="outline" size="sm" className="hidden sm:flex" onClick={() => handleViewJob(job.id)}>
-                      <Eye className="mr-2 h-4 w-4" />
-                      Chi tiết
+                    <Button variant="outline" size="sm" className="hidden sm:flex" asChild>
+                      <Link href={`/farmer/jobs/${job.id}`}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        Chi tiết
+                      </Link>
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -344,9 +320,11 @@ export function FarmerJobsList() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem onClick={() => handleViewJob(job.id)} className="cursor-pointer">
-                          <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
-                          Xem chi tiết
+                        <DropdownMenuItem asChild className="cursor-pointer">
+                          <Link href={`/farmer/jobs/${job.id}`}>
+                            <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
+                            Xem chi tiết
+                          </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem className="cursor-pointer">
                           <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -381,152 +359,6 @@ export function FarmerJobsList() {
         ))}
       </div>
 
-      <Dialog open={isViewingJob} onOpenChange={setIsViewingJob}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Chi tiết công việc</DialogTitle>
-            <DialogDescription>
-              Xem thông tin chi tiết về công việc đã đăng.
-            </DialogDescription>
-          </DialogHeader>
-
-          {isJobLoading ? (
-            <div className="flex justify-center items-center py-10">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : viewingJob ? (
-            <div className="grid gap-6 py-4">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between border-b pb-4">
-                  <div>
-                    <h2 className="text-2xl font-bold">{viewingJob.title}</h2>
-                    <div className="flex items-center gap-2 mt-2 text-muted-foreground">
-                      <MapPin className="h-4 w-4" />
-                      <span>{viewingJob.address}</span>
-                    </div>
-                  </div>
-                  {getStatusBadge(normalizeStatus(viewingJob.status))}
-                </div>
-
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="flex items-start gap-3 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border">
-                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg">
-                      <Banknote className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Mức lương</p>
-                      <p className="font-semibold text-emerald-600 dark:text-emerald-400">
-                        {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(viewingJob.salary)} / {viewingJob.salaryType}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border">
-                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
-                      <Users className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Số lượng</p>
-                      <p className="font-semibold text-foreground">
-                        {viewingJob.employeeCount} người
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border">
-                    <div className="p-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg">
-                      <CalendarDays className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Thời gian</p>
-                      <p className="font-semibold text-foreground truncate" title={`${formatDate(viewingJob.startDate)} - ${formatDate(viewingJob.endDate)}`}>
-                        {formatDate(viewingJob.startDate)} - {formatDate(viewingJob.endDate)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border">
-                    <div className="p-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-lg">
-                      <Briefcase className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Loại công việc</p>
-                      <p className="font-semibold text-foreground capitalize">
-                        {viewingJob.jobType}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-3 gap-6 pt-4">
-                  <div className="md:col-span-2 space-y-6">
-                    <div>
-                      <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-primary" />
-                        Mô tả công việc
-                      </h3>
-                      <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground border rounded-xl p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                        <p className="whitespace-pre-wrap">{viewingJob.description}</p>
-                      </div>
-                    </div>
-
-                    {(viewingJob.requirements && viewingJob.requirements.length > 0) && (
-                      <div>
-                        <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                          <CheckCircle2 className="h-5 w-5 text-primary" />
-                          Yêu cầu
-                        </h3>
-                        <div className="border rounded-xl p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                          <ul className="grid gap-2">
-                            {viewingJob.requirements.map((req, idx) => (
-                              <li key={idx} className="flex items-start gap-2 text-muted-foreground">
-                                <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
-                                <span>{req}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-6">
-                    {(viewingJob.skills && viewingJob.skills.length > 0) && (
-                      <div>
-                        <h3 className="text-base font-semibold mb-3">Kỹ năng chuyên môn</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {viewingJob.skills.map((skill, idx) => (
-                            <Badge key={idx} variant="secondary" className="bg-primary/10 text-primary border-primary/20">
-                              {skill}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {(viewingJob.materials && viewingJob.materials.length > 0) && (
-                      <div>
-                        <h3 className="text-base font-semibold mb-3">Công cụ / Vật tư</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {viewingJob.materials.map((item, idx) => (
-                            <Badge key={idx} variant="outline" className="border-slate-300 dark:border-slate-700">
-                              {item}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="py-10 text-center text-muted-foreground">
-              Không tìm thấy thông tin công việc.
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

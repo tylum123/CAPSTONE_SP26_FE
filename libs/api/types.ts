@@ -148,6 +148,8 @@ export interface Job {
   startDate: string;
   endDate: string;
   selectedDays: string[];
+  startTime: string;
+  endTime: string;
   workersNeeded: number;
   workersAccepted: number;
   jobTypeId: number;
@@ -189,6 +191,8 @@ export interface CreateJobRequest {
   startDate: string; 
   endDate: string; 
   selectedDays?: string[]; 
+  startTime: string;
+  endTime: string;
   skillIds: string[];
   workersNeeded: number;  
   workersAccepted: number;
@@ -200,14 +204,6 @@ export interface CreateJobRequest {
   updatedAt?: string;
   isUrgent: boolean;
   statusId: number;
-  
-  // Keep these just in case the backend alias is different
-  requiredSkills?: string[];
-  jobSkillRequirementIds?: string[];
-  estimatedHours?: number;
-  wageTypeId?: number;
-  paymentMethodId?: number;
-  genderPreference?: string;
 }
 
 export interface UpdateJobRequest extends Partial<CreateJobRequest> {

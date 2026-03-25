@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Switch } from "@/components/ui/switch"
 import { TimePicker } from "@/components/ui/time-picker"
 import { farmerService } from "@/libs/api/services/farmer.service"
 import { FarmService } from "@/libs/api/services/farm.service"
@@ -60,6 +61,8 @@ type PostedJobPreview = {
 
 const DEFAULT_FARM_ID = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
 const DEFAULT_JOB_CATEGORY_ID = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+const JOB_TYPE_CONTRACT_ID = 1
+const JOB_TYPE_DAILY_ID = 2
 const DEFAULT_WAGE_TYPE_ID = 1
 const DEFAULT_PAYMENT_METHOD_ID = 1
 const DEFAULT_STATUS_ID = 1
@@ -150,9 +153,6 @@ const getSelectionSpanInDays = (sortedDates: Date[]) => {
   return Math.floor((last.getTime() - first.getTime()) / millisecondsPerDay) + 1
 }
 
-const MAX_DAILY_RANGE_DAYS = 4
-const DAILY_RANGE_WARNING = `Khoảng giữa những ngày được chọn không được dài hơn ${MAX_DAILY_RANGE_DAYS} ngày.`
-
 export function FarmerJobForm() {
   const [step, setStep] = useState<1 | 2>(1)
   const [title, setTitle] = useState("")
@@ -173,6 +173,7 @@ export function FarmerJobForm() {
 
   const [benefits, setBenefits] = useState<string[]>(["Bao ăn"])
   const [newBenefit, setNewBenefit] = useState("")
+  const [isUrgent, setIsUrgent] = useState(DEFAULT_IS_URGENT)
 
   const [jobCategories, setJobCategories] = useState<JobCategory[]>([])
   const [selectedJobCategoryId, setSelectedJobCategoryId] = useState(DEFAULT_JOB_CATEGORY_ID)
@@ -188,7 +189,7 @@ export function FarmerJobForm() {
   const [contractStartDate, setContractStartDate] = useState("")
   const [contractEndDate, setContractEndDate] = useState("")
 
-  const [dailyStartTime, setDailyStartTime] = useState("06:00")
+  const [dailyStartTime, setDailyStartTime] = useState("09:00")
   const [dailyEndTime, setDailyEndTime] = useState("17:00")
   const [selectedDailyDates, setSelectedDailyDates] = useState<Date[]>([])
   const [isRangePicking, setIsRangePicking] = useState(false)
@@ -247,9 +248,20 @@ export function FarmerJobForm() {
   const selectedJobCategoryLabel = getJobCategoryLabel(selectedJobCategoryId)
   const selectedFarmLabel = getFarmLabel(selectedFarmId)
 
-  const toISODate = (dateValue: string) => {
+  const toDateOnlyString = (dateValue: string) => {
     const parsedDate = parseDDMMYYYYToDate(dateValue)
-    return parsedDate ? parsedDate.toISOString() : null
+    if (!parsedDate) return null
+    const year = parsedDate.getFullYear()
+    const month = String(parsedDate.getMonth() + 1).padStart(2, "0")
+    const day = String(parsedDate.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+  }
+
+  const toDateOnlyFromDate = (date: Date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, "0")
+    const day = String(date.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
   }
 
   const toDailyEstimatedHours = (startTime: string, endTime: string, days: number) => {
@@ -503,13 +515,7 @@ export function FarmerJobForm() {
 
       const next = mergeAndSortDates(candidate)
 
-      if (next.length && getSelectionSpanInDays(next) > MAX_DAILY_RANGE_DAYS) {
-        setDailySelectionNotice(DAILY_RANGE_WARNING)
-        return current
-      }
-
-      setDailySelectionNotice(null)
-      didUpdate = true
+    didUpdate = true
       return next
     })
 
@@ -688,74 +694,87 @@ export function FarmerJobForm() {
       return
     }
 
-    const nowISO = new Date().toISOString()
+      const now = new Date()
+      const nowISO = now.toISOString()
+      const nowDateOnly = toDateOnlyFromDate(now)
 
-    let startDate = nowISO
-    let endDate = nowISO
-    let estimatedHours = 1
+      let startDate = nowDateOnly
+      let endDate = nowDateOnly
+      let estimatedHours = 1
+      let startTime = "07:00:00"
+      let endTime = "17:00:00"
 
-    if (scheduleType === "contract") {
-      const startISO = toISODate(contractStartDate)
-      const endISO = toISODate(contractEndDate)
-
-      if (!startISO || !endISO) {
-        setSubmitError("Vui lòng nhập ngày theo định dạng dd/mm/yyyy.")
-        return
+      const formatTimeOnly = (timeStr: string) => {
+        if (!timeStr) return "00:00:00"
+        return timeStr.length === 5 ? `${timeStr}:00` : timeStr
       }
 
-      startDate = startISO
-      endDate = endISO
-      estimatedHours = toContractEstimatedHours(startISO, endISO)
-    } else {
-      if (!normalizedSelectedDailyDates.length) {
-        setSubmitError("Vui lòng chọn ít nhất một ngày làm việc trên lịch.")
-        return
+      if (scheduleType === "contract") {
+        const startOnly = toDateOnlyString(contractStartDate)
+        const endOnly = toDateOnlyString(contractEndDate)
+
+        if (!startOnly || !endOnly) {
+          setSubmitError("Vui lòng nhập ngày theo định dạng dd/mm/yyyy.")
+          return
+        }
+
+        startDate = startOnly
+        endDate = endOnly
+        estimatedHours = toContractEstimatedHours(startOnly, endOnly)
+        // Default working hours for contract if daily is not used
+        startTime = formatTimeOnly(dailyStartTime || "09:00")
+        endTime = formatTimeOnly(dailyEndTime || "17:00")
+      } else {
+        if (!normalizedSelectedDailyDates.length) {
+          setSubmitError("Vui lòng chọn ít nhất một ngày làm việc trên lịch.")
+          return
+        }
+
+        const sortedDates = normalizedSelectedDailyDates
+        const start = sortedDates[0]
+        const end = sortedDates[sortedDates.length - 1]
+
+        startDate = toDateOnlyFromDate(start)
+        endDate = toDateOnlyFromDate(end)
+        estimatedHours = toDailyEstimatedHours(dailyStartTime, dailyEndTime, sortedDates.length)
+        startTime = formatTimeOnly(dailyStartTime)
+        endTime = formatTimeOnly(dailyEndTime)
       }
 
-      const sortedDates = normalizedSelectedDailyDates
-      const start = sortedDates[0]
-      const end = sortedDates[sortedDates.length - 1]
+      const descriptionParts = [
+        description.trim(),
+        requirements.length ? `Yêu cầu: ${requirements.join(", ")}` : "",
+        benefits.length ? `Quyền lợi: ${benefits.join(", ")}` : "",
+        scheduleType === "daily"
+          ? `Lịch làm: ${selectedDailyDaysCount} ngày, ${dailyStartTime} - ${dailyEndTime}`
+          : `Lịch làm: ${formatDateDDMMYYYY(contractStartDate)} - ${formatDateDDMMYYYY(contractEndDate)}`,
+      ].filter(Boolean)
 
-      startDate = start.toISOString()
-      endDate = end.toISOString()
-      estimatedHours = toDailyEstimatedHours(dailyStartTime, dailyEndTime, sortedDates.length)
-    }
+      const jobTypeId = scheduleType === "daily" ? JOB_TYPE_DAILY_ID : JOB_TYPE_CONTRACT_ID
 
-    const descriptionParts = [
-      description.trim(),
-      requirements.length ? `Yêu cầu: ${requirements.join(", ")}` : "",
-      benefits.length ? `Quyền lợi: ${benefits.join(", ")}` : "",
-      scheduleType === "daily"
-        ? `Lịch làm: ${selectedDailyDaysCount} ngày, ${dailyStartTime} - ${dailyEndTime}`
-        : `Lịch làm: ${formatDateDDMMYYYY(contractStartDate)} - ${formatDateDDMMYYYY(contractEndDate)}`,
-    ].filter(Boolean)
-
-    const payload: CreateJobRequest = {
-      skillIds: selectedSkillIds,
-      requiredSkills: selectedSkillIds,
-      farmId: selectedFarmId || DEFAULT_FARM_ID,
-      jobCategoryId: selectedJobCategoryId || DEFAULT_JOB_CATEGORY_ID,
-      title: title.trim(),
-      description: descriptionParts.join("\n"),
-      address: location.trim(),
-      startDate,
-      endDate,
-      selectedDays: normalizedSelectedDailyDates.map(date => date.toISOString()),
-      estimatedHours,
-      workersNeeded: scheduleType === "daily" ? workersNeededNumber : 1,
-      workersAccepted: 0,
-      jobTypeId: scheduleType === "daily" ? 1 : 2,
-      wageTypeId: DEFAULT_WAGE_TYPE_ID,
-      wageAmount: incomeNumber,
-      requirements,
-      privileges: benefits,
-      paymentMethodId: DEFAULT_PAYMENT_METHOD_ID,
-      genderPreference: DEFAULT_GENDER_PREFERENCE,
-      publishedAt: nowISO,
-      createdAt: nowISO,
-      updatedAt: nowISO,
-      isUrgent: DEFAULT_IS_URGENT,
-      statusId: DEFAULT_STATUS_ID,
+      const payload: CreateJobRequest = {
+        skillIds: selectedSkillIds,
+        farmId: selectedFarmId || DEFAULT_FARM_ID,
+        jobCategoryId: selectedJobCategoryId || DEFAULT_JOB_CATEGORY_ID,
+        jobTypeId,
+        title: title.trim(),
+        description: descriptionParts.join("\n"),
+        address: location.trim(),
+        startDate,
+        endDate,
+        startTime,
+        endTime,
+        selectedDays: normalizedSelectedDailyDates.map(date => toDateOnlyFromDate(date)),
+        requirements,
+        privileges: benefits,
+        wageAmount: incomeNumber,
+         workersNeeded: workersNeededNumber,
+         workersAccepted: 0,
+        publishedAt: nowISO,
+        createdAt: nowISO,
+        updatedAt: nowISO,
+        isUrgent,
+        statusId: DEFAULT_STATUS_ID,
     }
 
     try {
@@ -809,10 +828,11 @@ export function FarmerJobForm() {
     setSelectedJobCategoryId(jobCategories[0]?.id ?? DEFAULT_JOB_CATEGORY_ID)
     setBenefits(["Bao ăn"])
     setNewBenefit("")
+    setIsUrgent(DEFAULT_IS_URGENT)
     setScheduleType("contract")
     setContractStartDate("")
     setContractEndDate("")
-    setDailyStartTime("06:00")
+    setDailyStartTime("09:00")
     setDailyEndTime("17:00")
     clearAllSelectedDailyDates()
     setSubmitError(null)
@@ -842,18 +862,21 @@ export function FarmerJobForm() {
               <CheckCheck className="h-5 w-5" />
               Đăng bài thành công
             </CardTitle>
-            <CardDescription>Tin tuyển dụng đã được tạo thành công từ backend.</CardDescription>
+            <CardDescription>Tin tuyển dụng đã được tạo thành công!</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-lg border bg-background p-4 text-sm">
-              <p>
-                <span className="font-medium">Mã tin:</span> {postedJob.id}
-              </p>
               <p>
                 <span className="font-medium">Tiêu đề:</span> {postedJob.title}
               </p>
               <p>
                 <span className="font-medium">Thu nhập:</span> {formatCurrency(postedJob.income)}
+              </p>
+              <p>
+                <span className="font-medium">Ngày làm:</span> {postedJob.scheduleType === "contract"
+                  ? `${formatDateDDMMYYYY(postedJob.contractStartDate ?? "")} - ${formatDateDDMMYYYY(postedJob.contractEndDate ?? "")}`
+                  : `${postedJob.daysToHire} ngày, ${postedJob.dailyStartTime?.slice(0, 5)} - ${postedJob.dailyEndTime?.slice(0, 5)}`
+                }
               </p>
               <p>
                 <span className="font-medium">Địa điểm:</span> {postedJob.location}
@@ -917,6 +940,13 @@ export function FarmerJobForm() {
                       </div>
                     </label>
                   </RadioGroup>
+                  <div className="mt-4 flex items-center justify-between rounded-lg border px-3 py-3">
+                    <div>
+                      <p className="font-medium">Cần tuyển gấp</p>
+                      <p className="text-sm text-muted-foreground">Tin đăng sẽ được đánh dấu ưu tiên.</p>
+                    </div>
+                    <Switch checked={isUrgent} onCheckedChange={setIsUrgent} />
+                  </div>
                 </CardContent>
               </Card>
 
@@ -942,7 +972,7 @@ export function FarmerJobForm() {
                             <Popover>
                               <PopoverTrigger asChild>
                                 <Button type="button" variant="outline" size="icon" aria-label="Chọn ngày bắt đầu">
-                                  <CalendarIcon className="h-4 w-4" />
+                                  <CalendarIcon className="h-3 w-5" />
                                 </Button>
                               </PopoverTrigger>
                               <PopoverContent className="w-auto p-0" align="end">
@@ -1004,7 +1034,7 @@ export function FarmerJobForm() {
                                   ? rangeSelectionAnchor
                                     ? "Chọn ngày kết thúc"
                                     : "Chọn ngày bắt đầu"
-                                  : "Chọn nhanh theo khoảng"}
+                                  : "Chọn theo khoảng"}
                               </Button>
                               <Button
                                 type="button"
@@ -1034,7 +1064,7 @@ export function FarmerJobForm() {
                               onDayClick={handleDailyCalendarDayClick}
                               disabled={(date) => date < tomorrow}
                               locale={vi}
-                              className="pointer-events-auto w-full max-w-[520px] [--cell-size:2.75rem]"
+                              className="pointer-events-auto w-full max-w-100 [--cell-size:2.75rem]"
                             />
                           </div>
                           {selectedDailyDaysCount > 0 ? (
@@ -1128,7 +1158,7 @@ export function FarmerJobForm() {
                         id="job-description"
                         value={description}
                         onChange={(event) => setDescription(event.target.value)}
-                        className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex min-h-30 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         placeholder="Mô tả các công việc cần làm, môi trường làm việc..."
                       />
                     </div>
@@ -1443,7 +1473,7 @@ export function FarmerJobForm() {
 
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <Button variant="outline" asChild>
-                  <Link href="/ /jobs">Hủy</Link>
+                  <Link href="/farmer/jobs">Hủy</Link>
                 </Button>
                 <Button type="button" onClick={goToPreview}>
                   Tiếp tục
