@@ -57,7 +57,7 @@ export default function FarmerDashboard() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const popupRef = useRef<HTMLDivElement>(null)
   const { currentWeather, loading: weatherLoading, refetch } = useWeather({
-    city: 'Hanoi',
+    useCurrentUserAddress: true,
   })
 
   useEffect(() => {

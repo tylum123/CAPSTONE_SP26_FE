@@ -18,6 +18,11 @@ class WeatherService {
     return response.data.data;
   }
 
+  async getWeatherByCurrentUserAddress(): Promise<BeWeatherData> {
+    const response = await axiosInstance.get<{ data: BeWeatherData }>(`${WEATHER_BASE}/me`);
+    return response.data.data;
+  }
+
   getWeatherIconUrl(iconCode: string): string {
     return `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
   }

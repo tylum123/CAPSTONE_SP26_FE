@@ -6,6 +6,7 @@ interface UseWeatherOptions {
   city?: string;
   lat?: number;
   lon?: number;
+  useCurrentUserAddress?: boolean;
 }
 
 interface UseWeatherReturn {
@@ -20,6 +21,7 @@ export function useWeather({
   city = 'Hanoi',
   lat,
   lon,
+  useCurrentUserAddress = false,
 }: UseWeatherOptions = {}): UseWeatherReturn {
   const [currentWeather, setCurrentWeather] = useState<BeWeatherData | null>(null);
   const [dailyForecast, setDailyForecast] = useState<Map<string, DailyWeather>>(new Map());
@@ -32,9 +34,11 @@ export function useWeather({
       setError(null);
 
       const weather =
-        lat !== undefined && lon !== undefined
-          ? await weatherService.getWeatherByCoords(lat, lon)
-          : await weatherService.getCurrentWeather(city);
+        useCurrentUserAddress
+          ? await weatherService.getWeatherByCurrentUserAddress()
+          : lat !== undefined && lon !== undefined
+            ? await weatherService.getWeatherByCoords(lat, lon)
+            : await weatherService.getCurrentWeather(city);
 
       setCurrentWeather(weather);
       setDailyForecast(weatherService.buildDailyForecastFromCurrent(weather));
@@ -48,7 +52,7 @@ export function useWeather({
 
   useEffect(() => {
     fetchWeather();
-  }, [city, lat, lon]);
+  }, [city, lat, lon, useCurrentUserAddress]);
 
   return {
     currentWeather,
