@@ -89,7 +89,17 @@ export const farmerService = {
    * Get job detail
    */
   getJobDetail: async (id: string): Promise<ApiResponse<Job>> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.FARMER.JOB_DETAIL(id));
+    const response = await axiosInstance.get(API_ENDPOINTS.FARMER.JOB_ID(id));
+    return response.data;
+  },
+
+  getFilteredJobs: async (params?: {
+    title?: string;
+    category?: string;
+    address?: string;
+    skill?: string;
+  }): Promise<ApiResponse<Job[]>> => {
+    const response = await axiosInstance.get(API_ENDPOINTS.FARMER.FILTERED_JOBS, { params });
     return response.data;
   },
 

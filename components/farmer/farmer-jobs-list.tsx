@@ -2,14 +2,25 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Users, Clock, Banknote, MapPin, Copy, Calendar, Inbox, LayoutGrid, LayoutList } from "lucide-react"
+import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Users, Clock, Banknote, MapPin, Copy, Calendar, Inbox, LayoutGrid, LayoutList, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { farmerService } from "@/libs/api/services/farmer.service"
-import type { Job } from "@/libs/api/types"
+import { jobCategoryService } from "@/libs/api/services/job-category.service"
+import { skillService } from "@/libs/api/services/skill.service"
+import { useProvinces } from "@/hooks/use-provinces"
+import type { Job, JobCategory, Skill } from "@/libs/api/types"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +37,18 @@ export function FarmerJobsList() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [filterCategory, setFilterCategory] = useState("all-categories")
+  const [filterAddress, setFilterAddress] = useState("all-provinces")
+  const [filterSkill, setFilterSkill] = useState("all-skills")
+
+  // For combo boxes
+  const [categories, setCategories] = useState<JobCategory[]>([])
+  const [skills, setSkills] = useState<Skill[]>([])
+  const [categoriesLoading, setCategoriesLoading] = useState(false)
+  const [skillsLoading, setSkillsLoading] = useState(false)
+
+  // Use provinces hook for address filter
+  const { provinces, loading: provincesLoading } = useProvinces()
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("vi-VN", {
@@ -66,13 +89,64 @@ export function FarmerJobsList() {
     return "active"
   }
 
+  // Fetch categories and skills on component mount
+  useEffect(() => {
+    const fetchDropdownData = async () => {
+      try {
+        setCategoriesLoading(true)
+        setSkillsLoading(true)
+
+        const [categoriesResponse, skillsResponse] = await Promise.all([
+          jobCategoryService.getJobCategories(),
+          skillService.getSkills(),
+        ])
+
+        const categoriesPayload = categoriesResponse.data as JobCategory[] | { data?: JobCategory[] }
+        const skillsPayload = skillsResponse.data as Skill[] | { data?: Skill[] }
+
+        if (Array.isArray(categoriesPayload)) {
+          setCategories(categoriesPayload)
+        } else if (Array.isArray(categoriesPayload?.data)) {
+          setCategories(categoriesPayload.data)
+        }
+
+        if (Array.isArray(skillsPayload)) {
+          setSkills(skillsPayload)
+        } else if (Array.isArray(skillsPayload?.data)) {
+          setSkills(skillsPayload.data)
+        }
+      } catch (err) {
+        console.error("Failed to fetch dropdown data:", err)
+      } finally {
+        setCategoriesLoading(false)
+        setSkillsLoading(false)
+      }
+    }
+
+    void fetchDropdownData()
+  }, [])
+
   useEffect(() => {
     const loadJobs = async () => {
       try {
         setIsLoading(true)
         setError(null)
 
-        const response = await farmerService.getJobs()
+        // Use getFilteredJobs if any filter parameters exist, otherwise use getJobs
+        const hasFilters = searchQuery || (filterCategory && filterCategory !== "all-categories") || (filterAddress && filterAddress !== "all-provinces") || (filterSkill && filterSkill !== "all-skills")
+        
+        let response
+        if (hasFilters) {
+          response = await farmerService.getFilteredJobs({
+            title: searchQuery || undefined,
+            category: (filterCategory && filterCategory !== "all-categories") ? filterCategory : undefined,
+            address: (filterAddress && filterAddress !== "all-provinces") ? filterAddress : undefined,
+            skill: (filterSkill && filterSkill !== "all-skills") ? filterSkill : undefined,
+          })
+        } else {
+          response = await farmerService.getJobs()
+        }
+
         const payload = response.data as Job[] | { data?: Job[]; items?: Job[] }
 
         if (Array.isArray(payload)) {
@@ -101,7 +175,7 @@ export function FarmerJobsList() {
     }
 
     void loadJobs()
-  }, [])
+  }, [searchQuery, filterCategory, filterAddress, filterSkill])
 
   const filteredJobs = useMemo(() => jobs.filter((job) => {
     const matchesSearch = [job.title, job.address, job.description]
@@ -150,25 +224,73 @@ export function FarmerJobsList() {
           </Link>
         </Button>
       </div>
+      <div className="flex flex-col gap-4 bg-card p-4 rounded-xl border shadow-sm">
 
-      {/* Search and Filters */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-card p-4 rounded-xl border shadow-sm">
-        <div className="relative w-full lg:w-96">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Tìm kiếm tiêu đề, khu vực..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-10 bg-background"
-          />
+        <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Tìm kiếm theo tiêu đề..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-10 bg-background"
+            />
+          </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-4">
+
+          {/* Category Select */}
+          <Select value={filterCategory} onValueChange={setFilterCategory} disabled={categoriesLoading}>
+            <SelectTrigger className="h-10 bg-background w-full">
+              <SelectValue placeholder={categoriesLoading ? "Đang tải..." : "Chọn danh mục"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all-categories">Tất cả danh mục</SelectItem>
+              {categories.map((category) => (
+                <SelectItem key={category.id} value={category.name || category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Skill Select */}
+          <Select value={filterSkill} onValueChange={setFilterSkill} disabled={skillsLoading}>
+            <SelectTrigger className="h-10 bg-background w-full">
+              <SelectValue placeholder={skillsLoading ? "Đang tải..." : "Chọn kỹ năng"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all-skills">Tất cả kỹ năng</SelectItem>
+              {skills.map((skill) => (
+                <SelectItem key={skill.id} value={skill.name || skill.id}>
+                  {skill.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Province/Address Select */}
+          <Select value={filterAddress} onValueChange={setFilterAddress} disabled={provincesLoading}>
+            <SelectTrigger className="h-10 bg-background w-full">
+              <SelectValue placeholder={provincesLoading ? "Đang tải..." : "Chọn khu vực"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all-provinces">Tất cả khu vực</SelectItem>
+              {provinces.map((province) => (
+                <SelectItem key={province.code} value={province.name}>
+                  {province.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <div className="flex items-center justify-between gap-4 w-full lg:w-auto">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full overflow-x-auto lg:w-auto flex-1">
-            <TabsList className="h-10 p-1 w-full justify-start lg:w-auto">
-              <TabsTrigger value="all" className="rounded-md px-4">Tất cả</TabsTrigger>
-              <TabsTrigger value="active" className="rounded-md px-4">Đang tuyển</TabsTrigger>
-              <TabsTrigger value="filled" className="rounded-md px-4">Đã đủ</TabsTrigger>
-              <TabsTrigger value="completed" className="rounded-md px-4">Hoàn thành</TabsTrigger>
+
+        <div className="flex items-center justify-between gap-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full overflow-x-auto lg:flex-1">
+            <TabsList className="h-10 p-1 w-full grid grid-cols-4">
+              <TabsTrigger value="all" className="rounded-md">Tất cả</TabsTrigger>
+              <TabsTrigger value="active" className="rounded-md">Đang tuyển</TabsTrigger>
+              <TabsTrigger value="filled" className="rounded-md">Đã đủ</TabsTrigger>
+              <TabsTrigger value="completed" className="rounded-md">Hoàn thành</TabsTrigger>
             </TabsList>
           </Tabs>
           
