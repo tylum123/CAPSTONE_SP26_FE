@@ -1,5 +1,6 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { useEffect, useState } from "react"
 import {
   AlertDialog,
@@ -30,27 +31,14 @@ import type { GetFarmResponse, UpdateFarmRequest } from "@/libs/api/types"
 import { Loader2, MapPin, Pencil, Plus, Star, Trash2, X, UploadCloud, Eye, ChevronLeft } from "lucide-react"
 import Image from "next/image"
 
-// Map Component
-function MapDisplay({ latitude, longitude, address }: { latitude: number | null; longitude: number | null; address: string }) {
-  if (!latitude || !longitude) {
-    return (
-      <div className="flex h-96 flex-col items-center justify-center rounded-lg border border-dashed bg-muted/50">
-        <MapPin className="mb-2 h-8 w-8 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">Chọn địa chỉ để xem bản đồ</p>
-      </div>
-    )
-  }
-
-  return (
-    <iframe
-      width="100%"
-      height="400"
-      frameBorder="0"
-      src={`https://www.openstreetmap.org/export/embed.html?bbox=${longitude - 0.01},${latitude - 0.01},${longitude + 0.01},${latitude + 0.01}&layer=mapnik&marker=${latitude},${longitude}`}
-      className="rounded-lg border"
-    />
-  )
-}
+const FarmLocationPickerMap = dynamic(() => import("@/components/farmer/farm-location-picker-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[400px] items-center justify-center rounded-lg border border-dashed bg-muted/50">
+      <Loader2 className="h-6 w-6 animate-spin text-agro-green" />
+    </div>
+  ),
+})
 
 type FarmFormState = {
   address: string
@@ -372,6 +360,44 @@ export function FarmerFarmManager() {
     }
   }
 
+  const handleSelectLocationFromMap = async (latitude: number, longitude: number) => {
+    setFormData((current) => ({
+      ...current,
+      latitude,
+      longitude,
+    }))
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
+        {
+          headers: {
+            "Accept-Language": "vi",
+          },
+        }
+      )
+
+      if (!response.ok) {
+        return
+      }
+
+      const result = (await response.json()) as { display_name?: string }
+
+      if (!result.display_name) {
+        return
+      }
+
+      setFormData((current) => ({
+        ...current,
+        latitude,
+        longitude,
+        address: result.display_name || current.address,
+      }))
+    } catch {
+      // Keep the selected coordinates even if reverse geocoding fails.
+    }
+  }
+
   const handleDelete = async () => {
     const farmId = pendingDeleteFarm ? getFarmId(pendingDeleteFarm) : undefined
 
@@ -610,7 +636,7 @@ export function FarmerFarmManager() {
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Nhập địa chỉ và nhấn Đồng bộ để đánh dấu vị trí trên bản đồ.
+                      Nhập địa chỉ để đồng bộ nhanh, hoặc nhấn trực tiếp trên bản đồ để chọn lại vị trí.
                     </p>
                   )}
                 </div>
@@ -702,10 +728,14 @@ export function FarmerFarmManager() {
           <Card>
             <CardHeader>
               <CardTitle>Vị trí trên bản đồ</CardTitle>
-              <CardDescription>Xem vị trí địa điểm của bạn</CardDescription>
+              <CardDescription>Nhấn trực tiếp lên bản đồ để chọn lại vị trí địa điểm</CardDescription>
             </CardHeader>
             <CardContent>
-              <MapDisplay latitude={formData.latitude} longitude={formData.longitude} address={formData.address} />
+              <FarmLocationPickerMap
+                latitude={formData.latitude}
+                longitude={formData.longitude}
+                onSelectLocation={handleSelectLocationFromMap}
+              />
             </CardContent>
           </Card>
         </div>
