@@ -25,6 +25,7 @@ import {
   Leaf,
   MessageCircle,
   Loader2,
+  Home,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { FarmerProfile, farmerService, authService } from "@/libs/api"
@@ -141,7 +142,9 @@ export default function FarmerLayout({
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-1">
               {navItems.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                const isActive = item.href === "/farmer"
+                  ? pathname === "/farmer"
+                  : pathname === item.href || pathname.startsWith(item.href + "/");
                 return (
                   <Link key={item.href} href={item.href}>
                     <Button
@@ -149,16 +152,11 @@ export default function FarmerLayout({
                       className={`gap-2 ${
                         isActive
                           ? "bg-agro-green text-white hover:bg-agro-green-dark"
-                          : "text-foreground hover:bg-agro-cream"
+                          : "text-foreground hover:bg-gray-200"
                       }`}
                     >
                       <item.icon className="h-4 w-4" />
                       {item.label}
-                      {item.badge && item.badge > 0 && (
-                        <span className="ml-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                          {item.badge}
-                        </span>
-                      )}
                     </Button>
                   </Link>
                 );
@@ -241,11 +239,6 @@ export default function FarmerLayout({
                             >
                               <item.icon className="h-5 w-5" />
                               {item.label}
-                              {item.badge && item.badge > 0 && (
-                                <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                                  {item.badge}
-                                </span>
-                              )}
                             </Button>
                           </Link>
                         );

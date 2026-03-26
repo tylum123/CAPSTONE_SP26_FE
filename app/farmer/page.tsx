@@ -1,4 +1,4 @@
-import { FarmerDashboard } from "@/components/farmer/farmer-dashboard";
+import FarmerDashboard from "@/app/farmer/dashboard/page";
 
 export default function FarmerPage() {
   return <FarmerDashboard />;

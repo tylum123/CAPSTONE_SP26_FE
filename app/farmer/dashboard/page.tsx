@@ -4,13 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
-import { Briefcase, Users, DollarSign, Clock, ChevronRight, Star, Cloud, Droplets, Wind, X, RefreshCw } from "lucide-react"
+import { Briefcase, Users, DollarSign, Clock, ChevronRight, Star, Cloud, Droplets, Wind, X, RefreshCw, ChevronDown, Plus, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect, useRef } from "react"
 import { farmerService } from "@/libs/api/services/farmer.service"
 import type { FarmerProfile } from "@/libs/api/types"
 import { useWeather } from "@/hooks/use-weather"
 import Image from "next/image"
+import { ActivityChart, JobStatusChart } from "@/components/farmer/dashboard-charts"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 const recentApplications = [
   {
@@ -121,22 +123,32 @@ export default function FarmerDashboard() {
   return (
     <div className="p-4 lg:p-6 space-y-6">
       {/* Welcome Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            Xin chào, {profile?.contactName || 'Loading...'}!
-          </h1>
-          <p className="text-muted-foreground">Đây là tổng quan hoạt động của nông trại.</p>
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-sky-500/10 p-6 md:p-8 border border-emerald-100 dark:border-emerald-900/20 shadow-sm transition-all hover:shadow-md group">
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl opacity-50 group-hover:bg-emerald-500/20 transition-all duration-500" />
+        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-64 w-64 rounded-full bg-teal-500/10 blur-3xl opacity-50 group-hover:bg-teal-500/20 transition-all duration-500" />
+        
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-3">
+              Chào ngày mới, <span className="text-agro-green">{profile?.contactName || 'Bạn'}</span>! 
+            </h1>
+            <p className="text-muted-foreground text-lg flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-amber-400 animate-pulse" />
+              Hôm nay công việc của bạn hoạt động thế nào?
+            </p>
+          </div>
+          <Link href="/farmer/create-job">
+            <Button size="lg" className="bg-agro-green hover:bg-agro-green-dark text-white rounded-full px-6 shadow-lg shadow-agro-green/20 hover:shadow-xl hover:shadow-agro-green/30 transition-all hover:-translate-y-0.5 active:translate-y-0">
+              <Plus className="mr-2 h-5 w-5 group-hover:rotate-90 transition-transform duration-300" />
+              Đăng công việc mới
+            </Button>
+          </Link>
         </div>
-        <Link href="/farmer/create-job">
-          <Button className="bg-agro-green hover:bg-agro-green-dark text-white">Tạo bài đăng mới</Button>
-        </Link>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {stats.map((stat, idx) => (
-          <Card key={idx}>
+          <Card key={idx} className="shadow-sm border-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm hover:shadow-md transition-all duration-200">
             <CardContent className="p-4 flex items-center gap-4">
               <div className={`p-3 rounded-lg ${stat.bgColor}`}>
                 <stat.icon className={`h-6 w-6 ${stat.color}`} />
@@ -150,12 +162,39 @@ export default function FarmerDashboard() {
         ))}
       </div>
 
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <ActivityChart />
+        <JobStatusChart />
+      </div>
+
+      {/* Stats Cards */}
+      
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Applications */}
         <div className="lg:col-span-2">
-          <Card>
+          <Collapsible defaultOpen className="space-y-2 group">
+            <div className="flex items-center justify-between p-2 rounded-lg bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm border shadow-sm transition-all hover:shadow-md">
+              <div className="flex items-center gap-2 px-2">
+                <div className="p-1.5 rounded-full bg-agro-green/10 text-agro-green">
+                   <Users className="h-4 w-4" />
+                </div>
+                <h4 className="text-sm font-semibold">
+                  Ứng viên mới cần duyệt
+                </h4>
+              </div>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="w-8 h-8 p-0 rounded-full hover:bg-muted transition-transform duration-200 data-[state=open]:rotate-180">
+                  <ChevronDown className="h-4 w-4" />
+                  <span className="sr-only">Toggle</span>
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+            <CollapsibleContent className="space-y-2">
+             <Card className="shadow-sm border-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-lg">Ứng viên mới cần duyệt</CardTitle>
+              <CardTitle className="text-lg">Danh sách</CardTitle>
               <Link href="/farmer/applications">
                 <Button variant="ghost" size="sm" className="text-agro-green">
                   Xem tất cả
@@ -166,7 +205,7 @@ export default function FarmerDashboard() {
             <CardContent>
               <div className="space-y-4">
                 {recentApplications.map((app) => (
-                  <div key={app.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div key={app.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-agro-green/10 flex items-center justify-center">
                         <span className="text-agro-green font-semibold">{app.workerName.charAt(0)}</span>
@@ -210,12 +249,32 @@ export default function FarmerDashboard() {
               </div>
             </CardContent>
           </Card>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
 
         {/* Calendar Widget */}
-        <Card>
+        <Collapsible defaultOpen className="space-y-2 group">
+          <div className="flex items-center justify-between p-2 rounded-lg bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm border shadow-sm transition-all hover:shadow-md">
+            <div className="flex items-center gap-2 px-2">
+              <div className="p-1.5 rounded-full bg-blue-500/10 text-blue-500">
+                <Cloud className="h-4 w-4" />
+              </div>
+              <h4 className="text-sm font-semibold">
+                Lịch mùa vụ & Thời tiết
+              </h4>
+            </div>
+             <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="w-8 h-8 p-0 rounded-full hover:bg-muted transition-transform duration-200 data-[state=open]:rotate-180">
+                  <ChevronDown className="h-4 w-4" />
+                  <span className="sr-only">Toggle</span>
+                </Button>
+              </CollapsibleTrigger>
+          </div>
+          <CollapsibleContent className="space-y-2">
+            <Card className="shadow-sm border-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Lịch mùa vụ & Thời tiết</CardTitle>
+            <CardTitle className="text-lg">Chi tiết</CardTitle>
             <Button
               variant="ghost"
               size="sm"
@@ -331,6 +390,8 @@ export default function FarmerDashboard() {
             </div>
           </CardContent>
         </Card>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
       {/* Weather Popup */}
