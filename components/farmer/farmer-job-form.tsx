@@ -24,6 +24,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Switch } from "@/components/ui/switch"
 import { TimePicker } from "@/components/ui/time-picker"
+import { OsmLocationPicker } from "@/components/farmer/osm-location-picker"
 import { farmerService } from "@/libs/api/services/farmer.service"
 import { FarmService } from "@/libs/api/services/farm.service"
 import { jobCategoryService } from "@/libs/api/services/job-category.service"
@@ -68,6 +69,8 @@ const DEFAULT_PAYMENT_METHOD_ID = 1
 const DEFAULT_STATUS_ID = 1
 const DEFAULT_GENDER_PREFERENCE = "any"
 const DEFAULT_IS_URGENT = false
+
+const OSM_REVERSE_URL = process.env.NEXT_PUBLIC_OSM_REVERSE_URL || "https://nominatim.openstreetmap.org/reverse"
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("vi-VN", {
@@ -479,6 +482,32 @@ export function FarmerJobForm() {
     }
   }
 
+  const handleMapPick = async (latitude: number, longitude: number) => {
+    setLocationLat(latitude)
+    setLocationLng(longitude)
+
+    // Reverse geocode to get address
+    try {
+      const response = await fetch(
+        `${OSM_REVERSE_URL}?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            "Accept-Language": "vi",
+          },
+        },
+      )
+
+      if (response.ok) {
+        const data = (await response.json()) as { display_name?: string }
+        if (data.display_name) {
+          setLocation(data.display_name)
+        }
+      }
+    } catch {
+      // Continue with just coordinates if reverse geocode fails
+    }
+  }
+
   const handleContractStartSelect = (date?: Date) => {
     if (!date) {
       setContractStartDate("")
@@ -816,7 +845,7 @@ export function FarmerJobForm() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-12">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b pb-4">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" asChild className="rounded-full h-10 w-10 border-muted-foreground/20">
             <Link href="/farmer/jobs">
@@ -825,7 +854,7 @@ export function FarmerJobForm() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Đăng tin tuyển dụng</h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="text-muted-foreground mt-1 mb-2">
               Tạo công việc mới và tìm kiếm nhân sự phù hợp cho nông trại của bạn.
             </p>
           </div>
@@ -916,7 +945,7 @@ export function FarmerJobForm() {
               <div className="lg:col-span-7  space-y-8">
                  {/* Card 1: Job Info */}
                  <Card className="overflow-hidden border-t-4 border-t-primary shadow-md">
-                   <CardHeader className="bg-muted/10 pb-4">
+                   <CardHeader className="bg-muted/10 pb-0">
                      <CardTitle className="flex items-center gap-2 text-xl">
                        <Briefcase className="h-5 w-5 text-primary" />
                        Thông tin công việc
@@ -1002,113 +1031,111 @@ export function FarmerJobForm() {
                    </CardContent>
                  </Card>
 
-                 {/* Card 2: Requirements & Stats */}
-                 <div className="grid gap-8 md:grid-cols-2">
-                    <Card className="shadow-md">
-                        <CardHeader className="bg-muted/10 pb-3">
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                <Award className="h-5 w-5 text-orange-500" />
-                                Kỹ năng & Kinh nghiệm
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-4 space-y-4">
-                            <p className="text-sm text-muted-foreground">Chọn các kỹ năng ứng viên cần có:</p>
-                            <div className="grid grid-cols-1 gap-2">
-                                {availableSkills.map((skill) => (
-                                   <div
-                                     key={skill.id}
-                                     onClick={() => toggleSkill(skill.id)}
-                                     className={cn(
-                                       "flex cursor-pointer items-center gap-3 rounded-lg border p-3 hover:bg-accent/50 transition-all",
-                                       selectedSkillIds.includes(skill.id) ? "border-primary bg-primary/5 shadow-sm" : "border-border"
-                                     )}
-                                   >
-                                     <Checkbox
-                                       id={`skill-${skill.id}`}
-                                       checked={selectedSkillIds.includes(skill.id)}
-                                       onCheckedChange={() => toggleSkill(skill.id)}
-                                       className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                                     />
-                                     <span className="text-sm font-medium">{skill.name}</span>
-                                   </div>
-                                ))}
+                 <div className="grid gap-8 md:grid-cols-1">
+
+                    {/* Location Card */}
+                    <Card className="shadow-md overflow-hidden border-t-4 border-t-teal-500">
+                      <CardHeader className="bg-muted/10">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <MapPin className="h-5 w-5 text-teal-600" />
+                          Địa điểm & Thù lao
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-7 pt-6">
+                        <div className="space-y-2">
+                          <Label className="font-semibold">Mức công (VNĐ)</Label>
+                          <div className="relative">
+                            <div className="absolute left-3 top-2.5 text-muted-foreground"><DollarSign className="h-4 w-4" /></div>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={income}
+                              onChange={(e) => setIncome(e.target.value)}
+                              className="pl-9 text-lg font-medium text-teal-700 dark:text-teal-400"
+                              placeholder="300,000"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Trang trại</Label>
+                          <Popover open={isFarmPopoverOpen} onOpenChange={setIsFarmPopoverOpen}>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" className="w-full justify-between" disabled={isLoadingFarms}>
+                                <span className="truncate">{selectedFarmLabel || "Chọn trang trại"}</span>
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[280px] p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Tìm trang trại..." />
+                                <CommandList>
+                                  <CommandEmpty>Không tìm thấy.</CommandEmpty>
+                                  <CommandGroup>
+                                    {farms.map((farm) => {
+                                      const fId = farm.farmId || (farm as any).id
+                                      return (
+                                        <CommandItem
+                                          key={fId}
+                                          value={farm.locationName ?? farm.address ?? fId}
+                                          onSelect={() => {
+                                            setSelectedFarmId(fId)
+                                            setIsFarmPopoverOpen(false)
+                                            if (farm.address) setLocation(farm.address)
+                                            if (farm.latitude && farm.longitude) {
+                                              setLocationLat(farm.latitude)
+                                              setLocationLng(farm.longitude)
+                                            }
+                                          }}
+                                        >
+                                          <Check className={cn("mr-2 h-4 w-4", selectedFarmId === fId ? "opacity-100" : "opacity-0")} />
+                                          <div className="flex flex-col overflow-hidden">
+                                            <span className="truncate">{farm.locationName}</span>
+                                            <span className="text-xs text-muted-foreground truncate">{farm.address}</span>
+                                          </div>
+                                        </CommandItem>
+                                      )
+                                    })}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Địa chỉ chi tiết</Label>
+                          <Input value={location} onChange={(e) => { setLocation(e.target.value); setLocationLat(undefined); setLocationLng(undefined); }} placeholder="Nhập địa chỉ..." />
+                          {/* Search suggestions dropdown */}
+                          {(isSearchingLocation || locationSuggestions.length > 0) && (
+                            <div className="absolute z-50 mt-1 max-h-60 w-[85%] overflow-auto rounded-md border bg-popover p-1 shadow-md">
+                              {locationSuggestions.map((place) => (
+                                <div key={place.place_id} onClick={() => selectOSMLocation(place)} className="cursor-pointer truncate rounded px-2 py-1.5 text-xs hover:bg-muted">
+                                  {place.display_name}
+                                </div>
+                              ))}
                             </div>
-                        </CardContent>
-                    </Card>
+                          )}
+                        </div>
 
-                    <Card className="shadow-md flex flex-col">
-                        <CardHeader className="bg-muted/10 pb-3">
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                <Users className="h-5 w-5 text-blue-500" />
-                                Yêu cầu & Quyền lợi
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-4 space-y-6 flex-1">
-                             <div className="space-y-3">
-                                 <Label className="text-sm font-semibold text-muted-foreground uppercase">Yêu cầu bổ sung</Label>
-                                 <div className="space-y-2">
-                                    <div className="flex gap-2">
-                                        <Input 
-                                           value={newRequirement} 
-                                           onChange={(e) => setNewRequirement(e.target.value)}
-                                           onKeyDown={handleRequirementKeyDown}
-                                           placeholder="Thêm yêu cầu..." 
-                                           className="h-9 text-sm"
-                                        />
-                                        <Button size="sm" variant="secondary" onClick={addRequirement} type="button">
-                                           <Plus className="h-4 w-4" />
-                                        </Button>
-                                     </div>
-                                     <div className="flex flex-wrap gap-2 min-h-[30px]">
-                                        {requirements.map((item, index) => (
-                                          <Badge key={`req-${index}`} variant="secondary" className="pl-2 pr-1 py-1 gap-1">
-                                            {item}
-                                            <button onClick={() => setRequirements(prev => prev.filter((_, i) => i !== index))} className="rounded-full hover:bg-destructive hover:text-white p-0.5 transition-colors">
-                                               <X className="h-3 w-3" />
-                                            </button>
-                                          </Badge>
-                                        ))}
-                                     </div>
-                                 </div>
-                             </div>
-
-                             <div className="space-y-3 pt-2 border-t">
-                                 <Label className="text-sm font-semibold text-muted-foreground uppercase">Quyền lợi</Label>
-                                 <div className="space-y-2">
-                                    <div className="flex gap-2">
-                                        <Input 
-                                           value={newBenefit} 
-                                           onChange={(e) => setNewBenefit(e.target.value)}
-                                           onKeyDown={handleBenefitKeyDown}
-                                           placeholder="Thêm quyền lợi..." 
-                                           className="h-9 text-sm"
-                                        />
-                                        <Button size="sm" variant="secondary" onClick={addBenefit} type="button">
-                                           <Plus className="h-4 w-4" />
-                                        </Button>
-                                     </div>
-                                     <div className="flex flex-wrap gap-2 min-h-[30px]">
-                                        {benefits.map((item, index) => (
-                                          <Badge key={`ben-${index}`} variant="outline" className="pl-2 pr-1 py-1 gap-1 border-green-200 bg-green-50 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300">
-                                            {item}
-                                            <button onClick={() => setBenefits(prev => prev.filter((_, i) => i !== index))} className="rounded-full hover:bg-destructive hover:text-white p-0.5 transition-colors">
-                                               <X className="h-3 w-3" />
-                                            </button>
-                                          </Badge>
-                                        ))}
-                                     </div>
-                                 </div>
-                             </div>
-                        </CardContent>
+                        <div className="relative h-100 w-full overflow-hidden rounded-md border bg-muted/20">
+                          <OsmLocationPicker
+                            latitude={locationLat ?? null}
+                            longitude={locationLng ?? null}
+                            onPick={handleMapPick}
+                            className="h-full"
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">Bấm vào bản đồ để chọn vị trí công việc</p>
+                      </CardContent>
                     </Card>
                  </div>
               </div>
 
-              {/* Right Column (4 cols) - Sticky */}
               <div className="lg:col-span-5 space-y-6">
                  {/* Schedule Card */}
                  <Card className="shadow-md border-t-4 border-t-purple-500">
-                    <CardHeader className="bg-muted/10 pb-4">
+                    <CardHeader className="bg-muted/10">
                       <CardTitle className="text-lg flex items-center gap-2">
                         <CalendarRange className="h-5 w-5 text-purple-600" />
                         Lịch làm việc
@@ -1124,7 +1151,7 @@ export function FarmerJobForm() {
                                scheduleType === "contract" ? "bg-background text-primary shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/50"
                              )}
                            >
-                             Khoán việc
+                             Khoán
                            </button>
                            <button
                              type="button"
@@ -1134,7 +1161,7 @@ export function FarmerJobForm() {
                                scheduleType === "daily" ? "bg-background text-primary shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/50"
                              )}
                            >
-                             Theo ngày
+                             Ngày
                            </button>
                        </div>
 
@@ -1223,107 +1250,110 @@ export function FarmerJobForm() {
                     </CardContent>
                  </Card>
 
-                 {/* Location Card */}
-                 <Card className="shadow-md border-t-4 border-t-teal-500">
-                    <CardHeader className="bg-muted/10 pb-4">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <MapPin className="h-5 w-5 text-teal-600" />
-                        Địa điểm & Thù lao
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-7 pt-6">
-                       <div className="space-y-2">
-                          <Label className="font-semibold">Mức công (VNĐ)</Label>
-                          <div className="relative">
-                             <div className="absolute left-3 top-2.5 text-muted-foreground"><DollarSign className="h-4 w-4" /></div>
-                             <Input 
-                                type="number" 
-                                min="0" 
-                                value={income} 
-                                onChange={(e) => setIncome(e.target.value)} 
-                                className="pl-9 text-lg font-medium text-teal-700 dark:text-teal-400" 
-                                placeholder="300,000" 
-                             />
-                          </div>
-                       </div>
+                <div className="grid gap-8 md:grid-cols-1">
+                    <Card className="shadow-md overflow-hidden border-t-4 border-t-orange-500">
+                      <CardHeader className="bg-muted/10 pb-3">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Award className="h-5 w-5 text-orange-500" />
+                          Kỹ năng & Kinh nghiệm
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <p className="text-sm text-muted-foreground">Chọn các kỹ năng ứng viên cần có:</p>
+                        <div className="grid grid-cols-1 gap-2">
+                          {availableSkills.map((skill) => (
+                            <div
+                              key={skill.id}
+                              onClick={() => toggleSkill(skill.id)}
+                              className={cn(
+                                "flex cursor-pointer items-center gap-3 rounded-lg border p-3 hover:bg-accent/50 transition-all",
+                                selectedSkillIds.includes(skill.id) ? "border-primary bg-primary/5 shadow-sm" : "border-border"
+                              )}
+                            >
+                              <Checkbox
+                                id={`skill-${skill.id}`}
+                                checked={selectedSkillIds.includes(skill.id)}
+                                onCheckedChange={() => toggleSkill(skill.id)}
+                                className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                              />
+                              <span className="text-sm font-medium">{skill.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
 
-                       <div className="space-y-2">
-                          <Label>Trang trại</Label>
-                          <Popover open={isFarmPopoverOpen} onOpenChange={setIsFarmPopoverOpen}>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" className="w-full justify-between" disabled={isLoadingFarms}>
-                                <span className="truncate">{selectedFarmLabel || "Chọn trang trại"}</span>
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    <Card className="shadow-md overflow-hidden border-t-4 border-t-blue-500 flex flex-col">
+                      <CardHeader className="bg-muted/10 pb-3">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Users className="h-5 w-5 text-blue-500" />
+                          Yêu cầu & Quyền lợi
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-6 flex-1">
+                        <div className="space-y-3">
+                          <Label className="text-sm font-semibold text-muted-foreground uppercase">Yêu cầu bổ sung</Label>
+                          <div className="space-y-2">
+                            <div className="flex gap-2">
+                              <Input
+                                value={newRequirement}
+                                onChange={(e) => setNewRequirement(e.target.value)}
+                                onKeyDown={handleRequirementKeyDown}
+                                placeholder="Thêm yêu cầu..."
+                                className="h-9 text-sm"
+                              />
+                              <Button size="sm" variant="secondary" onClick={addRequirement} type="button">
+                                <Plus className="h-4 w-4" />
                               </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[280px] p-0" align="start">
-                               <Command>
-                                  <CommandInput placeholder="Tìm trang trại..." />
-                                  <CommandList>
-                                     <CommandEmpty>Không tìm thấy.</CommandEmpty>
-                                     <CommandGroup>
-                                        {farms.map((farm) => {
-                                           const fId = farm.farmId || (farm as any).id
-                                           return (
-                                              <CommandItem
-                                                 key={fId}
-                                                 value={farm.locationName ?? farm.address ?? fId}
-                                                 onSelect={() => {
-                                                    setSelectedFarmId(fId)
-                                                    setIsFarmPopoverOpen(false)
-                                                    if (farm.address) setLocation(farm.address)
-                                                    if (farm.latitude && farm.longitude) {
-                                                       setLocationLat(farm.latitude)
-                                                       setLocationLng(farm.longitude)
-                                                    }
-                                                 }}
-                                              >
-                                                 <Check className={cn("mr-2 h-4 w-4", selectedFarmId === fId ? "opacity-100" : "opacity-0")} />
-                                                 <div className="flex flex-col overflow-hidden">
-                                                    <span className="truncate">{farm.locationName}</span>
-                                                    <span className="text-xs text-muted-foreground truncate">{farm.address}</span>
-                                                 </div>
-                                              </CommandItem>
-                                           )
-                                        })}
-                                     </CommandGroup>
-                                  </CommandList>
-                               </Command>
-                            </PopoverContent>
-                          </Popover>
-                       </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2 min-h-[30px]">
+                              {requirements.map((item, index) => (
+                                <Badge key={`req-${index}`} variant="secondary" className="pl-2 pr-1 py-1 gap-1">
+                                  {item}
+                                  <button onClick={() => setRequirements(prev => prev.filter((_, i) => i !== index))} className="rounded-full hover:bg-destructive hover:text-white p-0.5 transition-colors">
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
 
-                       <div className="space-y-2">
-                          <Label>Địa chỉ chi tiết</Label>
-                          <Input value={location} onChange={(e) => { setLocation(e.target.value); setLocationLat(undefined); setLocationLng(undefined); }} placeholder="Nhập địa chỉ..." />
-                          {/* Search suggestions dropdown */}
-                          {(isSearchingLocation || locationSuggestions.length > 0) && (
-                              <div className="absolute z-50 mt-1 max-h-60 w-[85%] overflow-auto rounded-md border bg-popover p-1 shadow-md">
-                                {locationSuggestions.map((place) => (
-                                   <div key={place.place_id} onClick={() => selectOSMLocation(place)} className="cursor-pointer truncate rounded px-2 py-1.5 text-xs hover:bg-muted">
-                                      {place.display_name}
-                                   </div>
-                                ))}
-                              </div>
-                          )}
-                       </div>
-
-                       <div className="h-40 w-full overflow-hidden rounded-md border bg-muted/20 relative">
-                          {locationLat && locationLng ? (
-                             <iframe title="Map" src={buildOSMEmbedUrl(locationLat, locationLng)} className="h-full w-full" loading="lazy" />
-                          ) : (
-                             <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
-                                <MapPinned className="h-8 w-8 mb-2 opacity-30" />
-                                <span className="text-xs text-center px-4">Bản đồ hiển thị khi có tọa độ</span>
-                             </div>
-                          )}
-                       </div>
-                    </CardContent>
-                 </Card>
+                        <div className="space-y-3 pt-2 border-t">
+                          <Label className="text-sm font-semibold text-muted-foreground uppercase">Quyền lợi</Label>
+                          <div className="space-y-2">
+                            <div className="flex gap-2">
+                              <Input
+                                value={newBenefit}
+                                onChange={(e) => setNewBenefit(e.target.value)}
+                                onKeyDown={handleBenefitKeyDown}
+                                placeholder="Thêm quyền lợi..."
+                                className="h-9 text-sm"
+                              />
+                              <Button size="sm" variant="secondary" onClick={addBenefit} type="button">
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <div className="flex flex-wrap gap-2 min-h-[30px]">
+                              {benefits.map((item, index) => (
+                                <Badge key={`ben-${index}`} variant="outline" className="pl-2 pr-1 py-1 gap-1 border-green-200 bg-green-50 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300">
+                                  {item}
+                                  <button onClick={() => setBenefits(prev => prev.filter((_, i) => i !== index))} className="rounded-full hover:bg-destructive hover:text-white p-0.5 transition-colors">
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                </div>
+                 
               </div>
 
               {/* Action Bar */}
-              <div className="lg:col-span-12 sticky bottom-4 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-4 border rounded-xl shadow-lg flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="lg:col-span-12 sticky bottom-4 z-1000 bg-background/95 backdrop-blur p-4 border rounded-xl shadow-lg flex flex-col sm:flex-row justify-between items-center gap-4">
                  <div className="text-sm text-muted-foreground">
                     {submitError ? (
                         <span className="flex items-center text-destructive font-semibold"><Info className="mr-2 h-4 w-4" /> {submitError}</span>
@@ -1335,7 +1365,7 @@ export function FarmerJobForm() {
                    <Button type="button" variant="outline" asChild className="flex-1 sm:flex-none">
                       <Link href="/farmer/jobs">Hủy bỏ</Link>
                    </Button>
-                   <Button type="button" onClick={goToPreview} className="flex-1 sm:flex-none min-w-[150px] shadow-sm">
+                   <Button type="button" onClick={goToPreview} className="flex-1 sm:flex-none shadow-sm">
                       Xem trước tin đăng <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
                    </Button>
                  </div>

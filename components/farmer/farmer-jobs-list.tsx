@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import {
@@ -20,7 +27,7 @@ import { farmerService } from "@/libs/api/services/farmer.service"
 import { jobCategoryService } from "@/libs/api/services/job-category.service"
 import { skillService } from "@/libs/api/services/skill.service"
 import { useProvinces } from "@/hooks/use-provinces"
-import type { Job, JobCategory, Skill } from "@/libs/api/types"
+import type { Application, Job, JobCategory, PaginatedResponse, Skill } from "@/libs/api/types"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +47,11 @@ export function FarmerJobsList() {
   const [filterCategory, setFilterCategory] = useState("all-categories")
   const [filterAddress, setFilterAddress] = useState("all-provinces")
   const [filterSkill, setFilterSkill] = useState("all-skills")
+  const [isApplicationsDialogOpen, setIsApplicationsDialogOpen] = useState(false)
+  const [selectedJobForApplications, setSelectedJobForApplications] = useState<Job | null>(null)
+  const [applications, setApplications] = useState<Application[]>([])
+  const [isLoadingApplications, setIsLoadingApplications] = useState(false)
+  const [applicationsError, setApplicationsError] = useState<string | null>(null)
 
   // For combo boxes
   const [categories, setCategories] = useState<JobCategory[]>([])
@@ -209,22 +221,98 @@ export function FarmerJobsList() {
     }
   }
 
+  const getApplicationStatusBadge = (status: Application["status"]) => {
+    if (status === "approved") {
+      return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Đã duyệt</Badge>
+    }
+
+    if (status === "rejected") {
+      return <Badge variant="destructive" className="bg-rose-100 text-rose-800 border-rose-200">Từ chối</Badge>
+    }
+
+    return <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">Chờ duyệt</Badge>
+  }
+
+  const statusCounts = useMemo(() => {
+    const active = jobs.filter((job) => normalizeStatus(job.status) === "active").length
+    const filled = jobs.filter((job) => normalizeStatus(job.status) === "filled").length
+    const completed = jobs.filter((job) => normalizeStatus(job.status) === "completed").length
+
+    return {
+      total: jobs.length,
+      active,
+      filled,
+      completed,
+    }
+  }, [jobs])
+
+  const openApplicationsDialog = async (job: Job) => {
+    setSelectedJobForApplications(job)
+    setIsApplicationsDialogOpen(true)
+    setIsLoadingApplications(true)
+    setApplicationsError(null)
+    setApplications([])
+
+    try {
+      const response = await farmerService.getJobApplicationsByPost({
+        jobId: job.id,
+        includeAll: true,
+      })
+
+      const payload = response.data as PaginatedResponse<Application> | Application[] | { data?: Application[] }
+
+      if (Array.isArray(payload)) {
+        setApplications(payload)
+      } else if (Array.isArray(payload?.data)) {
+        setApplications(payload.data)
+      } else {
+        setApplications([])
+      }
+    } catch (dialogError) {
+      console.error(dialogError)
+      setApplicationsError("Không thể tải danh sách ứng viên cho tin đăng này.")
+    } finally {
+      setIsLoadingApplications(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Page Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Tin tuyển dụng</h1>
-          <p className="text-muted-foreground">Quản lý các tin tuyển dụng của bạn</p>
+      <div className="relative overflow-hidden rounded-2xl border bg-linear-to-r from-emerald-50 via-teal-50 to-cyan-50 p-5 dark:from-emerald-950/30 dark:via-teal-950/20 dark:to-cyan-950/20">
+        <div className="pointer-events-none absolute -top-12 right-6 h-40 w-40 rounded-full bg-emerald-200/40 blur-3xl dark:bg-emerald-700/20" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Tin tuyển dụng</h1>
+            <p className="text-muted-foreground">Quản lý các tin tuyển dụng và theo dõi ứng viên theo từng bài đăng</p>
+          </div>
+          <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
+            <Link href="/farmer/create-job">
+              <Plus className="mr-2 h-4 w-4" />
+              Đăng tin mới
+            </Link>
+          </Button>
         </div>
-        <Button asChild>
-          <Link href="/farmer/jobs/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Đăng tin mới
-          </Link>
-        </Button>
+        <div className="relative mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-xl border bg-white/80 px-3 py-2 shadow-sm dark:bg-slate-900/70">
+            <p className="text-xs text-muted-foreground">Tổng tin</p>
+            <p className="text-lg font-bold">{statusCounts.total}</p>
+          </div>
+          <div className="rounded-xl border bg-white/80 px-3 py-2 shadow-sm dark:bg-slate-900/70">
+            <p className="text-xs text-muted-foreground">Đang tuyển</p>
+            <p className="text-lg font-bold text-emerald-600">{statusCounts.active}</p>
+          </div>
+          <div className="rounded-xl border bg-white/80 px-3 py-2 shadow-sm dark:bg-slate-900/70">
+            <p className="text-xs text-muted-foreground">Đã đủ</p>
+            <p className="text-lg font-bold text-amber-600">{statusCounts.filled}</p>
+          </div>
+          <div className="rounded-xl border bg-white/80 px-3 py-2 shadow-sm dark:bg-slate-900/70">
+            <p className="text-xs text-muted-foreground">Hoàn thành</p>
+            <p className="text-lg font-bold text-slate-600 dark:text-slate-300">{statusCounts.completed}</p>
+          </div>
+        </div>
       </div>
-      <div className="flex flex-col gap-4 bg-card p-4 rounded-xl border shadow-sm">
+      <div className="flex flex-col gap-4 bg-card/80 p-4 rounded-xl border shadow-sm backdrop-blur-sm">
 
         <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -370,6 +458,10 @@ export function FarmerJobsList() {
                                 Xem chi tiết
                               </Link>
                             </DropdownMenuItem>
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => void openApplicationsDialog(job)}>
+                              <Users className="mr-2 h-4 w-4 text-muted-foreground" />
+                              Xem ứng viên
+                            </DropdownMenuItem>
                             <DropdownMenuItem className="cursor-pointer">
                               <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
                               Chỉnh sửa
@@ -402,13 +494,21 @@ export function FarmerJobsList() {
                       <span className="truncate">{formatCurrency(job.wageAmount)}</span>
                     </div>
                     <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                      <Clock className="h-4 w-4 shrink-0 text-blue-500" />
-                      <span className="truncate">{job.estimatedHours} giờ</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                       <Users className="h-4 w-4 shrink-0 text-amber-500" />
                       <span className="truncate">{job.workersAccepted}/{job.workersNeeded} người</span>
                     </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/20"
+                      onClick={() => void openApplicationsDialog(job)}
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      Xem ứng viên
+                    </Button>
                   </div>
 
                   {normalizeStatus(job.status) !== "completed" && (
@@ -480,6 +580,60 @@ export function FarmerJobsList() {
           </Card>
         ))}
       </div>
+
+      <Dialog open={isApplicationsDialogOpen} onOpenChange={setIsApplicationsDialogOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Ứng viên của bài đăng</DialogTitle>
+            <DialogDescription>
+              {selectedJobForApplications
+                ? `Bài đăng: ${selectedJobForApplications.title}`
+                : "Danh sách ứng viên"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+            {isLoadingApplications ? (
+              <div className="flex min-h-40 flex-col items-center justify-center rounded-lg border border-dashed">
+                <Loader2 className="mb-2 h-6 w-6 animate-spin text-emerald-600" />
+                <p className="text-sm text-muted-foreground">Đang tải danh sách ứng viên...</p>
+              </div>
+            ) : null}
+
+            {!isLoadingApplications && applicationsError ? (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300">
+                {applicationsError}
+              </div>
+            ) : null}
+
+            {!isLoadingApplications && !applicationsError && applications.length === 0 ? (
+              <div className="flex min-h-40 flex-col items-center justify-center rounded-lg border border-dashed bg-slate-50/70 text-center dark:bg-slate-900/30">
+                <Users className="mb-2 h-6 w-6 text-muted-foreground" />
+                <p className="text-sm font-medium">Chưa có ứng viên</p>
+                <p className="text-xs text-muted-foreground">Bài đăng này chưa nhận được hồ sơ ứng tuyển.</p>
+              </div>
+            ) : null}
+
+            {!isLoadingApplications && !applicationsError && applications.length > 0
+              ? applications.map((application) => (
+                  <div
+                    key={application.id}
+                    className="rounded-xl border bg-slate-50/60 p-4 shadow-sm dark:bg-slate-900/30"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="space-y-1">
+                        <p className="font-semibold text-foreground">{application.workerName || "Ứng viên"}</p>
+                        <p className="text-sm text-muted-foreground">SĐT: {application.workerPhone || "-"}</p>
+                        <p className="text-xs text-muted-foreground">Nộp hồ sơ: {formatDate(application.appliedAt)}</p>
+                      </div>
+                      <div>{getApplicationStatusBadge(application.status)}</div>
+                    </div>
+                  </div>
+                ))
+              : null}
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </div>
   )

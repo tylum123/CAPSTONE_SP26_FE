@@ -101,12 +101,22 @@ export default function FarmerJobDetailPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3">
-        <Button variant="outline" asChild>
-          <Link href="/farmer/jobs">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Về danh sách bài đăng
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/farmer/jobs">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Về danh sách bài đăng
+            </Link>
+          </Button>
+          {jobId ? (
+            <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
+              <Link href={`/farmer/applications?jobId=${jobId}`}>
+                <Users className="mr-2 h-4 w-4" />
+                Quản lý ứng tuyển
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {isLoading ? (
