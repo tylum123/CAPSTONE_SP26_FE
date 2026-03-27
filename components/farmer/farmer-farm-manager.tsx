@@ -23,12 +23,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { OsmLocationPicker } from "@/components/farmer/osm-location-picker"
 import { useToast } from "@/hooks/use-toast"
 import { handleApiError } from "@/lib/utils/error-handler"
 import { FarmService } from "@/libs/api/services/farm.service"
 import type { GetFarmResponse, UpdateFarmRequest } from "@/libs/api/types"
-import { Loader2, MapPin, Pencil, Plus, Star, Trash2, X, UploadCloud, Eye } from "lucide-react"
+import { Loader2, MapPin, Pencil, Plus, Star, Trash2, X, UploadCloud, Eye, ChevronDown, PlusCircleIcon } from "lucide-react"
 import Image from "next/image"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible"
+
+const OSM_NOMINATIM_URL = process.env.NEXT_PUBLIC_OSM_NOMINATIM_URL || "https://nominatim.openstreetmap.org/search"
+const OSM_REVERSE_URL = process.env.NEXT_PUBLIC_OSM_REVERSE_URL || "https://nominatim.openstreetmap.org/reverse"
+const OSM_WEB_BASE_URL = process.env.NEXT_PUBLIC_OSM_WEB_BASE_URL || "https://www.openstreetmap.org"
 
 type FarmFormState = {
   address: string
@@ -47,6 +53,11 @@ type OSMPlace = {
   lat: string
   lon: string
   name?: string
+}
+
+type PendingImage = {
+  file: File
+  previewUrl: string
 }
 
 type FarmWithOptionalId = GetFarmResponse & {
@@ -132,6 +143,10 @@ function upsertFarm(farms: GetFarmResponse[], nextFarm: GetFarmResponse): GetFar
   return sortFarms(normalizedFarms)
 }
 
+function buildOsmDetailUrl(latitude: number, longitude: number): string {
+  return `${OSM_WEB_BASE_URL}/?mlat=${latitude}&mlon=${longitude}#map=16/${latitude}/${longitude}`
+}
+
 export function FarmerFarmManager() {
   const { toast } = useToast()
   const [farms, setFarms] = useState<GetFarmResponse[]>([])
@@ -147,6 +162,22 @@ export function FarmerFarmManager() {
   const [viewingFarmId, setViewingFarmId] = useState<string | null>(null)
   const [viewingFarmDetails, setViewingFarmDetails] = useState<GetFarmResponse | null>(null)
   const [loadingDetails, setLoadingDetails] = useState(false)
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([])
+  const [isFormCollapsibleOpen, setIsFormCollapsibleOpen] = useState(false)
+  const [selectedImageForViewer, setSelectedImageForViewer] = useState<string | null>(null)
+  const [imageZoom, setImageZoom] = useState(100)
+  const [imagePanX, setImagePanX] = useState(0)
+  const [imagePanY, setImagePanY] = useState(0)
+  const [isDraggingImage, setIsDraggingImage] = useState(false)
+  const [dragStartX, setDragStartX] = useState(0)
+  const [dragStartY, setDragStartY] = useState(0)
+
+  const clearPendingImages = () => {
+    pendingImages.forEach((pendingImage) => {
+      URL.revokeObjectURL(pendingImage.previewUrl)
+    })
+    setPendingImages([])
+  }
 
   const handleViewDetails = async (farmId: string) => {
     setViewingFarmId(farmId)
@@ -191,6 +222,14 @@ export function FarmerFarmManager() {
   }, [toast])
 
   useEffect(() => {
+    return () => {
+      pendingImages.forEach((pendingImage) => {
+        URL.revokeObjectURL(pendingImage.previewUrl)
+      })
+    }
+  }, [pendingImages])
+
+  useEffect(() => {
     const keyword = formData.address.trim()
 
     if (keyword.length < 3) {
@@ -202,14 +241,17 @@ export function FarmerFarmManager() {
     const timer = window.setTimeout(async () => {
       try {
         setIsSearchingLocation(true)
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=vn&q=${encodeURIComponent(keyword)}`,
-          {
-            headers: {
-              "Accept-Language": "vi",
-            },
-          }
-        )
+        const searchUrl = new URL(OSM_NOMINATIM_URL)
+        searchUrl.searchParams.set("format", "json")
+        searchUrl.searchParams.set("limit", "5")
+        searchUrl.searchParams.set("countrycodes", "vn")
+        searchUrl.searchParams.set("q", keyword)
+
+        const response = await fetch(searchUrl.toString(), {
+          headers: {
+            "Accept-Language": "vi",
+          },
+        })
 
         if (!response.ok) {
           setLocationSuggestions([])
@@ -240,22 +282,30 @@ export function FarmerFarmManager() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return
     const newFiles = Array.from(e.target.files)
-    
-    if (!editingFarmId) {
-      toast({
-        title: "Thông báo",
-        description: "Vui lòng thêm nông trại trước khi tải ảnh lên.",
-      })
-      e.target.value = ""
-      return
-    }
 
-    if (formData.images.length + newFiles.length > 3) {
+    if (formData.images.length + pendingImages.length + newFiles.length > 3) {
       toast({
         title: "Lỗi",
         description: "Chỉ được upload tối đa 3 hình ảnh.",
         variant: "destructive",
       })
+      e.target.value = ""
+      return
+    }
+
+    if (!editingFarmId) {
+      const queuedImages = newFiles.map((file) => ({
+        file,
+        previewUrl: URL.createObjectURL(file),
+      }))
+
+      setPendingImages((current) => [...current, ...queuedImages])
+
+      toast({
+        title: "Đã chọn ảnh",
+        description: "Ảnh sẽ được tải lên sau khi bạn thêm nông trại.",
+      })
+
       e.target.value = ""
       return
     }
@@ -287,13 +337,27 @@ export function FarmerFarmManager() {
   }
 
   const removeImage = (indexToRemove: number) => {
-    handleFieldChange(
-      "images",
-      formData.images.filter((_, index) => index !== indexToRemove)
-    )
+    if (indexToRemove < formData.images.length) {
+      handleFieldChange(
+        "images",
+        formData.images.filter((_, index) => index !== indexToRemove)
+      )
+      return
+    }
+
+    const pendingIndex = indexToRemove - formData.images.length
+    setPendingImages((current) => {
+      const imageToRemove = current[pendingIndex]
+      if (imageToRemove) {
+        URL.revokeObjectURL(imageToRemove.previewUrl)
+      }
+
+      return current.filter((_, index) => index !== pendingIndex)
+    })
   }
 
   const resetForm = () => {
+    clearPendingImages()
     setFormData(EMPTY_FORM)
     setEditingFarmId(null)
     setLocationSuggestions([])
@@ -312,9 +376,11 @@ export function FarmerFarmManager() {
       return
     }
 
+    clearPendingImages()
     setEditingFarmId(farmId)
     setFormData(toFormState(farm))
     setShowLocationSuggestions(false)
+    setIsFormCollapsibleOpen(true)
   }
 
   const handleAddressChange = (value: string) => {
@@ -341,6 +407,50 @@ export function FarmerFarmManager() {
     }))
     setLocationSuggestions([])
     setShowLocationSuggestions(false)
+  }
+
+  const handleMapPick = async (latitude: number, longitude: number) => {
+    setFormData((current) => ({
+      ...current,
+      latitude,
+      longitude,
+    }))
+    setShowLocationSuggestions(false)
+
+    try {
+      const reverseUrl = new URL(OSM_REVERSE_URL)
+      reverseUrl.searchParams.set("format", "jsonv2")
+      reverseUrl.searchParams.set("lat", String(latitude))
+      reverseUrl.searchParams.set("lon", String(longitude))
+      reverseUrl.searchParams.set("zoom", "18")
+
+      const response = await fetch(reverseUrl.toString(), {
+        headers: {
+          "Accept-Language": "vi",
+        },
+      })
+
+      if (!response.ok) {
+        return
+      }
+
+      const reverseData = (await response.json()) as {
+        display_name?: string
+        name?: string
+      }
+
+      const fallbackName = reverseData.display_name?.split(",")[0]?.trim() || ""
+
+      setFormData((current) => ({
+        ...current,
+        latitude,
+        longitude,
+        address: reverseData.display_name || current.address,
+        locationName: current.locationName.trim() || reverseData.name || fallbackName,
+      }))
+    } catch {
+      // Keep selected coordinates even if reverse geocoding fails.
+    }
   }
 
   const handleDelete = async () => {
@@ -433,7 +543,38 @@ export function FarmerFarmManager() {
         ? await FarmService.updateFarm(editingFarmId, payload)
         : await FarmService.addFarm(payload)
 
-      setFarms((current) => upsertFarm(current, response.data))
+      let savedFarm = response.data
+
+      if (!editingFarmId && pendingImages.length > 0) {
+        const createdFarmId = getFarmId(savedFarm)
+
+        if (createdFarmId) {
+          try {
+            const uploadedImages = await Promise.all(
+              pendingImages.map((pendingImage) => FarmService.uploadImage(createdFarmId, pendingImage.file))
+            )
+
+            const uploadedUrls = uploadedImages.map((result) => result.data).filter(Boolean)
+
+            if (uploadedUrls.length > 0) {
+              const existingUrls = Array.isArray(savedFarm.imageUrl) ? savedFarm.imageUrl : []
+              const updatedFarmResponse = await FarmService.updateFarm(createdFarmId, {
+                imageUrl: [...existingUrls, ...uploadedUrls],
+              })
+
+              savedFarm = updatedFarmResponse.data
+            }
+          } catch {
+            toast({
+              title: "Tạo nông trại thành công",
+              description: "Không thể tải một số ảnh. Bạn có thể tải lại khi chỉnh sửa nông trại.",
+              variant: "destructive",
+            })
+          }
+        }
+      }
+
+      setFarms((current) => upsertFarm(current, savedFarm))
       resetForm()
 
       toast({
@@ -455,215 +596,8 @@ export function FarmerFarmManager() {
 
   return (
     <>
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>{editingFarmId ? "Chỉnh sửa địa điểm" : "Thêm địa điểm"}</CardTitle>
-            <CardDescription>Quản lý các địa điểm canh tác và chọn địa điểm mặc định cho hồ sơ của bạn</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="locationName">Tên địa điểm</Label>
-                <Input
-                  id="locationName"
-                  value={formData.locationName}
-                  onChange={(event) => handleFieldChange("locationName", event.target.value)}
-                  placeholder="vd: Khu ruộng số 1"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Loại nông trại</Label>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant={formData.farmType === 2 ? "default" : "outline"}
-                      className={`flex-1 ${formData.farmType === 2 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
-                      onClick={() => {
-                        handleFieldChange("farmType", 2)
-                        handleFieldChange("livestockCount", 0) // Reset livestock count when switching to crop
-                      }}
-                    >
-                      Trồng trọt
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={formData.farmType === 1 ? "default" : "outline"}
-                      className={`flex-1 ${formData.farmType === 1 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
-                      onClick={() => {
-                        handleFieldChange("farmType", 1)
-                        handleFieldChange("areaSize", 0) // Reset area size when switching to livestock
-                      }}
-                    >
-                      Chăn nuôi
-                    </Button>
-                  </div>
-                </div>
-
-                {formData.farmType === 2 ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="areaSize">Diện tích (m²)</Label>
-                    <Input
-                      id="areaSize"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formData.areaSize || ""}
-                      onChange={(event) => handleFieldChange("areaSize", Number(event.target.value))}
-                      placeholder="vd: 1000"
-                    />
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label htmlFor="livestockCount">Số lượng vật nuôi (con)</Label>
-                    <Input
-                      id="livestockCount"
-                      type="number"
-                      min="0"
-                      value={formData.livestockCount || ""}
-                      onChange={(event) => handleFieldChange("livestockCount", Number(event.target.value))}
-                      placeholder="vd: 500"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="address">Địa chỉ</Label>
-                <div className="relative">
-                  <Input
-                    id="address"
-                    value={formData.address}
-                    onChange={(event) => handleAddressChange(event.target.value)}
-                    onFocus={() => setShowLocationSuggestions(true)}
-                    onBlur={() => {
-                      window.setTimeout(() => {
-                        setShowLocationSuggestions(false)
-                      }, 150)
-                    }}
-                    placeholder="vd: Ấp 3, xã Tân Phú, Đồng Tháp"
-                  />
-
-                  {showLocationSuggestions && (isSearchingLocation || locationSuggestions.length > 0) ? (
-                    <div className="absolute top-full z-20 mt-2 w-full rounded-lg border bg-background shadow-lg">
-                      {isSearchingLocation ? (
-                        <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Đang tìm gợi ý địa chỉ từ OSM...
-                        </div>
-                      ) : (
-                        <div className="py-1">
-                          {locationSuggestions.map((place, index) => (
-                            <button
-                              key={`${place.display_name}-${place.lat}-${place.lon}-${index}`}
-                              type="button"
-                              className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
-                              onClick={() => selectOSMLocation(place)}
-                            >
-                              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-agro-green" />
-                              <span>{place.display_name}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-                {formData.latitude !== null && formData.longitude !== null ? (
-                  <p className="text-xs text-muted-foreground">
-                    Tọa độ: {Number(formData.latitude).toFixed(6)}, {Number(formData.longitude).toFixed(6)}
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Chọn một địa chỉ từ danh sách gợi ý.
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Hình ảnh (Tối đa 3 ảnh)</Label>
-                  <span className="text-xs text-muted-foreground">
-                    {formData.images.length}/3
-                  </span>
-                </div>
-                {!editingFarmId ? (
-                  <p className="text-sm text-muted-foreground italic">
-                    Vui lòng thêm nông trại trước khi tải ảnh lên.
-                  </p>
-                ) : (
-                  <>
-                    {formData.images.length > 0 && (
-                      <div className="flex gap-4 overflow-x-auto pb-2">
-                        {formData.images.map((img, index) => (
-                          <div key={index} className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border">
-                            <Image src={img} alt={`Farm image ${index + 1}`} fill className="object-cover" unoptimized />
-                            <button
-                              type="button"
-                              onClick={() => removeImage(index)}
-                              className="absolute right-1 top-1 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {formData.images.length < 3 && (
-                      <label className="flex h-24 w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed hover:bg-muted/50">
-                        <UploadCloud className="h-6 w-6 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">Nhấn để tải ảnh lên</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={handleImageUpload}
-                        />
-                      </label>
-                    )}
-                  </>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border px-4 py-3">
-                <div>
-                  <p className="font-medium">Đặt làm địa điểm mặc định</p>
-                  <p className="text-sm text-muted-foreground">Địa điểm này sẽ được ưu tiên khi tạo bài đăng mới</p>
-                </div>
-                <Switch
-                  checked={formData.isPrimary}
-                  onCheckedChange={(checked) => handleFieldChange("isPrimary", checked)}
-                />
-              </div>
-
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Button
-                  type="submit"
-                  disabled={submitting}
-                  className="bg-agro-green text-white hover:bg-agro-green-dark"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Đang xử lý...
-                    </>
-                  ) : (
-                    <>
-                      {editingFarmId ? <Pencil className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
-                      {editingFarmId ? "Lưu cập nhật" : "Thêm nông trại"}
-                    </>
-                  )}
-                </Button>
-                <Button type="button" variant="outline" onClick={resetForm} disabled={submitting}>
-                  {editingFarmId ? "Hủy chỉnh sửa" : "Làm mới form"}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 xl:grid-row-[1.1fr_0.9fr]">
+        
 
         <Card>
           <CardHeader>
@@ -766,6 +700,283 @@ export function FarmerFarmManager() {
             )}
           </CardContent>
         </Card>
+
+        <Collapsible
+          className="space-y-6 group"
+          open={isFormCollapsibleOpen}
+          onOpenChange={setIsFormCollapsibleOpen}
+        >
+          <div className="flex items-center justify-between p-2 rounded-lg bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm border shadow-sm transition-all hover:shadow-md">
+            <div className="flex items-center gap-2 px-2">
+              <div className="p-1.5 rounded-full bg-blue-500/10 text-blue-500">
+                <PlusCircleIcon className="h-4 w-4" />
+              </div>
+              <h4 className="text-sm font-semibold">
+                Thêm địa điểm mới
+              </h4>
+            </div>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-8 h-8 p-0 rounded-full hover:bg-muted transition-transform duration-200 data-[state=open]:rotate-180">
+                <ChevronDown className="h-4 w-4" />
+                <span className="sr-only">Toggle</span>
+              </Button>
+            </CollapsibleTrigger>
+          </div>
+          <CollapsibleContent>
+            <Card>
+              <CardHeader>
+                <CardTitle>{editingFarmId ? "Chỉnh sửa địa điểm" : "Thêm địa điểm"}</CardTitle>
+                <CardDescription>Quản lý các địa điểm canh tác và chọn địa điểm mặc định cho hồ sơ của bạn</CardDescription>
+              </CardHeader>
+              <CardContent>
+              <form onSubmit={handleSubmit} className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="locationName">Tên địa điểm</Label>
+                    <Input
+                      id="locationName"
+                      value={formData.locationName}
+                      onChange={(event) => handleFieldChange("locationName", event.target.value)}
+                      placeholder="vd: Khu ruộng số 1"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Loại nông trại</Label>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant={formData.farmType === 2 ? "default" : "outline"}
+                          className={`flex-1 ${formData.farmType === 2 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
+                          onClick={() => {
+                            handleFieldChange("farmType", 2)
+                            handleFieldChange("livestockCount", 0) // Reset livestock count when switching to crop
+                          }}
+                        >
+                          Trồng trọt
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={formData.farmType === 1 ? "default" : "outline"}
+                          className={`flex-1 ${formData.farmType === 1 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
+                          onClick={() => {
+                            handleFieldChange("farmType", 1)
+                            handleFieldChange("areaSize", 0) // Reset area size when switching to livestock
+                          }}
+                        >
+                          Chăn nuôi
+                        </Button>
+                      </div>
+                    </div>
+
+                    {formData.farmType === 2 ? (
+                      <div className="space-y-2">
+                        <Label htmlFor="areaSize">Diện tích (m²)</Label>
+                        <Input
+                          id="areaSize"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={formData.areaSize || ""}
+                          onChange={(event) => handleFieldChange("areaSize", Number(event.target.value))}
+                          placeholder="vd: 1000"
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label htmlFor="livestockCount">Số lượng vật nuôi (con)</Label>
+                        <Input
+                          id="livestockCount"
+                          type="number"
+                          min="0"
+                          value={formData.livestockCount || ""}
+                          onChange={(event) => handleFieldChange("livestockCount", Number(event.target.value))}
+                          placeholder="vd: 500"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Địa chỉ</Label>
+                    <div className="relative">
+                      <Input
+                        id="address"
+                        value={formData.address}
+                        onChange={(event) => handleAddressChange(event.target.value)}
+                        onFocus={() => setShowLocationSuggestions(true)}
+                        onBlur={() => {
+                          window.setTimeout(() => {
+                            setShowLocationSuggestions(false)
+                          }, 150)
+                        }}
+                        placeholder="vd: Ấp 3, xã Tân Phú, Đồng Tháp"
+                      />
+
+                      {showLocationSuggestions && (isSearchingLocation || locationSuggestions.length > 0) ? (
+                        <div className="absolute top-full z-20 mt-2 w-full rounded-lg border bg-background shadow-lg">
+                          {isSearchingLocation ? (
+                            <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Đang tìm gợi ý địa chỉ từ OSM...
+                            </div>
+                          ) : (
+                            <div className="py-1">
+                              {locationSuggestions.map((place, index) => (
+                                <button
+                                  key={`${place.display_name}-${place.lat}-${place.lon}-${index}`}
+                                  type="button"
+                                  className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                                  onClick={() => selectOSMLocation(place)}
+                                >
+                                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-agro-green" />
+                                  <span>{place.display_name}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                    {formData.latitude !== null && formData.longitude !== null ? (
+                      <p className="text-xs text-muted-foreground">
+                        Tọa độ: {Number(formData.latitude).toFixed(6)}, {Number(formData.longitude).toFixed(6)}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Chọn địa chỉ từ gợi ý hoặc bấm trực tiếp trên bản đồ để ghim vị trí.
+                      </p>
+                    )}
+
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Hình ảnh (Tối đa 3 ảnh)</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {formData.images.length + pendingImages.length}/3
+                      </span>
+                    </div>
+                    {formData.images.length + pendingImages.length > 0 && (
+                      <div className="flex gap-4 overflow-x-auto pb-2">
+                        {formData.images.map((img, index) => (
+                          <div key={`${img}-${index}`} className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border">
+                            <Image src={img} alt={`Farm image ${index + 1}`} fill className="object-cover" unoptimized />
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index)}
+                              className="absolute right-1 top-1 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                        {pendingImages.map((pendingImage, index) => {
+                          const combinedIndex = formData.images.length + index
+
+                          return (
+                            <div key={`${pendingImage.previewUrl}-${index}`} className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border">
+                              <Image src={pendingImage.previewUrl} alt={`Pending farm image ${combinedIndex + 1}`} fill className="object-cover" unoptimized />
+                              <button
+                                type="button"
+                                onClick={() => removeImage(combinedIndex)}
+                                className="absolute right-1 top-1 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                    {formData.images.length + pendingImages.length < 3 && (
+                      <label className="flex h-24 w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed hover:bg-muted/50">
+                        <UploadCloud className="h-6 w-6 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Nhấn để tải ảnh lên</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={handleImageUpload}
+                        />
+                      </label>
+                    )}
+                    {!editingFarmId && pendingImages.length > 0 ? (
+                      <p className="text-xs text-muted-foreground italic">
+                        Ảnh sẽ được tải lên tự động sau khi thêm nông trại.
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-lg border px-4 py-3">
+                    <div>
+                      <p className="font-medium">Đặt làm địa điểm mặc định</p>
+                      <p className="text-sm text-muted-foreground">Địa điểm này sẽ được ưu tiên khi tạo bài đăng mới</p>
+                    </div>
+                    <Switch
+                      checked={formData.isPrimary}
+                      onCheckedChange={(checked) => handleFieldChange("isPrimary", checked)}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Button
+                      type="submit"
+                      disabled={submitting}
+                      className="bg-agro-green text-white hover:bg-agro-green-dark"
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Đang xử lý...
+                        </>
+                      ) : (
+                        <>
+                          {editingFarmId ? <Pencil className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
+                          {editingFarmId ? "Lưu cập nhật" : "Thêm nông trại"}
+                        </>
+                      )}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={resetForm} disabled={submitting}>
+                      {editingFarmId ? "Hủy chỉnh sửa" : "Làm mới form"}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* map */}
+                <div className="overflow-hidden rounded-lg border bg-muted/20 lg:sticky lg:top-4 w-full min-h-105 lg:h-full flex flex-col">
+                  <OsmLocationPicker
+                    latitude={formData.latitude}
+                    longitude={formData.longitude}
+                    onPick={handleMapPick}
+                    className="flex-1 min-h-90"
+                  />
+                  <div className="flex items-center justify-between px-3 py-2 text-xs text-muted-foreground">
+                    <span>Bấm vào bản đồ để ghim vị trí nông trại</span>
+                    {formData.latitude !== null && formData.longitude !== null ? (
+                      <a
+                        href={buildOsmDetailUrl(Number(formData.latitude), Number(formData.longitude))}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-medium text-agro-green hover:underline"
+                      >
+                        Mở trên OSM
+                      </a>
+                    ) : (
+                      <span>Chưa chọn tọa độ</span>
+                    )}
+                  </div>
+                </div>
+              </form>
+            </CardContent>
+
+          </Card>
+          </CollapsibleContent>
+        </Collapsible>
+
+        
       </div>
 
       <AlertDialog open={Boolean(pendingDeleteFarm)} onOpenChange={(open) => !open && setPendingDeleteFarm(null)}>
@@ -804,7 +1015,7 @@ export function FarmerFarmManager() {
           setTimeout(() => setViewingFarmDetails(null), 300)
         }
       }}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>{viewingFarmDetails?.locationName}</DialogTitle>
             <DialogDescription>
@@ -821,17 +1032,34 @@ export function FarmerFarmManager() {
                 {Array.isArray(viewingFarmDetails.imageUrl) && viewingFarmDetails.imageUrl.length > 0 && (
                   <div className="flex gap-2 overflow-x-auto pb-2">
                     {viewingFarmDetails.imageUrl.map((img, i) => (
-                      <div key={i} className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border">
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          setSelectedImageForViewer(img)
+                          setImageZoom(100)
+                        }}
+                        className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border hover:border-agro-green transition-colors cursor-pointer hover:shadow-md"
+                      >
                         <Image src={img} alt={`Farm image ${i}`} fill className="object-cover" unoptimized />
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
                 {typeof viewingFarmDetails.imageUrl === 'string' && viewingFarmDetails.imageUrl !== "" && (
                   <div className="flex gap-2 overflow-x-auto pb-2">
-                    <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof viewingFarmDetails.imageUrl === 'string') {
+                          setSelectedImageForViewer(viewingFarmDetails.imageUrl)
+                          setImageZoom(100)
+                        }
+                      }}
+                      className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border hover:border-agro-green transition-colors cursor-pointer hover:shadow-md"
+                    >
                       <Image src={viewingFarmDetails.imageUrl} alt={`Farm image`} fill className="object-cover" unoptimized />
-                    </div>
+                    </button>
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-4">
@@ -852,7 +1080,7 @@ export function FarmerFarmManager() {
                   )}
                   <div>
                     <span className="text-muted-foreground block mb-1">Trạng thái:</span>
-                    <p className="font-medium text-base">{viewingFarmDetails.isPrimary ? "Địa điểm chính" : "Phụ"}</p>
+                    <p className="font-medium text-base">{viewingFarmDetails.isPrimary ? "Địa điểm mặc định" : "Bình thường"}</p>
                   </div>
                   {(viewingFarmDetails.latitude || viewingFarmDetails.longitude) && (
                     <div>
@@ -871,6 +1099,109 @@ export function FarmerFarmManager() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(selectedImageForViewer)} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedImageForViewer(null)
+          setImageZoom(100)
+          setImagePanX(0)
+          setImagePanY(0)
+          setIsDraggingImage(false)
+        }
+      }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Xem ảnh chi tiết</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 flex flex-col items-center justify-center overflow-hidden">
+            {selectedImageForViewer && (
+              <div
+                className="relative w-full h-full flex items-center justify-center bg-muted/50 rounded-lg overflow-hidden cursor-grab active:cursor-grabbing"
+                onWheel={(e) => {
+                  e.preventDefault()
+                  const delta = -e.deltaY > 0 ? 10 : -10
+                  setImageZoom(Math.min(300, Math.max(50, imageZoom + delta)))
+                }}
+                onMouseDown={(e) => {
+                  if (imageZoom > 100) {
+                    setIsDraggingImage(true)
+                    setDragStartX(e.clientX - imagePanX)
+                    setDragStartY(e.clientY - imagePanY)
+                  }
+                }}
+                onMouseMove={(e) => {
+                  if (isDraggingImage && imageZoom > 100) {
+                    const newPanX = e.clientX - dragStartX
+                    const newPanY = e.clientY - dragStartY
+                    // Constrain pan to reasonable bounds
+                    const maxPan = (imageZoom / 100 - 1) * 300
+                    setImagePanX(Math.max(-maxPan, Math.min(maxPan, newPanX)))
+                    setImagePanY(Math.max(-maxPan, Math.min(maxPan, newPanY)))
+                  }
+                }}
+                onMouseUp={() => setIsDraggingImage(false)}
+                onMouseLeave={() => setIsDraggingImage(false)}
+              >
+                <div
+                  className="relative transition-transform duration-200 ease-out"
+                  style={{
+                    transform: `scale(${imageZoom / 100}) translate(${imagePanX}px, ${imagePanY}px)`,
+                    transformOrigin: 'center',
+                  }}
+                >
+                  <Image
+                    src={selectedImageForViewer}
+                    alt="Farm image detail"
+                    width={600}
+                    height={600}
+                    className="object-contain select-none"
+                    unoptimized
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center justify-center gap-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setImageZoom(Math.max(50, imageZoom - 10))}
+              disabled={imageZoom <= 50}
+            >
+              −
+            </Button>
+            <span className="w-16 text-center text-sm font-medium">
+              {imageZoom}%
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setImageZoom(Math.min(300, imageZoom + 10))}
+              disabled={imageZoom >= 300}
+            >
+              +
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setImageZoom(100)
+                setImagePanX(0)
+                setImagePanY(0)
+              }}
+              className="ml-2"
+            >
+              Khôi phục
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground text-center mt-2">
+            Cuộn chuột để phóng to/thu nhỏ. Kéo để di chuyển khi phóng to.
+          </p>
         </DialogContent>
       </Dialog>
     </>
