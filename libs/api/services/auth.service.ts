@@ -1,3 +1,4 @@
+import { verify } from 'crypto';
 import { axiosInstance } from '../axios-instance';
 import { API_ENDPOINTS } from '../config';
 import type {
@@ -8,6 +9,7 @@ import type {
   GoogleLoginRequest,
   ForgetPasswordRequest,
   ResetPasswordRequest,
+  VerifyEmail,
 } from '../types';
 
 export const authService = {
@@ -36,11 +38,21 @@ export const authService = {
     const response = await axiosInstance.post(API_ENDPOINTS.AUTH.REGISTER, data);
     
     // Store token in localStorage
-    if (response.data.data.token) {
+    if (response.data.data?.token) {
       localStorage.setItem('access_token', response.data.data.token);
       localStorage.setItem('user_email', response.data.data.email);
     }
-    
+
+    return response.data;
+  },
+
+  verifyRegister: async (data: VerifyEmail): Promise<ApiResponse<void>> => {        
+    const response = await axiosInstance.post(API_ENDPOINTS.AUTH.VERIFY_REGISTER, data);
+    return response.data;
+  },
+
+  resendOTP: async (email: string): Promise<ApiResponse<void>> => { 
+    const response = await axiosInstance.post(API_ENDPOINTS.AUTH.RESEND_OTP, { email });
     return response.data;
   },
 

@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,74 @@ export default function LoginPage() {
   const [farmerEmail, setFarmerEmail] = useState("");
   const [farmerPassword, setFarmerPassword] = useState("");
 
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [otp, setOtp] = useState("");
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (countdown > 0) {
+      timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otp) {
+      toast({
+        title: "Lỗi",
+        description: "Vui lòng nhập mã OTP",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      await authService.verifyRegister({
+        email: farmerEmail,
+        otp: otp
+      });
+      
+      toast({
+        title: "Thành công",
+        description: "Xác thực tài khoản thành công! Vui lòng đăng nhập lại.",
+        variant: "default",
+      });
+      
+      setIsVerifying(false);
+      setOtp("");
+      setIsLoading(false);
+    } catch (error: any) {
+      toast({
+        title: "Lỗi xác thực",
+        description: "Mã OTP không chính xác hoặc đã hết hạn",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (countdown > 0) return;
+    
+    try {
+      await authService.resendOTP(farmerEmail);
+      toast({
+        title: "Thành công",
+        description: "Mã OTP mới đã được gửi đến email của bạn.",
+      });
+      setCountdown(60);
+    } catch (error) {
+      toast({
+        title: "Lỗi",
+        description: "Không thể lấy lại mã OTP. Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const normalizeRole = (role: string | undefined): "admin" | "farmer" | "worker" | null => {
     const normalized = String(role || "").trim().toLowerCase();
 
@@ -43,8 +111,8 @@ export default function LoginPage() {
     return null;
   };
 
-  const handleFarmerLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleFarmerLogin = async (e: React.FormEvent, isAutoLogin = false) => {
+    e?.preventDefault?.();
     setIsLoading(true);
 
     try {
@@ -63,6 +131,34 @@ export default function LoginPage() {
         const accessToken = userData.token || '';
         const refreshToken = userData.refresh_token || '';
         const role = normalizeRole(userData.role);
+
+        if (userData.isVerified === false) {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("user_email");
+          localStorage.removeItem("refresh_token");
+          localStorage.removeItem("user");
+          
+          if (!isAutoLogin) {
+            toast({
+              title: "Tài khoản chưa xác thực",
+              description: "Hệ thống đã tự động gửi mã OTP mới đến email của bạn. Vui lòng xác thực.",
+            });
+            
+            // Automatically resend OTP
+            try {
+              await authService.resendOTP(farmerEmail);
+              setCountdown(60);
+              setIsVerifying(true);
+            } catch (err) {
+              toast({
+                title: "Lỗi",
+                description: "Không thể gửi lại mã OTP. Vui lòng chờ và thử lại.",
+                variant: "destructive",
+              });
+            }
+          }
+          return;
+        }
 
         if (!role) {
           toast({
@@ -100,7 +196,7 @@ export default function LoginPage() {
 
         toast({
           title: "Thành công",
-          description: response.message || "Đăng nhập thành công. Đang chuyển hướng...",
+          description: "Đăng nhập thành công. Đang chuyển hướng...",
           variant: "default",
         });
         
@@ -120,6 +216,35 @@ export default function LoginPage() {
     } catch (error: any) {
       // Handle network errors or unexpected errors
       console.error("Login error:", error);
+      
+      const isNotVerified = error?.response?.status === 403 && 
+                           (error?.response?.data?.message?.toLowerCase().includes("not verified") || 
+                            error?.response?.data?.error?.toLowerCase().includes("not verified"));
+
+      if (isNotVerified) {
+        if (!isAutoLogin) {
+          toast({
+            title: "Tài khoản chưa xác thực",
+            description: "Hệ thống đã tự động gửi mã OTP mới đến email của bạn. Vui lòng xác thực.",
+            variant: "destructive",
+          });
+          
+          // Automatically resend OTP
+          try {
+            await authService.resendOTP(farmerEmail);
+            setCountdown(60);
+            setIsVerifying(true);
+          } catch (err) {
+            toast({
+              title: "Lỗi",
+              description: "Không thể gửi lại mã OTP. Vui lòng chờ và thử lại.",
+              variant: "destructive",
+            });
+          }
+        }
+        return;
+      }
+
       const errorMessage = handleAuthError(error);
       toast({
         title: "Đăng nhập thất bại",
@@ -154,13 +279,63 @@ export default function LoginPage() {
               </div>
             </div>
             <CardTitle className="text-2xl text-agro-green">
-              Đăng nhập
+              {isVerifying ? "Xác thực tài khoản" : "Đăng nhập"}
             </CardTitle>
-            <CardDescription>Đăng nhập dành cho Nông dân</CardDescription>
+            <CardDescription>{isVerifying ? "Vui lòng nhập mã OTP đã được gửi đến email của bạn" : "Đăng nhập dành cho Nông dân"}</CardDescription>
           </CardHeader>
 
           <CardContent>
-            <div>
+            {isVerifying ? (
+              <form onSubmit={handleVerifyOTP} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="otp">Mã OTP</Label>
+                  <Input
+                    id="otp"
+                    name="otp"
+                    type="text"
+                    placeholder="Nhập mã OTP"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    className="border-agro-green/30 focus:border-agro-green text-center text-lg tracking-widest"
+                    maxLength={6}
+                    required
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 gap-2 pt-2">
+                  <Button
+                    type="submit"
+                    className="w-full bg-agro-green hover:bg-agro-green-dark text-white"
+                    disabled={isLoading || !otp}
+                  >
+                    {isLoading ? "Đang xác thực..." : "Xác thực"}
+                  </Button>
+                  
+                  <div className="text-center mt-4">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Chưa nhận được mã?
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleResendOTP}
+                      disabled={countdown > 0}
+                      className="w-full"
+                    >
+                      {countdown > 0 ? `Gửi lại sau ${countdown}s` : "Gửi lại mã"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => { setIsVerifying(false); setIsLoading(false); }}
+                      className="w-full mt-2"
+                    >
+                      Quay lại đăng nhập
+                    </Button>
+                  </div>
+                </div>
+              </form>
+            ) : (
                 <form onSubmit={handleFarmerLogin} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="farmer-email">Email</Label>
@@ -235,7 +410,7 @@ export default function LoginPage() {
                     </Link>
                   </p>
                 </form>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>

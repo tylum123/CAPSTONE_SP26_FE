@@ -743,7 +743,7 @@ export function FarmerFarmManager() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Loại nông trại</Label>
+                      <Label>Lĩnh vực canh tác</Label>
                       <div className="flex gap-2">
                         <Button
                           type="button"
@@ -767,6 +767,17 @@ export function FarmerFarmManager() {
                         >
                           Chăn nuôi
                         </Button>
+                          <Button
+                            type="button"
+                            variant={formData.farmType === 3 ? "default" : "outline"}
+                            className={`flex-1 ${formData.farmType === 3 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
+                            onClick={() => {
+                              handleFieldChange("farmType", 3)
+                              handleFieldChange("livestockCount", 0) // Reset livestock count when switching to crop
+                            }}
+                          >
+                           Nuôi trồng thủy hải sản
+                          </Button>
                       </div>
                     </div>
 
@@ -785,7 +796,7 @@ export function FarmerFarmManager() {
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        <Label htmlFor="livestockCount">Số lượng vật nuôi (con)</Label>
+                        <Label htmlFor="livestockCount">Số lượng (con)</Label>
                         <Input
                           id="livestockCount"
                           type="number"
@@ -853,7 +864,7 @@ export function FarmerFarmManager() {
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label>Hình ảnh (Tối đa 3 ảnh)</Label>
+                      <Label>Hình ảnh địa điểm (Tối đa 3 ảnh)</Label>
                       <span className="text-xs text-muted-foreground">
                         {formData.images.length + pendingImages.length}/3
                       </span>
@@ -905,7 +916,7 @@ export function FarmerFarmManager() {
                     )}
                     {!editingFarmId && pendingImages.length > 0 ? (
                       <p className="text-xs text-muted-foreground italic">
-                        Ảnh sẽ được tải lên tự động sau khi thêm nông trại.
+                        Ảnh sẽ được tải lên tự động sau khi thêm địa điểm.
                       </p>
                     ) : null}
                   </div>

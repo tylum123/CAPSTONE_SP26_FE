@@ -31,6 +31,7 @@ import { jobCategoryService } from "@/libs/api/services/job-category.service"
 import { skillService } from "@/libs/api/services/skill.service"
 import type { CreateJobRequest, GetFarmResponse, Job, JobCategory, Skill, UpdateJobRequest } from "@/libs/api/types"
 import { cn } from "@/libs/utils"
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@radix-ui/react-collapsible"
 
 type WorkScheduleType = "contract" | "daily"
 
@@ -241,9 +242,9 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
   const selectedDailyDaysCount = normalizedSelectedDailyDates.length
   const selectedDailyRange = selectedDailyDaysCount
     ? {
-        first: normalizedSelectedDailyDates[0],
-        last: normalizedSelectedDailyDates[selectedDailyDaysCount - 1],
-      }
+      first: normalizedSelectedDailyDates[0],
+      last: normalizedSelectedDailyDates[selectedDailyDaysCount - 1],
+    }
     : null
 
   const tomorrow = new Date()
@@ -329,7 +330,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
     if (!value) {
       return
     }
-    
+
     setBenefits((current) => [...current, value])
     setNewBenefit("")
   }
@@ -657,7 +658,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
           : [normalizedDay, rangeSelectionAnchor]
 
       const rangeDates = eachDayOfInterval({ start: rangeStart, end: rangeEnd })
-      
+
       setSelectedDailyDates((current) => mergeAndSortDates([...current, ...rangeDates]))
       setRangeSelectionAnchor(null)
       setIsRangePicking(false)
@@ -781,85 +782,85 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       return
     }
 
-      const now = new Date()
-      const nowISO = now.toISOString()
-      const nowDateOnly = toDateOnlyFromDate(now)
+    const now = new Date()
+    const nowISO = now.toISOString()
+    const nowDateOnly = toDateOnlyFromDate(now)
 
-      let startDate = nowDateOnly
-      let endDate = nowDateOnly
-      let estimatedHours = 1
-      let startTime = "07:00:00"
-      let endTime = "17:00:00"
+    let startDate = nowDateOnly
+    let endDate = nowDateOnly
+    let estimatedHours = 1
+    let startTime = "07:00:00"
+    let endTime = "17:00:00"
 
-      const formatTimeOnly = (timeStr: string) => {
-        if (!timeStr) return "00:00:00"
-        return timeStr.length === 5 ? `${timeStr}:00` : timeStr
+    const formatTimeOnly = (timeStr: string) => {
+      if (!timeStr) return "00:00:00"
+      return timeStr.length === 5 ? `${timeStr}:00` : timeStr
+    }
+
+    if (scheduleType === "contract") {
+      const startOnly = toDateOnlyString(contractStartDate)
+      const endOnly = toDateOnlyString(contractEndDate)
+
+      if (!startOnly || !endOnly) {
+        setSubmitError("Vui lòng nhập ngày theo định dạng dd/mm/yyyy.")
+        return
       }
 
-      if (scheduleType === "contract") {
-        const startOnly = toDateOnlyString(contractStartDate)
-        const endOnly = toDateOnlyString(contractEndDate)
-
-        if (!startOnly || !endOnly) {
-          setSubmitError("Vui lòng nhập ngày theo định dạng dd/mm/yyyy.")
-          return
-        }
-
-        startDate = startOnly
-        endDate = endOnly
-        estimatedHours = toContractEstimatedHours(startOnly, endOnly)
-        // Default working hours for contract if daily is not used
-        startTime = formatTimeOnly(dailyStartTime || "09:00")
-        endTime = formatTimeOnly(dailyEndTime || "17:00")
-      } else {
-        if (!normalizedSelectedDailyDates.length) {
-          setSubmitError("Vui lòng chọn ít nhất một ngày làm việc trên lịch.")
-          return
-        }
-
-        const sortedDates = normalizedSelectedDailyDates
-        const start = sortedDates[0]
-        const end = sortedDates[sortedDates.length - 1]
-
-        startDate = toDateOnlyFromDate(start)
-        endDate = toDateOnlyFromDate(end)
-        estimatedHours = toDailyEstimatedHours(dailyStartTime, dailyEndTime, sortedDates.length)
-        startTime = formatTimeOnly(dailyStartTime)
-        endTime = formatTimeOnly(dailyEndTime)
+      startDate = startOnly
+      endDate = endOnly
+      estimatedHours = toContractEstimatedHours(startOnly, endOnly)
+      // Default working hours for contract if daily is not used
+      startTime = formatTimeOnly(dailyStartTime || "09:00")
+      endTime = formatTimeOnly(dailyEndTime || "17:00")
+    } else {
+      if (!normalizedSelectedDailyDates.length) {
+        setSubmitError("Vui lòng chọn ít nhất một ngày làm việc trên lịch.")
+        return
       }
 
-      const descriptionParts = [
-        description.trim(),
-        requirements.length ? `Yêu cầu: ${requirements.join(", ")}` : "",
-        benefits.length ? `Quyền lợi: ${benefits.join(", ")}` : "",
-        scheduleType === "daily"
-          ? `Lịch làm: ${selectedDailyDaysCount} ngày, ${dailyStartTime} - ${dailyEndTime}`
-          : `Lịch làm: ${formatDateDDMMYYYY(contractStartDate)} - ${formatDateDDMMYYYY(contractEndDate)}`,
-      ].filter(Boolean)
+      const sortedDates = normalizedSelectedDailyDates
+      const start = sortedDates[0]
+      const end = sortedDates[sortedDates.length - 1]
 
-      const jobTypeId = scheduleType === "daily" ? JOB_TYPE_DAILY_ID : JOB_TYPE_CONTRACT_ID
+      startDate = toDateOnlyFromDate(start)
+      endDate = toDateOnlyFromDate(end)
+      estimatedHours = toDailyEstimatedHours(dailyStartTime, dailyEndTime, sortedDates.length)
+      startTime = formatTimeOnly(dailyStartTime)
+      endTime = formatTimeOnly(dailyEndTime)
+    }
 
-      const payload: UpdateJobRequest = {
-        skillIds: selectedSkillIds,
-        farmId: selectedFarmId || DEFAULT_FARM_ID,
-        jobCategoryId: selectedJobCategoryId || DEFAULT_JOB_CATEGORY_ID,
-        jobTypeId,
-        title: title.trim(),
-        description: descriptionParts.join("\n"),
-        address: location.trim(),
-        startDate,
-        endDate,
-        startTime,
-        endTime,
-        selectedDays: normalizedSelectedDailyDates.map(date => toDateOnlyFromDate(date)),
-        requirements,
-        privileges: benefits,
-        wageAmount: incomeNumber,
-        workersNeeded: workersNeededNumber,
-        workersAccepted: 0,
-        updatedAt: nowISO,
-        isUrgent,
-        statusId: DEFAULT_STATUS_ID,
+    const descriptionParts = [
+      description.trim(),
+      requirements.length ? `Yêu cầu: ${requirements.join(", ")}` : "",
+      benefits.length ? `Quyền lợi: ${benefits.join(", ")}` : "",
+      scheduleType === "daily"
+        ? `Lịch làm: ${selectedDailyDaysCount} ngày, ${dailyStartTime} - ${dailyEndTime}`
+        : `Lịch làm: ${formatDateDDMMYYYY(contractStartDate)} - ${formatDateDDMMYYYY(contractEndDate)}`,
+    ].filter(Boolean)
+
+    const jobTypeId = scheduleType === "daily" ? JOB_TYPE_DAILY_ID : JOB_TYPE_CONTRACT_ID
+
+    const payload: UpdateJobRequest = {
+      skillIds: selectedSkillIds,
+      farmId: selectedFarmId || DEFAULT_FARM_ID,
+      jobCategoryId: selectedJobCategoryId || DEFAULT_JOB_CATEGORY_ID,
+      jobTypeId,
+      title: title.trim(),
+      description: descriptionParts.join("\n"),
+      address: location.trim(),
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      selectedDays: normalizedSelectedDailyDates.map(date => toDateOnlyFromDate(date)),
+      requirements,
+      privileges: benefits,
+      wageAmount: incomeNumber,
+      workersNeeded: workersNeededNumber,
+      workersAccepted: 0,
+      updatedAt: nowISO,
+      isUrgent,
+      statusId: DEFAULT_STATUS_ID,
     }
 
     try {
@@ -868,10 +869,10 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       const response = isEditMode && jobId
         ? await farmerService.updateJob(jobId, payload)
         : await farmerService.createJob({
-            ...(payload as CreateJobRequest),
-            publishedAt: nowISO,
-            createdAt: nowISO,
-          })
+          ...(payload as CreateJobRequest),
+          publishedAt: nowISO,
+          createdAt: nowISO,
+        })
       const savedJob = response.data
 
       const postedPayload: PostedJobPreview = {
@@ -960,25 +961,25 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
             <p className="text-muted-foreground mt-1 mb-2">
               {isEditMode
                 ? "Cập nhật nội dung bài đăng để phù hợp hơn với nhu cầu tuyển dụng hiện tại."
-                : "Tạo công việc mới và tìm kiếm nhân sự phù hợp cho nông trại của bạn."}
+                : "Tạo nhân công phù hợp cho địa điểm canh tác của bạn."}
             </p>
           </div>
         </div>
-        
+
         {!postedJob && (
           <div className="flex items-center rounded-lg border bg-card p-1 shadow-sm">
-            <div 
+            <div
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-md transition-all", 
+                "flex items-center gap-2 px-4 py-2 rounded-md transition-all",
                 step === 1 ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"
               )}
             >
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/20 text-xs font-bold">1</span>
               <span className="text-sm font-medium">Soạn thảo</span>
             </div>
-            <div 
+            <div
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-md transition-all", 
+                "flex items-center gap-2 px-4 py-2 rounded-md transition-all",
                 step === 2 ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"
               )}
             >
@@ -1055,562 +1056,565 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       ) : (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
           {step === 1 ? (
-            <div className="grid gap-8 lg:grid-cols-12">
-              {/* Left Column (8 cols) */}
-              <div className="lg:col-span-7  space-y-8">
-                 {/* Card 1: Job Info */}
-                 <Card className="overflow-hidden border-t-4 border-t-primary shadow-md">
-                   <CardHeader className="bg-muted/10 pb-0">
-                     <CardTitle className="flex items-center gap-2 text-xl">
-                       <Briefcase className="h-5 w-5 text-primary" />
-                       Thông tin công việc
-                     </CardTitle>
-                     <CardDescription>Mô tả chi tiết công việc để ứng viên hiểu rõ hơn.</CardDescription>
-                   </CardHeader>
-                   <CardContent className="space-y-6 pt-6">
-                      <div className="space-y-3">
-                        <Label htmlFor="job-title" className="text-base font-semibold">
-                          Tiêu đề tin đăng <span className="text-destructive">*</span>
-                        </Label>
-                        <Input
-                          id="job-title"
-                          value={title}
-                          onChange={(event) => setTitle(event.target.value)}
-                          placeholder="Ví dụ: Cần 5 người thu hoạch dưa lưới tại vườn C1"
-                          className="text-lg py-6 shadow-sm border-muted-foreground/30 focus-visible:border-primary"
-                        />
-                      </div>
+            <div className="space-y-8 max-w-4xl mx-auto">
+              {/* Card thông tin */}
+              <Card className="overflow-hidden border-t-4 border-t-primary shadow-md">
+                <CardHeader className="bg-muted/10 pb-0">
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Briefcase className="h-5 w-5 text-primary" />
+                    Thông tin công việc
+                  </CardTitle>
+                  <CardDescription>Mô tả chi tiết công việc để ứng viên hiểu rõ hơn.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6 pt-6">
+                  <div className="grid gap-6 md:grid-cols-5">
+                    <div className="space-y-3 col-span-4">
+                      <Label htmlFor="job-title" className="text-base font-semibold">
+                        Tiêu đề <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="job-title"
+                        value={title}
+                        onChange={(event) => setTitle(event.target.value)}
+                        placeholder="Ví dụ: Cần thu hoạch dưa lưới tại vườn"
+                        className="text-lg py-6 shadow-sm border-muted-foreground/30 focus-visible:border-primary"
+                      />
+                    </div>
 
-                      <div className="grid gap-6 md:grid-cols-2">
-                        <div className="space-y-3">
-                            <Label className="font-semibold">Danh mục công việc <span className="text-destructive">*</span></Label>
-                            <Popover open={isJobCategoryPopoverOpen} onOpenChange={setIsJobCategoryPopoverOpen}>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  role="combobox"
-                                  className="w-full justify-between h-11 border-muted-foreground/30"
+                    <div className="space-y-10">
+                      <Label className="font-semibold flex items-center justify-between">
+                        <span></span>
+                      </Label>
+                      <div className="flex items-center justify-between rounded-lg border border-muted-foreground/30 p-3 h-11">
+                        <span className="text-sm">Tuyển gấp</span>
+                        <Switch checked={isUrgent} onCheckedChange={setIsUrgent} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="font-semibold">Lĩnh vực công việc <span className="text-destructive">*</span></Label>
+                    <Popover open={isJobCategoryPopoverOpen} onOpenChange={setIsJobCategoryPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className="w-full justify-between h-11 border-muted-foreground/30"
+                        >
+                          {selectedJobCategoryLabel || (isLoadingJobCategories ? "Đang tải..." : "Chọn danh mục")}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Tìm kiếm danh mục..." />
+                          <CommandList>
+                            <CommandEmpty>Không tìm thấy.</CommandEmpty>
+                            <CommandGroup heading="Các danh mục phổ biến">
+                              {jobCategories.map((category) => (
+                                <CommandItem
+                                  key={category.id}
+                                  value={category.name}
+                                  onSelect={() => {
+                                    setSelectedJobCategoryId(category.id)
+                                    setIsJobCategoryPopoverOpen(false)
+                                  }}
                                 >
-                                  {selectedJobCategoryLabel || (isLoadingJobCategories ? "Đang tải..." : "Chọn danh mục")}
-                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-[300px] p-0" align="start">
-                                 <Command>
-                                    <CommandInput placeholder="Tìm kiếm danh mục..." />
-                                    <CommandList>
-                                       <CommandEmpty>Không tìm thấy.</CommandEmpty>
-                                       <CommandGroup heading="Các danh mục phổ biến">
-                                          {jobCategories.map((category) => (
-                                             <CommandItem
-                                                key={category.id}
-                                                value={category.name}
-                                                onSelect={() => {
-                                                   setSelectedJobCategoryId(category.id)
-                                                   setIsJobCategoryPopoverOpen(false)
-                                                }}
-                                             >
-                                                <Check className={cn("mr-2 h-4 w-4 text-primary", selectedJobCategoryId === category.id ? "opacity-100" : "opacity-0")} />
-                                                {category.name}
-                                             </CommandItem>
-                                          ))}
-                                       </CommandGroup>
-                                    </CommandList>
-                                 </Command>
-                              </PopoverContent>
-                            </Popover>
-                        </div>
-                        
-                        <div className="space-y-3">
-                            <Label className="font-semibold flex items-center justify-between">
-                               <span>Độ khẩn cấp</span>
-                               {/* <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Tăng lượt xem</span> */}
-                            </Label>
-                            <div className="flex items-center justify-between rounded-lg border border-muted-foreground/30 p-3 h-11">
-                                <span className="text-sm">Tuyển gấp</span>
-                                <Switch checked={isUrgent} onCheckedChange={setIsUrgent} />
-                            </div>
-                        </div>
-                      </div>
+                                  <Check className={cn("mr-2 h-4 w-4 text-primary", selectedJobCategoryId === category.id ? "opacity-100" : "opacity-0")} />
+                                  {category.name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
 
-                      <div className="space-y-3">
-                        <Label htmlFor="job-description" className="font-semibold">Mô tả chi tiết <span className="text-destructive">*</span></Label>
-                        <textarea
-                          id="job-description"
-                          value={description}
-                          onChange={(event) => setDescription(event.target.value)}
-                          className="flex min-h-[150px] w-full rounded-md border border-muted-foreground/30 bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-y"
-                          placeholder="Mô tả công việc cụ thể, yêu cầu sức khỏe, môi trường làm việc..."
-                        />
-                      </div>
-                   </CardContent>
-                 </Card>
+                  <div className="space-y-3">
+                    <Label htmlFor="job-description" className="font-semibold">Mô tả chi tiết <span className="text-destructive">*</span></Label>
+                    <textarea
+                      id="job-description"
+                      value={description}
+                      onChange={(event) => setDescription(event.target.value)}
+                      className="flex w-full rounded-md border border-muted-foreground/30 bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-y"
+                      placeholder="Mô tả công việc cụ thể, số lượng hoặc diện tích canh tác..."
+                    />
+                  </div>
+                </CardContent>
+              </Card>
 
-                 <div className="grid gap-8 md:grid-cols-1">
+              <Card className="shadow-md border-t-4 border-t-purple-500">
+                <CardHeader className="bg-muted/10">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <CalendarRange className="h-5 w-5 text-purple-600" />
+                    Lịch làm việc
+                  </CardTitle>
+                  <span className="text-sm font-normal text-muted-foreground">Chọn loại hình làm việc bạn muốn.</span>
+                  <Collapsible className="space-y-2">
+                    <CollapsibleTrigger asChild>
+                      <Button variant="outline" size="sm" className="w-full">
+                        Khoán và Ngày khác nhau như thế nào?
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-2 pt-2 animate-in fade-in slide-in-from-top-4 duration-300">
+                      <Card className="flex flex-col gap-4 rounded-lg border bg-muted/50 p-4">
+                          <p className="text-sm text-foreground">Khoán sẽ được thực hiện trong một khoảng thời gian được đề ra nhất định, tiền công sẽ được thanh toán theo độ hoàn thiện sau ngày kết thúc.</p>
+                          <p className="text-sm text-foreground">Ngày sẽ được thực hiện theo giờ vào những ngày được đăng kí, tiền công sẽ được thanh toán dựa theo mức độ hoàn thiện sau khi kết thúc công việc.</p>
+                      </Card>
+                    </CollapsibleContent>
+                  </Collapsible>
 
-                    {/* Location Card */}
-                    <Card className="shadow-md overflow-hidden border-t-4 border-t-teal-500">
-                      <CardHeader className="bg-muted/10">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          <MapPin className="h-5 w-5 text-teal-600" />
-                          Địa điểm & Thù lao
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-7 pt-6">
-                        <div className="space-y-2">
-                          <Label className="font-semibold">Mức công (VNĐ)</Label>
-                          <div className="relative">
-                            <div className="absolute left-3 top-2.5 text-muted-foreground"><DollarSign className="h-4 w-4" /></div>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={income}
-                              onChange={(e) => setIncome(e.target.value)}
-                              className="pl-9 text-lg font-medium text-teal-700 dark:text-teal-400"
-                              placeholder="300,000"
-                            />
-                          </div>
-                        </div>
+                </CardHeader>
+                <CardContent className="space-y-6 pt-6">
+                  <div className="grid grid-cols-2 gap-3 p-1 bg-muted rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => setScheduleType("contract")}
+                      className={cn(
+                        "py-2 px-3 text-sm font-medium rounded-md transition-all duration-200",
+                        scheduleType === "contract" ? "bg-background text-primary shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/50"
+                      )}
+                    >
+                      Khoán
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScheduleType("daily")}
+                      className={cn(
+                        "py-2 px-3 text-sm font-medium rounded-md transition-all duration-200",
+                        scheduleType === "daily" ? "bg-background text-primary shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/50"
+                      )}
+                    >
+                      Ngày
+                    </button>
+                  </div>
 
-                        <div className="space-y-2">
-                          <Label>Trang trại</Label>
-                          <Popover open={isFarmPopoverOpen} onOpenChange={setIsFarmPopoverOpen}>
+                  {scheduleType === "contract" ? (
+                    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase text-muted-foreground">Ngày bắt đầu</Label>
+                        <div className="relative">
+                          <Input value={contractStartDate} onChange={(e) => setContractStartDate(e.target.value)} placeholder="dd/mm/yyyy" className="pl-10" />
+                          <Popover>
                             <PopoverTrigger asChild>
-                              <Button variant="outline" className="w-full justify-between" disabled={isLoadingFarms}>
-                                <span className="truncate">{selectedFarmLabel || "Chọn trang trại"}</span>
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
+                              <Button type="button" variant="ghost" size="icon" className="absolute left-0 top-0 h-10 w-10 text-muted-foreground"><CalendarIcon className="h-4 w-4" /></Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[280px] p-0" align="start">
-                              <Command>
-                                <CommandInput placeholder="Tìm trang trại..." />
-                                <CommandList>
-                                  <CommandEmpty>Không tìm thấy.</CommandEmpty>
-                                  <CommandGroup>
-                                    {farms.map((farm) => {
-                                      const fId = farm.farmId || (farm as any).id
-                                      return (
-                                        <CommandItem
-                                          key={fId}
-                                          value={farm.locationName ?? farm.address ?? fId}
-                                          onSelect={() => {
-                                            setSelectedFarmId(fId)
-                                            setIsFarmPopoverOpen(false)
-                                            if (farm.address) setLocation(farm.address)
-                                            if (farm.latitude && farm.longitude) {
-                                              setLocationLat(farm.latitude)
-                                              setLocationLng(farm.longitude)
-                                            }
-                                          }}
-                                        >
-                                          <Check className={cn("mr-2 h-4 w-4", selectedFarmId === fId ? "opacity-100" : "opacity-0")} />
-                                          <div className="flex flex-col overflow-hidden">
-                                            <span className="truncate">{farm.locationName}</span>
-                                            <span className="text-xs text-muted-foreground truncate">{farm.address}</span>
-                                          </div>
-                                        </CommandItem>
-                                      )
-                                    })}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar mode="single" selected={selectedContractStartDate} onSelect={handleContractStartSelect} disabled={(d) => d < tomorrow} />
                             </PopoverContent>
                           </Popover>
                         </div>
-
-                        <div className="space-y-2">
-                          <Label>Địa chỉ chi tiết</Label>
-                          <Input value={location} onChange={(e) => { setLocation(e.target.value); setLocationLat(undefined); setLocationLng(undefined); }} placeholder="Nhập địa chỉ..." />
-                          {/* Search suggestions dropdown */}
-                          {(isSearchingLocation || locationSuggestions.length > 0) && (
-                            <div className="absolute z-50 mt-1 max-h-60 w-[85%] overflow-auto rounded-md border bg-popover p-1 shadow-md">
-                              {locationSuggestions.map((place) => (
-                                <div key={place.place_id} onClick={() => selectOSMLocation(place)} className="cursor-pointer truncate rounded px-2 py-1.5 text-xs hover:bg-muted">
-                                  {place.display_name}
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase text-muted-foreground">Ngày kết thúc</Label>
+                        <div className="relative">
+                          <Input value={contractEndDate} onChange={(e) => setContractEndDate(e.target.value)} placeholder="dd/mm/yyyy" className="pl-10" />
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button type="button" variant="ghost" size="icon" className="absolute left-0 top-0 h-10 w-10 text-muted-foreground"><CalendarIcon className="h-4 w-4" /></Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar mode="single" selected={selectedContractEndDate} onSelect={handleContractEndSelect} disabled={(d) => d < tomorrow || (selectedContractStartDate ? d < selectedContractStartDate : false)} />
+                            </PopoverContent>
+                          </Popover>
                         </div>
-
-                        <div className="relative h-100 w-full overflow-hidden rounded-md border bg-muted/20">
-                          <OsmLocationPicker
-                            latitude={locationLat ?? null}
-                            longitude={locationLng ?? null}
-                            onPick={handleMapPick}
-                            className="h-full"
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
+                      <div className="rounded-lg border bg-card p-3 shadow-inner">
+                        <div className="mb-3 flex items-center justify-between">
+                          <Label className="text-xs font-bold">CHỌN NGÀY</Label>
+                          <div className="flex gap-1">
+                            <Button type="button" size="sm" variant={isRangePicking ? "default" : "outline"} className="h-7 text-[15px] px-2" onClick={toggleRangeSelectionMode}>
+                              {isRangePicking ? "Chọn đích" : "Khoảng"}
+                            </Button>
+                            <Button type="button" size="sm" variant="ghost" className="h-7 text-[15px] px-2 text-destructive" onClick={clearAllSelectedDailyDates} disabled={selectedDailyDaysCount === 0}>
+                              Xóa
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex justify-center bg-background rounded-md p-1">
+                          <Calendar
+                            key={calendarSelectionSignature}
+                            mode="multiple"
+                            selected={calendarSelectedDates}
+                            onDayClick={handleDailyCalendarDayClick}
+                            disabled={(d) => d < tomorrow}
+                            className="rounded-md scale-100 w-full"
                           />
                         </div>
-                        <p className="text-xs text-muted-foreground">Bấm vào bản đồ để chọn vị trí công việc</p>
-                      </CardContent>
-                    </Card>
-                 </div>
-              </div>
+                        <div className="mt-2 text-center">
+                          <Badge variant="secondary" className="font-normal">
+                            {selectedDailyDaysCount > 0 ? `Đã chọn ${selectedDailyDaysCount} ngày` : "Chưa chọn ngày"}
+                          </Badge>
+                        </div>
+                      </div>
 
-              <div className="lg:col-span-5 space-y-6">
-                 {/* Schedule Card */}
-                 <Card className="shadow-md border-t-4 border-t-purple-500">
-                    <CardHeader className="bg-muted/10">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <CalendarRange className="h-5 w-5 text-purple-600" />
-                        Lịch làm việc
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-6 pt-6">
-                       <div className="grid grid-cols-2 gap-3 p-1 bg-muted rounded-lg">
-                           <button 
-                             type="button"
-                             onClick={() => setScheduleType("contract")}
-                             className={cn(
-                               "py-2 px-3 text-sm font-medium rounded-md transition-all duration-200",
-                               scheduleType === "contract" ? "bg-background text-primary shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/50"
-                             )}
-                           >
-                             Khoán
-                           </button>
-                           <button
-                             type="button"
-                             onClick={() => setScheduleType("daily")}
-                             className={cn(
-                               "py-2 px-3 text-sm font-medium rounded-md transition-all duration-200",
-                               scheduleType === "daily" ? "bg-background text-primary shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/50"
-                             )}
-                           >
-                             Ngày
-                           </button>
-                       </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground font-bold">Giờ bắt đầu</Label>
+                          <TimePicker value={dailyStartTime} onChange={setDailyStartTime} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] uppercase text-muted-foreground font-bold">Giờ kết thúc</Label>
+                          <TimePicker value={dailyEndTime} onChange={setDailyEndTime} />
+                        </div>
+                      </div>
 
-                       {scheduleType === "contract" ? (
-                          <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
-                             <div className="space-y-2">
-                                <Label className="text-xs font-bold uppercase text-muted-foreground">Ngày bắt đầu</Label>
-                                <div className="relative">
-                                   <Input value={contractStartDate} onChange={(e) => setContractStartDate(e.target.value)} placeholder="dd/mm/yyyy" className="pl-10" />
-                                   <Popover>
-                                     <PopoverTrigger asChild>
-                                       <Button type="button" variant="ghost" size="icon" className="absolute left-0 top-0 h-10 w-10 text-muted-foreground"><CalendarIcon className="h-4 w-4" /></Button>
-                                     </PopoverTrigger>
-                                     <PopoverContent className="w-auto p-0" align="start">
-                                         <Calendar mode="single" selected={selectedContractStartDate} onSelect={handleContractStartSelect} disabled={(d) => d < tomorrow} initialFocus />
-                                     </PopoverContent>
-                                   </Popover>
-                                </div>
-                             </div>
-                             <div className="space-y-2">
-                                <Label className="text-xs font-bold uppercase text-muted-foreground">Ngày kết thúc</Label>
-                                <div className="relative">
-                                   <Input value={contractEndDate} onChange={(e) => setContractEndDate(e.target.value)} placeholder="dd/mm/yyyy" className="pl-10" />
-                                   <Popover>
-                                     <PopoverTrigger asChild>
-                                       <Button type="button" variant="ghost" size="icon" className="absolute left-0 top-0 h-10 w-10 text-muted-foreground"><CalendarIcon className="h-4 w-4" /></Button>
-                                     </PopoverTrigger>
-                                     <PopoverContent className="w-auto p-0" align="start">
-                                         <Calendar mode="single" selected={selectedContractEndDate} onSelect={handleContractEndSelect} disabled={(d) => d < tomorrow || (selectedContractStartDate ? d < selectedContractStartDate : false)} initialFocus />
-                                     </PopoverContent>
-                                   </Popover>
-                                </div>
-                             </div>
-                          </div>
-                       ) : (
-                          <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
-                             <div className="rounded-lg border bg-card p-3 shadow-inner">
-                                <div className="mb-3 flex items-center justify-between">
-                                   <Label className="text-xs font-bold">CHỌN NGÀY</Label>
-                                   <div className="flex gap-1">
-                                      <Button type="button" size="sm" variant={isRangePicking ? "default" : "outline"} className="h-6 text-[10px] px-2" onClick={toggleRangeSelectionMode}>
-                                         {isRangePicking ? "Chọn đích" : "Khoảng"}
-                                      </Button>
-                                      <Button type="button" size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-destructive" onClick={clearAllSelectedDailyDates} disabled={selectedDailyDaysCount === 0}>
-                                         Xóa
-                                      </Button>
-                                   </div>
-                                </div>
-                                <div className="flex justify-center bg-background rounded-md p-1">
-                                   <Calendar
-                                      key={calendarSelectionSignature}
-                                      mode="multiple"
-                                      selected={calendarSelectedDates}
-                                      onDayClick={handleDailyCalendarDayClick}
-                                      disabled={(d) => d < tomorrow}
-                                      className="rounded-md scale-90 origin-top p-0 w-full"
-                                   />
-                                </div>
-                                <div className="mt-2 text-center">
-                                   <Badge variant="secondary" className="font-normal">
-                                      {selectedDailyDaysCount > 0 ? `Đã chọn ${selectedDailyDaysCount} ngày` : "Chưa chọn ngày"}
-                                   </Badge>
-                                </div>
-                             </div>
-                             
-                             <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                   <Label className="text-[10px] uppercase text-muted-foreground font-bold">Giờ bắt đầu</Label>
-                                   <TimePicker value={dailyStartTime} onChange={setDailyStartTime} />
-                                </div>
-                                <div className="space-y-1">
-                                   <Label className="text-[10px] uppercase text-muted-foreground font-bold">Giờ kết thúc</Label>
-                                   <TimePicker value={dailyEndTime} onChange={setDailyEndTime} />
-                                </div>
-                             </div>
+                      <div className="space-y-2 pt-5 border-t">
+                        <Label className="flex justify-between">
+                          <span>Số lượng nhân công</span>
+                          <span className="font-bold text-primary">{workersNeeded}</span>
+                        </Label>
+                        <Input type="number" min="1" value={workersNeeded} onChange={(e) => setWorkersNeeded(e.target.value)} />
+                      </div>
 
-                             <div className="space-y-2 pt-2 border-t">
-                                <Label className="flex justify-between">
-                                   <span>Số người cần</span>
-                                   <span className="font-bold text-primary">{workersNeeded}</span>
-                                </Label>
-                                <Input type="number" min="1" value={workersNeeded} onChange={(e) => setWorkersNeeded(e.target.value)} />
-                             </div>
-                          </div>
-                       )}
-                    </CardContent>
-                 </Card>
 
-                <div className="grid gap-8 md:grid-cols-1">
-                    <Card className="shadow-md overflow-hidden border-t-4 border-t-orange-500">
-                      <CardHeader className="bg-muted/10 pb-3">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          <Award className="h-5 w-5 text-orange-500" />
-                          Kỹ năng & Kinh nghiệm
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <p className="text-sm text-muted-foreground">Chọn các kỹ năng ứng viên cần có:</p>
-                        <div className="grid grid-cols-1 gap-2">
-                          {availableSkills.map((skill) => (
-                            <div
-                              key={skill.id}
-                              onClick={() => toggleSkill(skill.id)}
-                              className={cn(
-                                "flex cursor-pointer items-center gap-3 rounded-lg border p-3 hover:bg-accent/50 transition-all",
-                                selectedSkillIds.includes(skill.id) ? "border-primary bg-primary/5 shadow-sm" : "border-border"
-                              )}
-                            >
-                              <Checkbox
-                                id={`skill-${skill.id}`}
-                                checked={selectedSkillIds.includes(skill.id)}
-                                onCheckedChange={() => toggleSkill(skill.id)}
-                                className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                              />
-                              <span className="text-sm font-medium">{skill.name}</span>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label className="font-semibold">Tiền công (VNĐ)</Label>
+                    <div className="relative">
+                      {/* <div className="absolute left-3 top-2.5 text-muted-foreground"><div className="h-4 w-4">VNĐ</div></div> */}
+                      <Input
+                        type="number"
+                        min="0"
+                        value={income}
+                        onChange={(e) => setIncome(e.target.value)}
+                        className="pl-9 text-lg font-medium text-teal-700 dark:text-teal-400"
+                        placeholder="300,000"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-md overflow-hidden border-t-4 border-t-teal-500">
+                <CardHeader className="bg-muted/10">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-teal-600" />
+                    Địa điểm làm việc<span className="text-destructive">*</span>
+                  </CardTitle>
+                    <span className="text-sm font-normal text-muted-foreground">Chọn nơi bạn muốn công việc được thực hiện.</span>
+                </CardHeader>
+                <CardContent className="space-y-7 pt-6">
+
+                  <div className="space-y-2">
+                    <Label>Tên</Label>
+                    <Popover open={isFarmPopoverOpen} onOpenChange={setIsFarmPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between" disabled={isLoadingFarms}>
+                          <span className="truncate">{selectedFarmLabel || "Chọn địa điểm"}</span>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[280px] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Tìm địa điểm..." />
+                          <CommandList>
+                            <CommandEmpty>Không tìm thấy.</CommandEmpty>
+                            <CommandGroup>
+                              {farms.map((farm) => {
+                                const fId = farm.farmId || (farm as any).id
+                                return (
+                                  <CommandItem
+                                    key={fId}
+                                    value={farm.locationName ?? farm.address ?? fId}
+                                    onSelect={() => {
+                                      setSelectedFarmId(fId)
+                                      setIsFarmPopoverOpen(false)
+                                      if (farm.address) setLocation(farm.address)
+                                      if (farm.latitude && farm.longitude) {
+                                        setLocationLat(farm.latitude)
+                                        setLocationLng(farm.longitude)
+                                      }
+                                    }}
+                                  >
+                                    <Check className={cn("mr-2 h-4 w-4", selectedFarmId === fId ? "opacity-100" : "opacity-0")} />
+                                    <div className="flex flex-col overflow-hidden">
+                                      <span className="truncate">{farm.locationName}</span>
+                                      <span className="text-xs text-muted-foreground truncate">{farm.address}</span>
+                                    </div>
+                                  </CommandItem>
+                                )
+                              })}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Địa chỉ</Label>
+                    <div className="relative z-1000 ">
+                      <Input value={location} onChange={(e) => { setLocation(e.target.value); setLocationLat(undefined); setLocationLng(undefined); }} placeholder="Nhập địa chỉ chi tiết..." />
+                      {/* Search suggestions dropdown */}
+                      {(isSearchingLocation || locationSuggestions.length > 0) && (
+                        <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-60 overflow-auto rounded-md border bg-popover p-1 shadow-md">
+                          {locationSuggestions.map((place) => (
+                            <div key={place.place_id} onClick={() => selectOSMLocation(place)} className="cursor-pointer truncate rounded px-2 py-1.5 text-xs hover:bg-muted">
+                              {place.display_name}
                             </div>
                           ))}
                         </div>
-                      </CardContent>
-                    </Card>
+                      )}
+                    </div>
+                  </div>
 
-                    <Card className="shadow-md overflow-hidden border-t-4 border-t-blue-500 flex flex-col">
-                      <CardHeader className="bg-muted/10 pb-3">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          <Users className="h-5 w-5 text-blue-500" />
-                          Yêu cầu & Quyền lợi
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-6 flex-1">
-                        <div className="space-y-3">
-                          <Label className="text-sm font-semibold text-muted-foreground uppercase">Yêu cầu bổ sung</Label>
-                          <div className="space-y-2">
-                            <div className="flex gap-2">
-                              <Input
-                                value={newRequirement}
-                                onChange={(e) => setNewRequirement(e.target.value)}
-                                onKeyDown={handleRequirementKeyDown}
-                                placeholder="Thêm yêu cầu..."
-                                className="h-9 text-sm"
-                              />
-                              <Button size="sm" variant="secondary" onClick={addRequirement} type="button">
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            <div className="flex flex-wrap gap-2 min-h-[30px]">
-                              {requirements.map((item, index) => (
-                                <Badge key={`req-${index}`} variant="secondary" className="pl-2 pr-1 py-1 gap-1">
-                                  {item}
-                                  <button onClick={() => setRequirements(prev => prev.filter((_, i) => i !== index))} className="rounded-full hover:bg-destructive hover:text-white p-0.5 transition-colors">
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
+                  <div className="relative h-100 w-full overflow-hidden rounded-md border bg-muted/20">
+                    <OsmLocationPicker
+                      latitude={locationLat ?? null}
+                      longitude={locationLng ?? null}
+                      onPick={handleMapPick}
+                      className="h-full"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Bấm vào bản đồ để chọn vị trí công việc</p>
+                </CardContent>
+              </Card>
 
-                        <div className="space-y-3 pt-2 border-t">
-                          <Label className="text-sm font-semibold text-muted-foreground uppercase">Quyền lợi</Label>
-                          <div className="space-y-2">
-                            <div className="flex gap-2">
-                              <Input
-                                value={newBenefit}
-                                onChange={(e) => setNewBenefit(e.target.value)}
-                                onKeyDown={handleBenefitKeyDown}
-                                placeholder="Thêm quyền lợi..."
-                                className="h-9 text-sm"
-                              />
-                              <Button size="sm" variant="secondary" onClick={addBenefit} type="button">
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            <div className="flex flex-wrap gap-2 min-h-[30px]">
-                              {benefits.map((item, index) => (
-                                <Badge key={`ben-${index}`} variant="outline" className="pl-2 pr-1 py-1 gap-1 border-green-200 bg-green-50 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300">
-                                  {item}
-                                  <button onClick={() => setBenefits(prev => prev.filter((_, i) => i !== index))} className="rounded-full hover:bg-destructive hover:text-white p-0.5 transition-colors">
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
+
+
+              <Card className="shadow-md overflow-hidden border-t-4 border-t-blue-500 flex flex-col">
+                <CardHeader className="bg-muted/10 pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Award className="h-5 w-5 text-blue-500" />
+                    Yêu cầu & Quyền lợi
+                  </CardTitle>
+                    <span className="text-sm font-normal text-muted-foreground">Thêm những yêu cầu bổ sung và quyền lợi cho công việc.</span>
+                </CardHeader>
+                <CardContent className="space-y-6 flex-1">
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold text-muted-foreground uppercase">Kỹ năng</Label>
+                    <p className="text-sm text-muted-foreground">Chọn các kỹ năng ứng viên cần có:</p>
+                    <div className="grid grid-cols-1 gap-2">
+                      {availableSkills.map((skill) => (
+                        <div
+                          key={skill.id}
+                          onClick={() => toggleSkill(skill.id)}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-3 rounded-lg border p-3 hover:bg-accent/50 transition-all",
+                            selectedSkillIds.includes(skill.id) ? "border-primary bg-primary/5 shadow-sm" : "border-border"
+                          )}
+                        >
+                          <Checkbox
+                            id={`skill-${skill.id}`}
+                            checked={selectedSkillIds.includes(skill.id)}
+                            onCheckedChange={() => toggleSkill(skill.id)}
+                            className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                          />
+                          <span className="text-sm font-medium">{skill.name}</span>
                         </div>
-                      </CardContent>
-                    </Card>
-                </div>
-                 
-              </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-4">
+                    <Label className="text-sm font-semibold text-muted-foreground uppercase">Yêu cầu bổ sung</Label>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          value={newRequirement}
+                          onChange={(e) => setNewRequirement(e.target.value)}
+                          onKeyDown={handleRequirementKeyDown}
+                          placeholder="VD: Độ tuổi ưu tiên, giới tính, những loại công cụ cần thiết..."
+                          className="h-9 text-sm"
+                        />
+                        <Button size="sm" variant="secondary" onClick={addRequirement} type="button">
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 min-h-[30px]">
+                        {requirements.map((item, index) => (
+                          <Badge key={`req-${index}`} variant="secondary" className="pl-2 pr-1 py-1 gap-1">
+                            {item}
+                            <button onClick={() => setRequirements(prev => prev.filter((_, i) => i !== index))} className="rounded-full hover:bg-destructive hover:text-white p-0.5 transition-colors">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2 border-t">
+                    <Label className="text-sm font-semibold text-muted-foreground uppercase">Quyền lợi</Label>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          value={newBenefit}
+                          onChange={(e) => setNewBenefit(e.target.value)}
+                          onKeyDown={handleBenefitKeyDown}
+                          placeholder="VD: Ăn uống, nơi nghỉ ngơi..."
+                          className="h-9 text-sm"
+                        />
+                        <Button size="sm" variant="secondary" onClick={addBenefit} type="button">
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 min-h-[30px]">
+                        {benefits.map((item, index) => (
+                          <Badge key={`ben-${index}`} variant="outline" className="pl-2 pr-1 py-1 gap-1 border-green-200 bg-green-50 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300">
+                            {item}
+                            <button onClick={() => setBenefits(prev => prev.filter((_, i) => i !== index))} className="rounded-full hover:bg-destructive hover:text-white p-0.5 transition-colors">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Action Bar */}
-              <div className="lg:col-span-12 sticky bottom-4 z-1000 bg-background/95 backdrop-blur p-4 border rounded-xl shadow-lg flex flex-col sm:flex-row justify-between items-center gap-4">
-                 <div className="text-sm text-muted-foreground">
-                    {submitError ? (
-                        <span className="flex items-center text-destructive font-semibold"><Info className="mr-2 h-4 w-4" /> {submitError}</span>
-                    ) : (
-                        <span>Vui lòng điền đầy đủ thông tin có dấu <span className="text-destructive">*</span></span>
-                    )}
-                 </div>
-                 <div className="flex gap-3 w-full sm:w-auto">
-                   <Button type="button" variant="outline" asChild className="flex-1 sm:flex-none">
-                      <Link href="/farmer/jobs">Hủy bỏ</Link>
-                   </Button>
-                   <Button type="button" onClick={goToPreview} className="flex-1 sm:flex-none shadow-sm">
-                     {isEditMode ? "Xem trước cập nhật" : "Xem trước tin đăng"} <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
-                   </Button>
-                 </div>
+              <div className="sticky bottom-4 z-1000 bg-background/95 backdrop-blur p-4 border rounded-xl shadow-lg flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="text-sm text-muted-foreground">
+                  {submitError ? (
+                    <span className="flex items-center text-destructive font-semibold"><Info className="mr-2 h-4 w-4" /> {submitError}</span>
+                  ) : (
+                    <span>Vui lòng điền đầy đủ thông tin có dấu <span className="text-destructive">*</span></span>
+                  )}
+                </div>
+                <div className="flex gap-3 w-full sm:w-auto">
+                  <Button type="button" variant="outline" asChild className="flex-1 sm:flex-none">
+                    <Link href="/farmer/jobs">Hủy bỏ</Link>
+                  </Button>
+                  <Button type="button" onClick={goToPreview} className="flex-1 sm:flex-none shadow-sm">
+                    {isEditMode ? "Xem trước cập nhật" : "Xem trước tin đăng"} <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (
-             /* Step 2: Preview */
-             <div className="max-w-4xl mx-auto space-y-8 pb-10">
-                <Card className="shadow-lg border-2 border-primary/10">
-                   <CardHeader className="bg-muted/30 border-b pb-6">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                         <div>
-                            <CardTitle className="text-2xl">Xác nhận thông tin</CardTitle>
-                            <CardDescription>Vui lòng kiểm tra kỹ nội dung tin tuyển dụng trước khi đăng công khai.</CardDescription>
-                         </div>
-                         <div className="flex items-center gap-2">
-                            <Badge variant="outline" className={cn("px-3 py-1 font-normal", isUrgent ? "bg-red-100 text-red-700 border-red-200" : "bg-blue-50 text-blue-700 border-blue-200")}>
-                               {isUrgent ? "🔥 Tuyển gấp" : "Tiêu chuẩn"}
-                            </Badge>
-                         </div>
+            /* Step 2: Preview */
+            <div className="max-w-4xl mx-auto space-y-8 pb-10">
+              <Card className="shadow-lg border-2 border-primary/10">
+                <CardHeader className="bg-muted/30 border-b pb-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <CardTitle className="text-2xl">Xác nhận thông tin</CardTitle>
+                      <CardDescription>Vui lòng kiểm tra kỹ nội dung tin tuyển dụng trước khi đăng công khai.</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={cn("px-3 py-1 font-normal", isUrgent ? "bg-red-100 text-red-700 border-red-200" : "bg-blue-50 text-blue-700 border-blue-200")}>
+                        {isUrgent ? "🔥 Tuyển gấp" : "Tiêu chuẩn"}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-8 pt-8 px-6 md:px-10">
+                  {/* Job Status Banner */}
+                  <div className="bg-primary/5 rounded-xl p-6 border border-primary/10">
+                    <h3 className="text-2xl font-bold text-foreground mb-4">{title}</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase">Mức lương</p>
+                        <div className="flex items-center font-medium text-primary"><DollarSign className="mr-1 h-4 w-4" /> {formatCurrency(incomeNumber)}</div>
                       </div>
-                   </CardHeader>
-                   <CardContent className="space-y-8 pt-8 px-6 md:px-10">
-                      {/* Job Status Banner */}
-                      <div className="bg-primary/5 rounded-xl p-6 border border-primary/10">
-                         <h3 className="text-2xl font-bold text-foreground mb-4">{title}</h3>
-                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="space-y-1">
-                               <p className="text-xs font-semibold text-muted-foreground uppercase">Mức lương</p>
-                               <div className="flex items-center font-medium text-primary"><DollarSign className="mr-1 h-4 w-4" /> {formatCurrency(incomeNumber)}</div>
-                            </div>
-                            <div className="space-y-1">
-                               <p className="text-xs font-semibold text-muted-foreground uppercase">Hình thức</p>
-                               <div className="flex items-center font-medium"><CalendarRange className="mr-1 h-4 w-4" /> {scheduleType === "contract" ? "Khoán việc" : "Theo ngày"}</div>
-                            </div>
-                            <div className="space-y-1">
-                               <p className="text-xs font-semibold text-muted-foreground uppercase">Số lượng</p>
-                               <div className="flex items-center font-medium"><Users className="mr-1 h-4 w-4" /> {workersNeededNumber} người</div>
-                            </div>
-                            <div className="space-y-1">
-                               <p className="text-xs font-semibold text-muted-foreground uppercase">Địa điểm</p>
-                               <div className="flex items-center font-medium truncate" title={selectedFarmLabel}><MapPin className="mr-1 h-4 w-4" /> {selectedFarmLabel}</div>
-                            </div>
-                         </div>
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase">Hình thức</p>
+                        <div className="flex items-center font-medium"><CalendarRange className="mr-1 h-4 w-4" /> {scheduleType === "contract" ? "Khoán việc" : "Theo ngày"}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase">Số lượng</p>
+                        <div className="flex items-center font-medium"><Users className="mr-1 h-4 w-4" /> {workersNeededNumber} người</div>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase">Địa điểm</p>
+                        <div className="flex items-center font-medium truncate" title={selectedFarmLabel}><MapPin className="mr-1 h-4 w-4" /> {selectedFarmLabel}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-3 gap-8">
+                    <div className="md:col-span-2 space-y-6">
+                      <div className="space-y-3">
+                        <h4 className="flex items-center text-sm font-bold uppercase text-muted-foreground tracking-wide border-b pb-2">
+                          <AlignLeft className="mr-2 h-4 w-4" /> Chi tiết công việc
+                        </h4>
+                        <div className="bg-muted/10 rounded-lg p-4 text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 border">
+                          {description}
+                        </div>
                       </div>
 
-                      <div className="grid md:grid-cols-3 gap-8">
-                         <div className="md:col-span-2 space-y-6">
-                            <div className="space-y-3">
-                               <h4 className="flex items-center text-sm font-bold uppercase text-muted-foreground tracking-wide border-b pb-2">
-                                  <AlignLeft className="mr-2 h-4 w-4" /> Chi tiết công việc
-                               </h4>
-                               <div className="bg-muted/10 rounded-lg p-4 text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 border">
-                                  {description}
-                               </div>
-                            </div>
-
-                            <div className="space-y-3">
-                               <h4 className="flex items-center text-sm font-bold uppercase text-muted-foreground tracking-wide border-b pb-2">
-                                  <Award className="mr-2 h-4 w-4" /> Yêu cầu kỹ năng
-                               </h4>
-                               <div className="flex flex-wrap gap-2">
-                                  {selectedSkillIds.length > 0 ? (
-                                     selectedSkillIds.map(id => (
-                                        <Badge key={id} variant="secondary" className="px-3 py-1">{getSkillLabel(id)}</Badge>
-                                     ))
-                                  ) : (
-                                     <span className="text-sm text-muted-foreground italic">Không yêu cầu kỹ năng đặc biệt</span>
-                                  )}
-                               </div>
-                            </div>
-                         </div>
-
-                         <div className="space-y-6">
-                            <div className="space-y-3">
-                               <h4 className="flex items-center text-sm font-bold uppercase text-muted-foreground tracking-wide border-b pb-2">
-                                  <CalendarRange className="mr-2 h-4 w-4" /> Thời gian
-                               </h4>
-                               <div className="bg-blue-50/50 dark:bg-blue-900/10 rounded-lg p-4 border border-blue-100 dark:border-blue-900 space-y-2 text-sm">
-                                  {scheduleType === "contract" ? (
-                                     <>
-                                        <div className="flex justify-between"><span>Bắt đầu:</span> <span className="font-semibold">{formatDateDDMMYYYY(contractStartDate)}</span></div>
-                                        <div className="flex justify-between"><span>Kết thúc:</span> <span className="font-semibold">{formatDateDDMMYYYY(contractEndDate)}</span></div>
-                                     </>
-                                  ) : (
-                                     <>
-                                        <div className="flex justify-between"><span>Số ngày:</span> <span className="font-semibold">{selectedDailyDaysCount} ngày</span></div>
-                                        <div className="flex justify-between"><span>Ca làm:</span> <span className="font-semibold">{dailyStartTime} - {dailyEndTime}</span></div>
-                                     </>
-                                  )}
-                               </div>
-                            </div>
-
-                            <div className="space-y-3">
-                               <h4 className="flex items-center text-sm font-bold uppercase text-muted-foreground tracking-wide border-b pb-2">
-                                  <Gift className="mr-2 h-4 w-4" /> Quyền lợi
-                               </h4>
-                               <div className="flex flex-wrap gap-2">
-                                  {benefits.length > 0 ? benefits.map(b => (
-                                     <Badge key={b} variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800">{b}</Badge>
-                                  )) : <span className="text-sm text-muted-foreground">Cơ bản</span>}
-                               </div>
-                            </div>
-
-                            <div className="space-y-3">
-                               <h4 className="flex items-center text-sm font-bold uppercase text-muted-foreground tracking-wide border-b pb-2">
-                                  <Info className="mr-2 h-4 w-4" /> Yêu cầu khác
-                               </h4>
-                               <div className="flex flex-wrap gap-2">
-                                  {requirements.length > 0 ? requirements.map(r => (
-                                     <Badge key={r} variant="outline">{r}</Badge>
-                                  )) : <span className="text-sm text-muted-foreground">Không có</span>}
-                               </div>
-                            </div>
-                         </div>
+                      <div className="space-y-3">
+                        <h4 className="flex items-center text-sm font-bold uppercase text-muted-foreground tracking-wide border-b pb-2">
+                          <Award className="mr-2 h-4 w-4" /> Yêu cầu kỹ năng
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedSkillIds.length > 0 ? (
+                            selectedSkillIds.map(id => (
+                              <Badge key={id} variant="secondary" className="px-3 py-1">{getSkillLabel(id)}</Badge>
+                            ))
+                          ) : (
+                            <span className="text-sm text-muted-foreground italic">Không yêu cầu kỹ năng đặc biệt</span>
+                          )}
+                        </div>
                       </div>
-                   </CardContent>
-                   <CardContent className="bg-muted/20 border-t p-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-                      {submitError && <p className="text-destructive font-semibold flex items-center"><Info className="mr-2 h-4 w-4" /> {submitError}</p>}
-                      <div className="flex gap-4 w-full sm:w-auto ml-auto">
-                         <Button type="button" variant="outline" onClick={() => setStep(1)} className="flex-1 sm:flex-none">
-                            <ArrowLeft className="mr-2 h-4 w-4" /> Chỉnh sửa
-                         </Button>
-                         <Button type="button" size="lg" onClick={submitJob} disabled={isSubmitting} className="flex-1 sm:flex-none shadow-md min-w-[200px]">
-                           {isSubmitting ? "Đang xử lý..." : isEditMode ? "Xác nhận & Cập nhật" : "Xác nhận & Đăng tin"}
-                         </Button>
+                    </div>
+
+                    <div className="space-y-6">
+                      <div className="space-y-3">
+                        <h4 className="flex items-center text-sm font-bold uppercase text-muted-foreground tracking-wide border-b pb-2">
+                          <CalendarRange className="mr-2 h-4 w-4" /> Thời gian
+                        </h4>
+                        <div className="bg-blue-50/50 dark:bg-blue-900/10 rounded-lg p-4 border border-blue-100 dark:border-blue-900 space-y-2 text-sm">
+                          {scheduleType === "contract" ? (
+                            <>
+                              <div className="flex justify-between"><span>Bắt đầu:</span> <span className="font-semibold">{formatDateDDMMYYYY(contractStartDate)}</span></div>
+                              <div className="flex justify-between"><span>Kết thúc:</span> <span className="font-semibold">{formatDateDDMMYYYY(contractEndDate)}</span></div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex justify-between"><span>Số ngày:</span> <span className="font-semibold">{selectedDailyDaysCount} ngày</span></div>
+                              <div className="flex justify-between"><span>Ca làm:</span> <span className="font-semibold">{dailyStartTime} - {dailyEndTime}</span></div>
+                            </>
+                          )}
+                        </div>
                       </div>
-                   </CardContent>
-                </Card>
-             </div>
+
+                      <div className="space-y-3">
+                        <h4 className="flex items-center text-sm font-bold uppercase text-muted-foreground tracking-wide border-b pb-2">
+                          <Gift className="mr-2 h-4 w-4" /> Quyền lợi
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {benefits.length > 0 ? benefits.map(b => (
+                            <Badge key={b} variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800">{b}</Badge>
+                          )) : <span className="text-sm text-muted-foreground">Cơ bản</span>}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <h4 className="flex items-center text-sm font-bold uppercase text-muted-foreground tracking-wide border-b pb-2">
+                          <Info className="mr-2 h-4 w-4" /> Yêu cầu khác
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {requirements.length > 0 ? requirements.map(r => (
+                            <Badge key={r} variant="outline">{r}</Badge>
+                          )) : <span className="text-sm text-muted-foreground">Không có</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardContent className="bg-muted/20 border-t p-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+                  {submitError && <p className="text-destructive font-semibold flex items-center"><Info className="mr-2 h-4 w-4" /> {submitError}</p>}
+                  <div className="flex gap-4 w-full sm:w-auto ml-auto">
+                    <Button type="button" variant="outline" onClick={() => setStep(1)} className="flex-1 sm:flex-none">
+                      <ArrowLeft className="mr-2 h-4 w-4" /> Chỉnh sửa
+                    </Button>
+                    <Button type="button" size="lg" onClick={submitJob} disabled={isSubmitting} className="flex-1 sm:flex-none shadow-md min-w-[200px]">
+                      {isSubmitting ? "Đang xử lý..." : isEditMode ? "Xác nhận & Cập nhật" : "Xác nhận & Đăng tin"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </div>
       )}

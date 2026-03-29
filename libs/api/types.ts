@@ -40,6 +40,7 @@ export interface LoginResponse {
   expiresAt: string;
   email: string;
   role: string;
+  isVerified: boolean;
 }
 
 
@@ -47,9 +48,18 @@ export interface RegisterRequest {
   email: string;
   password: string;
   phoneNumber?: string;
-  address?: string;
   roleId: number;
 }
+
+export interface VerifyEmail {
+  email: string;
+  otp: string;
+}
+
+export interface ResendVerificationEmail {
+  email: string;
+}
+
 export interface ForgetPasswordRequest {
   email: string;
 }
