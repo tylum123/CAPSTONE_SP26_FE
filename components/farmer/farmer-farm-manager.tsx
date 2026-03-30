@@ -25,12 +25,14 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { OsmLocationPicker } from "@/components/farmer/osm-location-picker"
 import { useToast } from "@/hooks/use-toast"
+import { useProvinces } from "@/hooks/use-provinces"
 import { handleApiError } from "@/lib/utils/error-handler"
 import { FarmService } from "@/libs/api/services/farm.service"
 import type { GetFarmResponse, UpdateFarmRequest } from "@/libs/api/types"
 import { Loader2, MapPin, Pencil, Plus, Star, Trash2, X, UploadCloud, Eye, ChevronDown, PlusCircleIcon } from "lucide-react"
 import Image from "next/image"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible"
+import { AddressForm } from "@/components/address-form"
 
 const OSM_NOMINATIM_URL = process.env.NEXT_PUBLIC_OSM_NOMINATIM_URL || "https://nominatim.openstreetmap.org/search"
 const OSM_REVERSE_URL = process.env.NEXT_PUBLIC_OSM_REVERSE_URL || "https://nominatim.openstreetmap.org/reverse"
@@ -164,6 +166,8 @@ export function FarmerFarmManager() {
   const [loadingDetails, setLoadingDetails] = useState(false)
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([])
   const [isFormCollapsibleOpen, setIsFormCollapsibleOpen] = useState(false)
+  const { provinces, loading: provincesLoading } = useProvinces()
+  const [selectedProvince, setSelectedProvince] = useState<number | null>(null)
   const [selectedImageForViewer, setSelectedImageForViewer] = useState<string | null>(null)
   const [imageZoom, setImageZoom] = useState(100)
   const [imagePanX, setImagePanX] = useState(0)
@@ -391,6 +395,19 @@ export function FarmerFarmManager() {
       longitude: null,
     }))
     setShowLocationSuggestions(true)
+  }
+
+  // When province changes, update address and clear lat/lng
+  const handleProvinceChange = (provinceCode: number) => {
+    setSelectedProvince(provinceCode)
+    const provinceObj = provinces.find((p) => p.code === provinceCode)
+    setFormData((current) => ({
+      ...current,
+      address: provinceObj ? provinceObj.name : "",
+      latitude: null,
+      longitude: null,
+    }))
+    setShowLocationSuggestions(false)
   }
 
   const selectOSMLocation = (place: OSMPlace) => {
@@ -637,7 +654,7 @@ export function FarmerFarmManager() {
                           <span className="flex items-center gap-1.5 line-clamp-1">
                             <span className="font-medium text-foreground">Loại:</span> {farm.farmType === 1 ? "Chăn nuôi" : farm.farmType === 2 ? "Trồng trọt" : "Nuôi trồng thủy hải sản"}
                           </span>
-                          {farm.farmType === 2 ? (
+                          {farm.farmType === 2 || farm.farmType === 3 ? (
                             <span className="flex items-center gap-1.5 line-clamp-1">
                               <span className="font-medium text-foreground">Diện tích:</span> {farm.areaSize ? `${farm.areaSize} m²` : "Không có"}
                             </span>
@@ -811,56 +828,23 @@ export function FarmerFarmManager() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="address">Địa chỉ</Label>
-                    <div className="relative">
-                      <Input
-                        id="address"
-                        value={formData.address}
-                        onChange={(event) => handleAddressChange(event.target.value)}
-                        onFocus={() => setShowLocationSuggestions(true)}
-                        onBlur={() => {
-                          window.setTimeout(() => {
-                            setShowLocationSuggestions(false)
-                          }, 150)
-                        }}
-                        placeholder="vd: Ấp 3, xã Tân Phú, Đồng Tháp"
-                      />
-
-                      {showLocationSuggestions && (isSearchingLocation || locationSuggestions.length > 0) ? (
-                        <div className="absolute top-full z-20 mt-2 w-full rounded-lg border bg-background shadow-lg">
-                          {isSearchingLocation ? (
-                            <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Đang tìm gợi ý địa chỉ từ OSM...
-                            </div>
-                          ) : (
-                            <div className="py-1">
-                              {locationSuggestions.map((place, index) => (
-                                <button
-                                  key={`${place.display_name}-${place.lat}-${place.lon}-${index}`}
-                                  type="button"
-                                  className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
-                                  onClick={() => selectOSMLocation(place)}
-                                >
-                                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-agro-green" />
-                                  <span>{place.display_name}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ) : null}
-                    </div>
-                    {formData.latitude !== null && formData.longitude !== null ? (
-                      <p className="text-xs text-muted-foreground">
-                        Tọa độ: {Number(formData.latitude).toFixed(6)}, {Number(formData.longitude).toFixed(6)}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        Chọn địa chỉ từ gợi ý hoặc bấm trực tiếp trên bản đồ để ghim vị trí.
-                      </p>
-                    )}
-
+                    <AddressForm
+                      value={{
+                        province: formData.province || "",
+                        ward: formData.ward || "",
+                        detailedAddress: formData.detailedAddress || ""
+                      }}
+                      onChange={({ province, ward, detailedAddress }) => {
+                        setFormData((current) => ({
+                          ...current,
+                          province,
+                          ward,
+                          detailedAddress,
+                          // Compose a full address string for OSM/geocoding if needed
+                          address: [detailedAddress, ward, province].filter(Boolean).join(", ")
+                        }))
+                      }}
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -1079,7 +1063,7 @@ export function FarmerFarmManager() {
                     <span className="text-muted-foreground block mb-1">Loại:</span>
                     <p className="font-medium text-base">{viewingFarmDetails.farmType === 1 ? "Chăn nuôi" : viewingFarmDetails.farmType === 2 ? "Trồng trọt" : "Nuôi trồng thủy hải sản"}</p>
                   </div>
-                  {viewingFarmDetails.farmType === 2 ? (
+                  {viewingFarmDetails.farmType === 2 || viewingFarmDetails.farmType === 3 ? (
                     <div>
                       <span className="text-muted-foreground block mb-1">Diện tích:</span>
                       <p className="font-medium text-base">{viewingFarmDetails.areaSize ? `${viewingFarmDetails.areaSize} m²` : "Không có"}</p>

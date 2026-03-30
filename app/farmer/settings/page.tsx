@@ -348,7 +348,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Địa chỉ chính</Label>
+                <Label>Địa chỉ</Label>
                 {!editingAddress ? (
                   <div className="flex items-center gap-4 bg-gray-50/50 rounded-xl p-4 border border-gray-100">
                     <div className="flex-1 text-base text-gray-700 text-sm">
