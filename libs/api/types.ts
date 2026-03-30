@@ -118,7 +118,7 @@ export interface FarmerProfile {
   id: string;
   userId: string;
   contactName: string;
-  address: string;
+  address?: string;
   dateOfBirth: string;
   averageRating: number;
   totalJobsPosted: number;
