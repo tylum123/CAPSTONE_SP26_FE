@@ -27,7 +27,7 @@ export const farmerService = {
   updateProfile: async (data: UpdateFarmerRequest): Promise<ApiResponse<FarmerProfile>> => {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      
+
       const response = await axiosInstance.put(API_ENDPOINTS.FARMER.PROFILE, data, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -51,7 +51,7 @@ export const farmerService = {
         }
         throw error;
       }
-      
+
       // Fallback to POST if PUT is not available
       if (error.response?.status === 405) {
         const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
@@ -100,7 +100,7 @@ export const farmerService = {
     title?: string;
     category?: string;
     address?: string;
-    skill?: string;
+    skill?: string[];
   }): Promise<ApiResponse<Job[]>> => {
     const response = await axiosInstance.get(API_ENDPOINTS.FARMER.FILTERED_JOBS, { params });
     return response.data;
