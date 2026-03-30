@@ -188,7 +188,7 @@ export function FarmerFarmManager() {
     } catch (error: any) {
       toast({
         title: "Lỗi",
-        description: handleApiError(error, { defaultMessage: "Không thể tải thông tin chi tiết nông trại" }),
+        description: handleApiError(error, { defaultMessage: "Không thể tải thông tin chi tiết địa điểm" }),
         variant: "destructive",
       })
       setViewingFarmId(null)
@@ -209,7 +209,7 @@ export function FarmerFarmManager() {
         toast({
           title: "Lỗi",
           description: handleApiError(error, {
-            defaultMessage: "Không thể tải danh sách nông trại",
+            defaultMessage: "Không thể tải danh sách địa điểm",
           }),
           variant: "destructive",
         })
@@ -303,7 +303,7 @@ export function FarmerFarmManager() {
 
       toast({
         title: "Đã chọn ảnh",
-        description: "Ảnh sẽ được tải lên sau khi bạn thêm nông trại.",
+        description: "Ảnh sẽ được tải lên sau khi bạn thêm địa điểm.",
       })
 
       e.target.value = ""
@@ -370,7 +370,7 @@ export function FarmerFarmManager() {
     if (!farmId) {
       toast({
         title: "Lỗi",
-        description: "Không tìm thấy mã nông trại để chỉnh sửa",
+        description: "Không tìm thấy mã địa điểm để chỉnh sửa",
         variant: "destructive",
       })
       return
@@ -460,7 +460,7 @@ export function FarmerFarmManager() {
       setPendingDeleteFarm(null)
       toast({
         title: "Lỗi",
-        description: "Không tìm thấy mã nông trại để xóa",
+        description: "Không tìm thấy mã địa điểm để xóa",
         variant: "destructive",
       })
       return
@@ -477,13 +477,13 @@ export function FarmerFarmManager() {
 
       toast({
         title: "Thành công",
-        description: "Đã xóa nông trại",
+        description: "Đã xóa địa điểm",
       })
     } catch (error: any) {
       toast({
         title: "Lỗi",
         description: handleApiError(error, {
-          defaultMessage: "Không thể xóa nông trại",
+          defaultMessage: "Không thể xóa địa điểm",
         }),
         variant: "destructive",
       })
@@ -504,7 +504,7 @@ export function FarmerFarmManager() {
     if (!formData.locationName.trim() || !formData.address.trim()) {
       toast({
         title: "Thiếu thông tin",
-        description: "Vui lòng nhập tên địa điểm và địa chỉ nông trại",
+        description: "Vui lòng nhập tên địa điểm và địa chỉ địa điểm",
         variant: "destructive",
       })
       return
@@ -566,8 +566,8 @@ export function FarmerFarmManager() {
             }
           } catch {
             toast({
-              title: "Tạo nông trại thành công",
-              description: "Không thể tải một số ảnh. Bạn có thể tải lại khi chỉnh sửa nông trại.",
+              title: "Tạo địa điểm thành công",
+              description: "Không thể tải một số ảnh. Bạn có thể tải lại khi chỉnh sửa địa điểm.",
               variant: "destructive",
             })
           }
@@ -579,13 +579,13 @@ export function FarmerFarmManager() {
 
       toast({
         title: "Thành công",
-        description: editingFarmId ? "Đã cập nhật nông trại" : "Đã thêm nông trại mới",
+        description: editingFarmId ? "Đã cập nhật địa điểm" : "Đã thêm địa điểm mới",
       })
     } catch (error: any) {
       toast({
         title: "Lỗi",
         description: handleApiError(error, {
-          defaultMessage: editingFarmId ? "Không thể cập nhật nông trại" : "Không thể tạo nông trại",
+          defaultMessage: editingFarmId ? "Không thể cập nhật địa điểm" : "Không thể tạo địa điểm",
         }),
         variant: "destructive",
       })
@@ -635,7 +635,7 @@ export function FarmerFarmManager() {
                         <p className="text-sm text-muted-foreground">{farm.address}</p>
                         <div className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-2 mt-1">
                           <span className="flex items-center gap-1.5 line-clamp-1">
-                            <span className="font-medium text-foreground">Loại:</span> {farm.farmTypeName || (farm.farmType === 1 ? "Chăn nuôi" : "Trồng trọt")}
+                            <span className="font-medium text-foreground">Loại:</span> {farm.farmType === 1 ? "Chăn nuôi" : farm.farmType === 2 ? "Trồng trọt" : "Nuôi trồng thủy hải sản"}
                           </span>
                           {farm.farmType === 2 ? (
                             <span className="flex items-center gap-1.5 line-clamp-1">
@@ -744,14 +744,14 @@ export function FarmerFarmManager() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Lĩnh vực canh tác</Label>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 w-full">
                         <Button
                           type="button"
                           variant={formData.farmType === 2 ? "default" : "outline"}
-                          className={`flex-1 ${formData.farmType === 2 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
+                          className={`flex-1 min-w-0 ${formData.farmType === 2 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
                           onClick={() => {
                             handleFieldChange("farmType", 2)
-                            handleFieldChange("livestockCount", 0) // Reset livestock count when switching to crop
+                            handleFieldChange("livestockCount", 0)
                           }}
                         >
                           Trồng trọt
@@ -759,29 +759,42 @@ export function FarmerFarmManager() {
                         <Button
                           type="button"
                           variant={formData.farmType === 1 ? "default" : "outline"}
-                          className={`flex-1 ${formData.farmType === 1 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
+                          className={`flex-1 min-w-0 ${formData.farmType === 1 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
                           onClick={() => {
                             handleFieldChange("farmType", 1)
-                            handleFieldChange("areaSize", 0) // Reset area size when switching to livestock
+                            handleFieldChange("areaSize", 0)
                           }}
                         >
                           Chăn nuôi
                         </Button>
-                          <Button
-                            type="button"
-                            variant={formData.farmType === 3 ? "default" : "outline"}
-                            className={`flex-1 ${formData.farmType === 3 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
-                            onClick={() => {
-                              handleFieldChange("farmType", 3)
-                              handleFieldChange("livestockCount", 0) // Reset livestock count when switching to crop
-                            }}
-                          >
-                           Nuôi trồng thủy hải sản
-                          </Button>
                       </div>
+                        <Button
+                          type="button"
+                          variant={formData.farmType === 3 ? "default" : "outline"}
+                          className={`flex-1 min-w-0 w-full ${formData.farmType === 3 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
+                          onClick={() => {
+                            handleFieldChange("farmType", 3)
+                            handleFieldChange("livestockCount", 0)
+                          }}
+                        >
+                          Nuôi trồng thủy hải sản
+                        </Button>
                     </div>
 
-                    {formData.farmType === 2 ? (
+                    {/* Field logic: Crop (2) and Aquaculture (3) use areaSize, Livestock (1) uses livestockCount */}
+                    {formData.farmType === 1 ? (
+                      <div className="space-y-2">
+                        <Label htmlFor="livestockCount">Số lượng (con)</Label>
+                        <Input
+                          id="livestockCount"
+                          type="number"
+                          min="0"
+                          value={formData.livestockCount || ""}
+                          onChange={(event) => handleFieldChange("livestockCount", Number(event.target.value))}
+                          placeholder="vd: 500"
+                        />
+                      </div>
+                    ) : (
                       <div className="space-y-2">
                         <Label htmlFor="areaSize">Diện tích (m²)</Label>
                         <Input
@@ -792,18 +805,6 @@ export function FarmerFarmManager() {
                           value={formData.areaSize || ""}
                           onChange={(event) => handleFieldChange("areaSize", Number(event.target.value))}
                           placeholder="vd: 1000"
-                        />
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Label htmlFor="livestockCount">Số lượng (con)</Label>
-                        <Input
-                          id="livestockCount"
-                          type="number"
-                          min="0"
-                          value={formData.livestockCount || ""}
-                          onChange={(event) => handleFieldChange("livestockCount", Number(event.target.value))}
-                          placeholder="vd: 500"
                         />
                       </div>
                     )}
@@ -946,7 +947,7 @@ export function FarmerFarmManager() {
                       ) : (
                         <>
                           {editingFarmId ? <Pencil className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
-                          {editingFarmId ? "Lưu cập nhật" : "Thêm nông trại"}
+                          {editingFarmId ? "Lưu cập nhật" : "Thêm địa điểm"}
                         </>
                       )}
                     </Button>
@@ -965,7 +966,7 @@ export function FarmerFarmManager() {
                     className="flex-1 min-h-90"
                   />
                   <div className="flex items-center justify-between px-3 py-2 text-xs text-muted-foreground">
-                    <span>Bấm vào bản đồ để ghim vị trí nông trại</span>
+                    <span>Bấm vào bản đồ để ghim vị trí địa điểm</span>
                     {formData.latitude !== null && formData.longitude !== null ? (
                       <a
                         href={buildOsmDetailUrl(Number(formData.latitude), Number(formData.longitude))}
@@ -993,10 +994,10 @@ export function FarmerFarmManager() {
       <AlertDialog open={Boolean(pendingDeleteFarm)} onOpenChange={(open) => !open && setPendingDeleteFarm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xóa nông trại?</AlertDialogTitle>
+            <AlertDialogTitle>Xóa địa điểm?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingDeleteFarm
-                ? `Nông trại ${pendingDeleteFarm.locationName} sẽ bị xóa khỏi tài khoản của bạn. Hành động này không thể hoàn tác.`
+                ? `địa điểm ${pendingDeleteFarm.locationName} sẽ bị xóa khỏi tài khoản của bạn. Hành động này không thể hoàn tác.`
                 : "Hành động này không thể hoàn tác."}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1013,7 +1014,7 @@ export function FarmerFarmManager() {
                   Đang xóa...
                 </>
               ) : (
-                "Xóa nông trại"
+                "Xóa địa điểm"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -1076,7 +1077,7 @@ export function FarmerFarmManager() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <span className="text-muted-foreground block mb-1">Loại:</span>
-                    <p className="font-medium text-base">{viewingFarmDetails.farmTypeName || (viewingFarmDetails.farmType === 1 ? "Chăn nuôi" : "Trồng trọt")}</p>
+                    <p className="font-medium text-base">{viewingFarmDetails.farmType === 1 ? "Chăn nuôi" : viewingFarmDetails.farmType === 2 ? "Trồng trọt" : "Nuôi trồng thủy hải sản"}</p>
                   </div>
                   {viewingFarmDetails.farmType === 2 ? (
                     <div>

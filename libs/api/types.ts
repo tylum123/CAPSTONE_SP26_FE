@@ -1,5 +1,11 @@
 // Common API Types
 
+enum FarmTypes {
+  Aquaculture = 'Nuôi trồng thủy hải sản',
+  Crop = 'Trồng trọt',
+  Livestock = 'Chăn nuôi',
+}
+
 export interface ApiResponse<T = any> {
   message: string;
   status_code: number;
@@ -91,7 +97,7 @@ export interface GetFarmResponse {
   locationName: string,
   imageUrl: string [],
   farmType: number,
-  farmTypeName: string,
+  farmTypeName: FarmTypes,
   livestockCount: number,
   areaSize: number,
   isPrimary: boolean,
