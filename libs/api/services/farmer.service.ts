@@ -1,5 +1,6 @@
 import axiosInstance from '../axios-instance';
-import { API_ENDPOINTS } from '../config';
+import { API_ENDPOINTS } from '../endpoints/config';
+import { ApplicationStatusId } from '@/libs/types';
 import type {
   ApiResponse,
   PaginatedResponse,
@@ -7,9 +8,11 @@ import type {
   CreateJobRequest,
   UpdateJobRequest,
   Application,
+  ApplicationDTO,
   FarmerProfile,
+  RespondApplicationRequest,
   UpdateFarmerRequest,
-} from '../types';
+} from '@/libs/types';
 
 export const farmerService = {
 
@@ -24,7 +27,7 @@ export const farmerService = {
   updateProfile: async (data: UpdateFarmerRequest): Promise<ApiResponse<FarmerProfile>> => {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      
+
       const response = await axiosInstance.put(API_ENDPOINTS.FARMER.PROFILE, data, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -48,7 +51,7 @@ export const farmerService = {
         }
         throw error;
       }
-      
+
       // Fallback to POST if PUT is not available
       if (error.response?.status === 405) {
         const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
@@ -97,7 +100,7 @@ export const farmerService = {
     title?: string;
     category?: string;
     address?: string;
-    skill?: string;
+    skill?: string[];
   }): Promise<ApiResponse<Job[]>> => {
     const response = await axiosInstance.get(API_ENDPOINTS.FARMER.FILTERED_JOBS, { params });
     return response.data;
@@ -130,43 +133,64 @@ export const farmerService = {
 
 
   /**
-   * Get all applicants for farmer's jobs
+   * Get all job application for farmer's job posts
    */
-  getApplicants: async (params?: {
+  getJobApplicationsByPost: async (params?: {
     jobId?: string;
-    status?: string;
-    page?: number;
-    limit?: number;
-  }): Promise<ApiResponse<PaginatedResponse<Application>>> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.FARMER.APPLICANTS, { params });
+    includeAll?: boolean;
+    statusId?: number;
+  }): Promise<ApiResponse<PaginatedResponse<ApplicationDTO> | ApplicationDTO[]>> => {
+    const jobId = params?.jobId || '';
+    const queryParams = {
+      includeAll: params?.includeAll,
+      statusId: params?.statusId,
+    };
+    const response = await axiosInstance.get(API_ENDPOINTS.FARMER.JOB_APPLICATIONS_BY_POST(jobId), { params: queryParams });
     return response.data;
   },
 
   /**
-   * Get applicant detail
+   * Get application detail
    */
-  getApplicantDetail: async (id: string): Promise<ApiResponse<Application>> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.FARMER.APPLICANT_DETAIL(id));
+  getApplicationDetail: async (id: string): Promise<ApiResponse<ApplicationDTO>> => {
+    const response = await axiosInstance.get(API_ENDPOINTS.FARMER.APPLICATION_DETAIL(id));
     return response.data;
   },
 
   /**
-   * Approve applicant
+   * Respond to applicant (accept/reject/cancel)
    */
-  approveApplicant: async (id: string): Promise<ApiResponse<Application>> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.FARMER.APPROVE_APPLICANT(id));
+  respondApplicant: async (
+    id: string,
+    data: RespondApplicationRequest,
+  ): Promise<ApiResponse<ApplicationDTO>> => {
+    const response = await axiosInstance.post(API_ENDPOINTS.FARMER.RESPOND_APPLICANT(id), data);
     return response.data;
   },
 
   /**
-   * Reject applicant
+   * Backward-compatible approve helper
+   */
+  approveApplicant: async (id: string, responseMessage?: string): Promise<ApiResponse<ApplicationDTO>> => {
+    const response = await axiosInstance.post(API_ENDPOINTS.FARMER.RESPOND_APPLICANT(id), {
+      statusId: ApplicationStatusId.Accepted,
+      respondedAt: new Date().toISOString(),
+      responseMessage,
+    });
+    return response.data;
+  },
+
+  /**
+   * Backward-compatible reject helper
    */
   rejectApplicant: async (
     id: string,
     reason?: string
-  ): Promise<ApiResponse<Application>> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.FARMER.REJECT_APPLICANT(id), {
-      reason,
+  ): Promise<ApiResponse<ApplicationDTO>> => {
+    const response = await axiosInstance.post(API_ENDPOINTS.FARMER.RESPOND_APPLICANT(id), {
+      statusId: ApplicationStatusId.Rejected,
+      respondedAt: new Date().toISOString(),
+      responseMessage: reason,
     });
     return response.data;
   },

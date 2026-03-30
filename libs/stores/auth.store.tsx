@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import type { User, AuthContextType } from "@/types";
+import type { User, AuthContextType } from "@/libs/types";
 import { STORAGE_KEYS } from "@/constants";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

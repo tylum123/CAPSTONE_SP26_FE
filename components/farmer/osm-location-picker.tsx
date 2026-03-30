@@ -28,11 +28,6 @@ export function OsmLocationPicker({ latitude, longitude, onPick, className }: Os
   const mapElementRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const markerRef = useRef<L.Marker | null>(null)
-  const onPickRef = useRef(onPick)
-
-  useEffect(() => {
-    onPickRef.current = onPick
-  }, [onPick])
 
   useEffect(() => {
     if (!mapElementRef.current || mapRef.current) {
@@ -56,11 +51,7 @@ export function OsmLocationPicker({ latitude, longitude, onPick, className }: Os
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map)
 
-    map.on("click", (event: L.LeafletMouseEvent) => {
-      const pickedLatitude = Number(event.latlng.lat.toFixed(6))
-      const pickedLongitude = Number(event.latlng.lng.toFixed(6))
-      onPickRef.current(pickedLatitude, pickedLongitude)
-    })
+    // Do NOT add map click handler
 
     mapRef.current = map
 
@@ -76,6 +67,10 @@ export function OsmLocationPicker({ latitude, longitude, onPick, className }: Os
     const map = mapRef.current
 
     if (!map || latitude === null || longitude === null) {
+      if (markerRef.current) {
+        markerRef.current.remove()
+        markerRef.current = null
+      }
       return
     }
 

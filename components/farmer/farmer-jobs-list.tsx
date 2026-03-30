@@ -2,11 +2,29 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Users, Clock, Banknote, MapPin, Copy, Calendar, Inbox, LayoutGrid, LayoutList, Loader2 } from "lucide-react"
+import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Users, Clock, Banknote, MapPin, Copy, Calendar, Inbox, LayoutGrid, LayoutList, Loader2, Filter, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import {
@@ -20,7 +38,7 @@ import { farmerService } from "@/libs/api/services/farmer.service"
 import { jobCategoryService } from "@/libs/api/services/job-category.service"
 import { skillService } from "@/libs/api/services/skill.service"
 import { useProvinces } from "@/hooks/use-provinces"
-import type { Job, JobCategory, Skill } from "@/libs/api/types"
+import type { Application, Job, JobCategory, PaginatedResponse, Skill } from "@/libs/types"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,7 +57,18 @@ export function FarmerJobsList() {
   const [error, setError] = useState<string | null>(null)
   const [filterCategory, setFilterCategory] = useState("all-categories")
   const [filterAddress, setFilterAddress] = useState("all-provinces")
-  const [filterSkill, setFilterSkill] = useState("all-skills")
+  const [filterSkills, setFilterSkills] = useState<string[]>([])
+  const [skillPage, setSkillPage] = useState(1)
+  const [skillTotalPages, setSkillTotalPages] = useState(1)
+  const SKILLS_PER_PAGE = 6
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false)
+  const [isApplicationsDialogOpen, setIsApplicationsDialogOpen] = useState(false)
+  const [selectedJobForApplications, setSelectedJobForApplications] = useState<Job | null>(null)
+  const [applications, setApplications] = useState<Application[]>([])
+  const [isLoadingApplications, setIsLoadingApplications] = useState(false)
+  const [applicationsError, setApplicationsError] = useState<string | null>(null)
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null)
+  const [jobPendingDelete, setJobPendingDelete] = useState<Job | null>(null)
 
   // For combo boxes
   const [categories, setCategories] = useState<JobCategory[]>([])
@@ -89,42 +118,87 @@ export function FarmerJobsList() {
     return "active"
   }
 
-  // Fetch categories and skills on component mount
+  // Fetch categories on mount
   useEffect(() => {
-    const fetchDropdownData = async () => {
+    const fetchCategories = async () => {
       try {
         setCategoriesLoading(true)
-        setSkillsLoading(true)
-
-        const [categoriesResponse, skillsResponse] = await Promise.all([
-          jobCategoryService.getJobCategories(),
-          skillService.getSkills(),
-        ])
-
+        const categoriesResponse = await jobCategoryService.getJobCategories()
         const categoriesPayload = categoriesResponse.data as JobCategory[] | { data?: JobCategory[] }
-        const skillsPayload = skillsResponse.data as Skill[] | { data?: Skill[] }
-
         if (Array.isArray(categoriesPayload)) {
           setCategories(categoriesPayload)
         } else if (Array.isArray(categoriesPayload?.data)) {
           setCategories(categoriesPayload.data)
         }
-
-        if (Array.isArray(skillsPayload)) {
-          setSkills(skillsPayload)
-        } else if (Array.isArray(skillsPayload?.data)) {
-          setSkills(skillsPayload.data)
-        }
       } catch (err) {
-        console.error("Failed to fetch dropdown data:", err)
+        console.error("Failed to fetch categories:", err)
       } finally {
         setCategoriesLoading(false)
+      }
+    }
+    void fetchCategories()
+  }, [])
+
+  // Fetch skills when filterCategory or skillPage changes
+  useEffect(() => {
+    const fetchSkills = async () => {
+      try {
+        setSkillsLoading(true)
+        let skillsResponse;
+
+        const selectedCat = categories.find(c => c.name === filterCategory || c.id === filterCategory);
+
+        if (selectedCat && selectedCat.id && filterCategory !== "all-categories") {
+          skillsResponse = await skillService.getSkillsByCategory(selectedCat.id, { page: skillPage, limit: SKILLS_PER_PAGE })
+
+          const skillsPayload = skillsResponse.data as Skill[] | { data?: Skill[], items?: Skill[], metadata?: any, pagination?: any }
+          const totalPages = (skillsResponse.data && !Array.isArray(skillsResponse.data) && (skillsResponse.data as any).totalPages) ||
+            (skillsResponse as any).metadata?.totalPages ||
+            (skillsResponse as any).pagination?.totalPages ||
+            (skillsResponse as any).totalPages ||
+            (skillsResponse as any).meta?.totalPages ||
+            1;
+
+          setSkillTotalPages(totalPages)
+
+          if (Array.isArray(skillsPayload)) {
+            setSkills(skillsPayload)
+          } else if (Array.isArray(skillsPayload?.items)) {
+            setSkills(skillsPayload.items)
+          } else if (Array.isArray(skillsPayload?.data)) {
+            setSkills(skillsPayload.data)
+          } else {
+            setSkills([])
+          }
+        } else {
+          // Frontend pagination if no category selected
+          skillsResponse = await skillService.getSkills()
+          const skillsPayload = skillsResponse.data as Skill[] | { data?: Skill[], items?: Skill[] }
+
+          let allItems: Skill[] = [];
+          if (Array.isArray(skillsPayload)) {
+            allItems = skillsPayload
+          } else if (Array.isArray(skillsPayload?.items)) {
+            allItems = skillsPayload.items
+          } else if (Array.isArray(skillsPayload?.data)) {
+            allItems = skillsPayload.data
+          }
+
+          setSkillTotalPages(Math.ceil(allItems.length / SKILLS_PER_PAGE) || 1)
+          const startIdx = (skillPage - 1) * SKILLS_PER_PAGE
+          setSkills(allItems.slice(startIdx, startIdx + SKILLS_PER_PAGE))
+        }
+      } catch (err) {
+        console.error("Failed to fetch skills:", err)
+      } finally {
         setSkillsLoading(false)
       }
     }
 
-    void fetchDropdownData()
-  }, [])
+    if (categories.length > 0 || filterCategory === "all-categories") {
+      void fetchSkills()
+    }
+  }, [filterCategory, categories, skillPage])
 
   useEffect(() => {
     const loadJobs = async () => {
@@ -133,15 +207,15 @@ export function FarmerJobsList() {
         setError(null)
 
         // Use getFilteredJobs if any filter parameters exist, otherwise use getJobs
-        const hasFilters = searchQuery || (filterCategory && filterCategory !== "all-categories") || (filterAddress && filterAddress !== "all-provinces") || (filterSkill && filterSkill !== "all-skills")
-        
+        const hasFilters = searchQuery || (filterCategory && filterCategory !== "all-categories") || (filterAddress && filterAddress !== "all-provinces") || filterSkills.length > 0
+
         let response
         if (hasFilters) {
           response = await farmerService.getFilteredJobs({
             title: searchQuery || undefined,
             category: (filterCategory && filterCategory !== "all-categories") ? filterCategory : undefined,
             address: (filterAddress && filterAddress !== "all-provinces") ? filterAddress : undefined,
-            skill: (filterSkill && filterSkill !== "all-skills") ? filterSkill : undefined,
+            skill: filterSkills.length > 0 ? filterSkills : undefined,
           })
         } else {
           response = await farmerService.getJobs()
@@ -175,7 +249,7 @@ export function FarmerJobsList() {
     }
 
     void loadJobs()
-  }, [searchQuery, filterCategory, filterAddress, filterSkill])
+  }, [searchQuery, filterCategory, filterAddress, filterSkills])
 
   const filteredJobs = useMemo(() => jobs.filter((job) => {
     const matchesSearch = [job.title, job.address, job.description]
@@ -209,113 +283,262 @@ export function FarmerJobsList() {
     }
   }
 
+  const getApplicationStatusBadge = (status: Application["status"]) => {
+    if (status === "approved") {
+      return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Đã duyệt</Badge>
+    }
+
+    if (status === "rejected") {
+      return <Badge variant="destructive" className="bg-rose-100 text-rose-800 border-rose-200">Từ chối</Badge>
+    }
+
+    return <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">Chờ duyệt</Badge>
+  }
+
+  const openApplicationsDialog = async (job: Job) => {
+    setSelectedJobForApplications(job)
+    setIsApplicationsDialogOpen(true)
+    setIsLoadingApplications(true)
+    setApplicationsError(null)
+    setApplications([])
+
+    try {
+      const response = await farmerService.getJobApplicationsByPost({
+        jobId: job.id,
+        includeAll: true,
+      })
+
+      const payload = response.data as PaginatedResponse<Application> | Application[] | { data?: Application[] }
+
+      if (Array.isArray(payload)) {
+        setApplications(payload)
+      } else if (Array.isArray(payload?.data)) {
+        setApplications(payload.data)
+      } else {
+        setApplications([])
+      }
+    } catch (dialogError) {
+      console.error(dialogError)
+      setApplicationsError("Không thể tải danh sách ứng viên cho tin đăng này.")
+    } finally {
+      setIsLoadingApplications(false)
+    }
+  }
+
+  const handleDeleteJob = async (job: Job) => {
+    try {
+      setDeletingJobId(job.id)
+      await farmerService.deleteJob(job.id)
+      setJobs((currentJobs) => currentJobs.filter((currentJob) => currentJob.id !== job.id))
+      setJobPendingDelete(null)
+    } catch (deleteError) {
+      console.error(deleteError)
+      setError("Không thể xóa bài đăng. Vui lòng thử lại.")
+    } finally {
+      setDeletingJobId(null)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Page Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Tin tuyển dụng</h1>
-          <p className="text-muted-foreground">Quản lý các tin tuyển dụng của bạn</p>
+      <div className="relative overflow-hidden rounded-2xl border bg-linear-to-r from-emerald-50 via-teal-50 to-cyan-50 p-5 dark:from-emerald-950/30 dark:via-teal-950/20 dark:to-cyan-950/20">
+        <div className="pointer-events-none absolute -top-12 right-6 h-40 w-40 rounded-full bg-emerald-200/40 blur-3xl dark:bg-emerald-700/20" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Tin tuyển dụng</h1>
+            <p className="text-muted-foreground">Quản lý các tin tuyển dụng và theo dõi ứng viên theo từng bài đăng</p>
+          </div>
+          <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
+            <Link href="/farmer/create-job">
+              <Plus className="mr-2 h-4 w-4" />
+              Đăng tin mới
+            </Link>
+          </Button>
         </div>
-        <Button asChild>
-          <Link href="/farmer/jobs/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Đăng tin mới
-          </Link>
-        </Button>
       </div>
-      <div className="flex flex-col gap-4 bg-card p-4 rounded-xl border shadow-sm">
+      <div className="flex flex-col sm:flex-row items-center gap-3 bg-card p-3 rounded-xl border shadow-sm">
+        {/* Search */}
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Tìm kiếm theo tiêu đề..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 h-10 w-full"
+          />
+        </div>
 
-        <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Tìm kiếm theo tiêu đề..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-10 bg-background"
-            />
+        {/* Right Controls */}
+        <div className="flex items-center gap-3 w-full sm:w-auto overflow-x-auto">
+          {/* Status Select */}
+          <div className="w-full sm:w-[160px] shrink-0">
+            <Select value={activeTab} onValueChange={setActiveTab}>
+              <SelectTrigger className="h-10 font-medium">
+                <SelectValue placeholder="Trạng thái" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                <SelectItem value="active">Đang tuyển</SelectItem>
+                <SelectItem value="filled">Đã đủ</SelectItem>
+                <SelectItem value="completed">Hoàn thành</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-4">
+          {/* Filter Button */}
+          <Button variant="outline" onClick={() => setIsFilterDialogOpen(true)} className="h-10 shrink-0">
+            <Filter className="mr-2 h-4 w-4" /> Bộ lọc
+          </Button>
 
-          {/* Category Select */}
-          <Select value={filterCategory} onValueChange={setFilterCategory} disabled={categoriesLoading}>
-            <SelectTrigger className="h-10 bg-background w-full">
-              <SelectValue placeholder={categoriesLoading ? "Đang tải..." : "Chọn danh mục"} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all-categories">Tất cả danh mục</SelectItem>
-              {categories.map((category) => (
-                <SelectItem key={category.id} value={category.name || category.id}>
-                  {category.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Skill Select */}
-          <Select value={filterSkill} onValueChange={setFilterSkill} disabled={skillsLoading}>
-            <SelectTrigger className="h-10 bg-background w-full">
-              <SelectValue placeholder={skillsLoading ? "Đang tải..." : "Chọn kỹ năng"} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all-skills">Tất cả kỹ năng</SelectItem>
-              {skills.map((skill) => (
-                <SelectItem key={skill.id} value={skill.name || skill.id}>
-                  {skill.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Province/Address Select */}
-          <Select value={filterAddress} onValueChange={setFilterAddress} disabled={provincesLoading}>
-            <SelectTrigger className="h-10 bg-background w-full">
-              <SelectValue placeholder={provincesLoading ? "Đang tải..." : "Chọn khu vực"} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all-provinces">Tất cả khu vực</SelectItem>
-              {provinces.map((province) => (
-                <SelectItem key={province.code} value={province.name}>
-                  {province.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex items-center justify-between gap-4">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full overflow-x-auto lg:flex-1">
-            <TabsList className="h-10 p-1 w-full grid grid-cols-4">
-              <TabsTrigger value="all" className="rounded-md">Tất cả</TabsTrigger>
-              <TabsTrigger value="active" className="rounded-md">Đang tuyển</TabsTrigger>
-              <TabsTrigger value="filled" className="rounded-md">Đã đủ</TabsTrigger>
-              <TabsTrigger value="completed" className="rounded-md">Hoàn thành</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          
-          <div className="hidden sm:flex items-center gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
-           
+          {/* View Toggles */}
+          <div className="hidden sm:flex items-center gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setViewMode("grid")}
-              className={`h-8 w-8 rounded-md ${viewMode === "grid" ? "bg-white dark:bg-slate-700 shadow-sm text-primary" : "text-muted-foreground"}`}
+              className={`h-8 w-8 rounded-md ${viewMode === "grid" ? "bg-white dark:bg-slate-700 shadow-sm text-emerald-600 dark:text-emerald-500" : "text-slate-500"}`}
             >
               <LayoutGrid className="h-4 w-4" />
             </Button>
-
-             <Button
+            <Button
               variant="ghost"
               size="icon"
               onClick={() => setViewMode("list")}
-              className={`h-8 w-8 rounded-md ${viewMode === "list" ? "bg-white dark:bg-slate-700 shadow-sm text-primary" : "text-muted-foreground"}`}
+              className={`h-8 w-8 rounded-md ${viewMode === "list" ? "bg-white dark:bg-slate-700 shadow-sm text-emerald-600 dark:text-emerald-500" : "text-slate-500"}`}
             >
               <LayoutList className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </div>
+
+      <Dialog open={isFilterDialogOpen} onOpenChange={setIsFilterDialogOpen}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>Bộ lọc tìm kiếm</DialogTitle>
+            <DialogDescription>
+              Tùy chỉnh các tiêu chí để lọc danh sách công việc
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Danh mục công việc</Label>
+              <Select
+                value={filterCategory}
+                onValueChange={(val) => {
+                  setFilterCategory(val)
+                  setFilterSkills([]) // Reset skills when category changes
+                  setSkillPage(1) // Reset skill page when category changes
+                }}
+                disabled={categoriesLoading}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={categoriesLoading ? "Đang tải..." : "Chọn danh mục"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all-categories">Tất cả danh mục</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.name || category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <Label>Kỹ năng</Label>
+                <div className="flex items-center gap-2">
+                  {filterSkills.length > 0 && (
+                    <Button variant="ghost" className="h-auto p-0 text-xs text-muted-foreground mr-2" onClick={() => setFilterSkills([])}>
+                      Xóa chọn ({filterSkills.length})
+                    </Button>
+                  )}
+                  {skillTotalPages > 1 && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => setSkillPage((p) => Math.max(1, p - 1))}
+                        disabled={skillPage === 1 || skillsLoading}
+                      >
+                        <ChevronLeft className="h-3 w-3" />
+                        <span className="sr-only">Trang trước</span>
+                      </Button>
+                      <span className="text-xs font-medium min-w-[3ch] text-center">
+                        {skillPage}/{skillTotalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => setSkillPage((p) => Math.min(skillTotalPages, p + 1))}
+                        disabled={skillPage === skillTotalPages || skillsLoading}
+                      >
+                        <ChevronRight className="h-3 w-3" />
+                        <span className="sr-only">Trang sau</span>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {skillsLoading ? (
+                <div className="flex items-center justify-center py-8 min-h-[140px]">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : skills.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-4 border rounded-md px-3 bg-slate-50 text-center min-h-[140px] flex items-center justify-center">Không có kỹ năng nào.</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 min-h-[140px] content-start p-1">
+                  {skills.map((skill) => (
+                    <div key={skill.id} className="flex items-start space-x-2 border rounded-md p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                      <Checkbox
+                        id={`filter-skill-${skill.id}`}
+                        checked={filterSkills.includes(skill.name || skill.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setFilterSkills([...filterSkills, skill.name || skill.id])
+                          } else {
+                            setFilterSkills(filterSkills.filter(s => s !== (skill.name || skill.id)))
+                          }
+                        }}
+                        className="mt-0.5"
+                      />
+                      <Label htmlFor={`filter-skill-${skill.id}`} className="text-xs font-medium cursor-pointer flex-1 line-clamp-2 leading-relaxed h-full grid items-center">
+                        {skill.name}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Khu vực</Label>
+              <Select value={filterAddress} onValueChange={setFilterAddress} disabled={provincesLoading}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={provincesLoading ? "Đang tải..." : "Chọn khu vực"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all-provinces">Tất cả khu vực</SelectItem>
+                  {provinces.map((province) => (
+                    <SelectItem key={province.code} value={province.name}>
+                      {province.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <Button onClick={() => setIsFilterDialogOpen(false)}>Hoàn tất</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Jobs List */}
       <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
@@ -325,7 +548,7 @@ export function FarmerJobsList() {
             <p>Đang tải danh sách công việc...</p>
           </div>
         ) : null}
-        
+
         {error ? (
           <div className={`p-4 rounded-lg bg-destructive/10 text-destructive border border-destructive/20 text-center ${viewMode === "grid" ? "col-span-full" : ""}`}>
             <p className="font-medium">{error}</p>
@@ -370,25 +593,31 @@ export function FarmerJobsList() {
                                 Xem chi tiết
                               </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer">
-                              <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
-                              Chỉnh sửa
+                            <DropdownMenuItem asChild className="cursor-pointer">
+                              <Link href={`/farmer/jobs/${job.id}/edit`}>
+                                <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
+                                Chỉnh sửa
+                              </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer">
+                            {/* <DropdownMenuItem className="cursor-pointer">
                               <Copy className="mr-2 h-4 w-4 text-muted-foreground" />
                               Đăng lại
-                            </DropdownMenuItem>
+                            </DropdownMenuItem> */}
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive focus:text-destructive cursor-pointer">
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive cursor-pointer"
+                              onClick={() => setJobPendingDelete(job)}
+                              disabled={deletingJobId === job.id}
+                            >
                               <Trash2 className="mr-2 h-4 w-4" />
-                              Xóa tin
+                              {deletingJobId === job.id ? "Đang xóa..." : "Xóa tin"}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
                     )}
                   </div>
-                  
+
                   <Badge variant="secondary" className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800">{job.jobSkillRequirements?.[0]?.name ?? job.requiredSkills ?? "Nông nghiệp"}</Badge>
                   <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed max-w-4xl">{job.description || "Không có mô tả chi tiết."}</p>
 
@@ -400,10 +629,6 @@ export function FarmerJobsList() {
                     <div className="flex items-center gap-2 font-medium text-primary">
                       <Banknote className="h-4 w-4 shrink-0" />
                       <span className="truncate">{formatCurrency(job.wageAmount)}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                      <Clock className="h-4 w-4 shrink-0 text-blue-500" />
-                      <span className="truncate">{job.estimatedHours} giờ</span>
                     </div>
                     <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                       <Users className="h-4 w-4 shrink-0 text-amber-500" />
@@ -448,18 +673,24 @@ export function FarmerJobsList() {
                             Xem chi tiết
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer">
-                          <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
-                          Chỉnh sửa
+                        <DropdownMenuItem asChild className="cursor-pointer">
+                          <Link href={`/farmer/jobs/${job.id}/edit`}>
+                            <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
+                            Chỉnh sửa
+                          </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem className="cursor-pointer">
                           <Copy className="mr-2 h-4 w-4 text-muted-foreground" />
                           Đăng lại
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive focus:text-destructive cursor-pointer">
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive cursor-pointer"
+                          onClick={() => setJobPendingDelete(job)}
+                          disabled={deletingJobId === job.id}
+                        >
                           <Trash2 className="mr-2 h-4 w-4" />
-                          Xóa tin
+                          {deletingJobId === job.id ? "Đang xóa..." : "Xóa tin"}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -480,6 +711,40 @@ export function FarmerJobsList() {
           </Card>
         ))}
       </div>
+
+      <AlertDialog
+        open={Boolean(jobPendingDelete)}
+        onOpenChange={(open) => {
+          if (!open && !deletingJobId) {
+            setJobPendingDelete(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xóa bài đăng?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {jobPendingDelete
+                ? `Bạn có chắc muốn xóa bài đăng "${jobPendingDelete.title}"? Hành động này không thể hoàn tác.`
+                : "Bạn có chắc muốn xóa bài đăng này?"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(deletingJobId)}>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (jobPendingDelete) {
+                  void handleDeleteJob(jobPendingDelete)
+                }
+              }}
+              disabled={Boolean(deletingJobId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingJobId ? "Đang xóa..." : "Xóa"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   )

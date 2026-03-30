@@ -1,0 +1,22 @@
+app/farmer/layout.tsx(31,10): error TS2305: Module '"@/libs/api/services"' has no exported member 'FarmerProfile'.
+app/farmer/settings/page.tsx(319,25): error TS2322: Type '"dropdown-buttons"' is not assignable to type '"label" | "dropdown" | "dropdown-months" | "dropdown-years" | undefined'.
+app/farmer/setup-profile/page.tsx(257,29): error TS2322: Type '"dropdown-buttons"' is not assignable to type '"label" | "dropdown" | "dropdown-months" | "dropdown-years" | undefined'.
+components/admin/admin-layout.tsx(7,29): error TS2307: Cannot find module '@/libs/api' or its corresponding type declarations.
+components/admin/admin-users.tsx(79,29): error TS2339: Property 'name' does not exist on type 'never'.
+components/admin/admin-users.tsx(79,55): error TS2339: Property 'roleName' does not exist on type 'never'.
+components/admin/admin-users.tsx(538,60): error TS2345: Argument of type 'string' is not assignable to parameter of type 'GetUserResponse'.
+  Type 'string' is not assignable to type 'GetUserResponse'.
+components/admin/admin-users.tsx(556,64): error TS2339: Property 'address' does not exist on type 'GetUserResponse'.
+components/farmer/farmer-farm-manager.tsx(210,71): error TS7006: Parameter 'farm' implicitly has an 'any' type.
+components/farmer/farmer-farm-manager.tsx(322,41): error TS7006: Parameter 'res' implicitly has an 'any' type.
+components/farmer/farmer-farm-manager.tsx(574,54): error TS7006: Parameter 'result' implicitly has an 'any' type.
+components/farmer/farmer-farm-manager.tsx(833,46): error TS2339: Property 'province' does not exist on type 'FarmFormState'.
+components/farmer/farmer-farm-manager.tsx(834,42): error TS2339: Property 'ward' does not exist on type 'FarmFormState'.
+components/farmer/farmer-farm-manager.tsx(835,53): error TS2339: Property 'detailedAddress' does not exist on type 'FarmFormState'.
+components/farmer/farmer-job-form.tsx(1740,73): error TS2304: Cannot find name 'Users'.
+libs/api/services/admin.service.ts(65,7): error TS2353: Object literal may only specify known properties, and 'email' does not exist in type 'UpdateUserRequest'.
+libs/api/services/admin.service.ts(67,21): error TS2339: Property 'address' does not exist on type 'GetUserResponse'.
+libs/api/services/admin.service.ts(79,7): error TS2353: Object literal may only specify known properties, and 'email' does not exist in type 'UpdateUserRequest'.
+libs/api/services/admin.service.ts(81,21): error TS2339: Property 'address' does not exist on type 'GetUserResponse'.
+libs/api/services/farm.service.ts(3,70): error TS2307: Cannot find module '../types' or its corresponding type declarations.
+libs/api/services/payment.service.ts(35,26): error TS2304: Cannot find name 'createFormData'.

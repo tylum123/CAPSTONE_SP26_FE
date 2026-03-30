@@ -1,6 +1,6 @@
 import axiosInstance from '../axios-instance';
-import { API_ENDPOINTS } from '../config';
-import type { ApiResponse, User, UpdateProfileRequest } from '../types';
+import { API_ENDPOINTS } from '../endpoints/config';
+import type { ApiResponse, User, UpdateProfileRequest } from '@/libs/types';
 
 export const userService = {
   /**

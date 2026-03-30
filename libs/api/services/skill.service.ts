@@ -1,15 +1,20 @@
 import axiosInstance from '../axios-instance';
-import { API_ENDPOINTS } from '../config';
+import { API_ENDPOINTS } from '../endpoints/config';
 import type {
   ApiResponse,
   Skill,
   CreateSkillRequest,
   UpdateSkillRequest,
-} from '../types';
+} from '@/libs/types';
 
 export const skillService = {
   getSkills: async (): Promise<ApiResponse<Skill[]>> => {
     const response = await axiosInstance.get(API_ENDPOINTS.SKILL.SKILLS);
+    return response.data;
+  },
+
+  getSkillsByCategory: async (categoryId: string, params?: { page?: number; limit?: number }): Promise<ApiResponse<Skill[]>> => {
+    const response = await axiosInstance.get(API_ENDPOINTS.SKILL.SKILLS_CATEGORY(categoryId), { params });
     return response.data;
   },
 

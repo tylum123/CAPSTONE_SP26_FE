@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Settings, LogOut, Leaf } from "lucide-react";
-import { useAuth } from "@/stores/auth.store";
+import { useAuth } from "@/libs/stores/auth.store";
 import { farmerService } from "@/libs/api/services/farmer.service";
-import { FarmerProfile } from "@/libs/api/types";
+import { FarmerProfile } from "@/libs/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,

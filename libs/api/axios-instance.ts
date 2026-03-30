@@ -1,5 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { API_CONFIG } from './config';
+import { API_CONFIG } from './endpoints/config';
 
 // Create axios instance
 export const axiosInstance = axios.create({
@@ -19,11 +19,11 @@ axiosInstance.interceptors.request.use(
     if (typeof FormData !== 'undefined' && config.data instanceof FormData && config.headers) {
       delete (config.headers as any)['Content-Type'];
     }
-    
+
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
+
     return config;
   },
   (error: AxiosError) => {
@@ -46,14 +46,14 @@ axiosInstance.interceptors.response.use(
       try {
         // Attempt to refresh token
         const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
-        
+
         if (refreshToken) {
           const response = await axios.post(`${API_CONFIG.BASE_URL}/auth/refresh-token`, {
             refreshToken,
           });
 
           const { accessToken } = response.data;
-          
+
           if (typeof window !== 'undefined') {
             localStorage.setItem('access_token', accessToken);
           }

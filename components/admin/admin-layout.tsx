@@ -5,7 +5,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { authService } from "@/libs/api"
-import { useAuth } from "@/stores/auth.store"
+import { useAuth } from "@/libs/stores/auth.store"
 import {
   LayoutDashboard,
   Users,
@@ -23,7 +23,7 @@ import {
   Banknote,
   BarChart3,
 } from "lucide-react"
-import { cn } from "@/libs/utils"
+import { cn } from "@/libs/utils/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -206,11 +206,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
-                                      <span className="flex items-center">
-                                        <LogOut className="h-4 w-4 mr-2" />
-                                        Đăng xuất
-                                      </span>
-                                    </DropdownMenuItem>
+                    <span className="flex items-center">
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Đăng xuất
+                    </span>
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

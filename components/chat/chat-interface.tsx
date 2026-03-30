@@ -7,12 +7,12 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Search, Send, MoreVertical, Phone, Video, Paperclip } from "lucide-react";
-import { cn } from "@/libs/utils";
+import { cn } from "@/libs/utils/utils";
 import { HubConnection, HubConnectionBuilder, HttpTransportType, LogLevel } from "@microsoft/signalr";
 import { commonService } from "@/libs/api/services";
-import { API_CONFIG } from "@/libs/api/config";
+import { API_CONFIG } from "@/libs/api/endpoints/config";
 import { STORAGE_KEYS } from "@/constants";
-import { useAuth } from "@/stores/auth.store";
+import { useAuth } from "@/libs/stores/auth.store";
 
 interface Message {
   id: string;
@@ -172,7 +172,7 @@ export function ChatInterface({
     ensureConnectionStarted().catch((e) => console.error("SignalR connect failed:", e));
 
     return () => {
-      connectionRef.current?.stop().catch(() => {});
+      connectionRef.current?.stop().catch(() => { });
       connectionRef.current = null;
     };
     // hubBaseUrl is stable (memoized). ensureConnectionStarted uses connectionRef + localStorage.
@@ -304,34 +304,34 @@ export function ChatInterface({
               {messages.map((message) => {
                 const isMine = !!myUserId && message.senderId === myUserId;
                 return (
-                <div
-                  key={message.id}
-                  className={cn(
-                    "flex",
-                    isMine ? "justify-end" : "justify-start"
-                  )}
-                >
                   <div
+                    key={message.id}
                     className={cn(
-                      "max-w-[70%] rounded-lg px-4 py-2",
-                      isMine
-                        ? "bg-agro-green text-white"
-                        : "bg-gray-100 text-foreground"
+                      "flex",
+                      isMine ? "justify-end" : "justify-start"
                     )}
                   >
-                    <p className="text-sm">{message.content}</p>
-                    <span
+                    <div
                       className={cn(
-                        "text-xs mt-1 block",
+                        "max-w-[70%] rounded-lg px-4 py-2",
                         isMine
-                          ? "text-white/70"
-                          : "text-muted-foreground"
+                          ? "bg-agro-green text-white"
+                          : "bg-gray-100 text-foreground"
                       )}
                     >
-                      {formatCreatedAt(message.createdAt)}
-                    </span>
+                      <p className="text-sm">{message.content}</p>
+                      <span
+                        className={cn(
+                          "text-xs mt-1 block",
+                          isMine
+                            ? "text-white/70"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        {formatCreatedAt(message.createdAt)}
+                      </span>
+                    </div>
                   </div>
-                </div>
                 );
               })}
             </div>

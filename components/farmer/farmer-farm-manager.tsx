@@ -25,12 +25,14 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { OsmLocationPicker } from "@/components/farmer/osm-location-picker"
 import { useToast } from "@/hooks/use-toast"
-import { handleApiError } from "@/lib/utils/error-handler"
+import { useProvinces } from "@/hooks/use-provinces"
+import { handleApiError } from "@/libs/utils/error-handler"
 import { FarmService } from "@/libs/api/services/farm.service"
-import type { GetFarmResponse, UpdateFarmRequest } from "@/libs/api/types"
+import type { GetFarmResponse, UpdateFarmRequest } from "@/libs/types"
 import { Loader2, MapPin, Pencil, Plus, Star, Trash2, X, UploadCloud, Eye, ChevronDown, PlusCircleIcon } from "lucide-react"
 import Image from "next/image"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible"
+import { AddressForm } from "@/components/address-form"
 
 const OSM_NOMINATIM_URL = process.env.NEXT_PUBLIC_OSM_NOMINATIM_URL || "https://nominatim.openstreetmap.org/search"
 const OSM_REVERSE_URL = process.env.NEXT_PUBLIC_OSM_REVERSE_URL || "https://nominatim.openstreetmap.org/reverse"
@@ -135,9 +137,9 @@ function upsertFarm(farms: GetFarmResponse[], nextFarm: GetFarmResponse): GetFar
 
   const normalizedFarms = normalizedFarm.isPrimary
     ? updatedFarms.map((farm) => ({
-        ...farm,
-        isPrimary: getFarmId(farm) === normalizedFarmId,
-      }))
+      ...farm,
+      isPrimary: getFarmId(farm) === normalizedFarmId,
+    }))
     : updatedFarms
 
   return sortFarms(normalizedFarms)
@@ -164,6 +166,8 @@ export function FarmerFarmManager() {
   const [loadingDetails, setLoadingDetails] = useState(false)
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([])
   const [isFormCollapsibleOpen, setIsFormCollapsibleOpen] = useState(false)
+  const { provinces, loading: provincesLoading } = useProvinces()
+  const [selectedProvince, setSelectedProvince] = useState<number | null>(null)
   const [selectedImageForViewer, setSelectedImageForViewer] = useState<string | null>(null)
   const [imageZoom, setImageZoom] = useState(100)
   const [imagePanX, setImagePanX] = useState(0)
@@ -188,7 +192,7 @@ export function FarmerFarmManager() {
     } catch (error: any) {
       toast({
         title: "Lỗi",
-        description: handleApiError(error, { defaultMessage: "Không thể tải thông tin chi tiết nông trại" }),
+        description: handleApiError(error, { defaultMessage: "Không thể tải thông tin chi tiết địa điểm" }),
         variant: "destructive",
       })
       setViewingFarmId(null)
@@ -209,7 +213,7 @@ export function FarmerFarmManager() {
         toast({
           title: "Lỗi",
           description: handleApiError(error, {
-            defaultMessage: "Không thể tải danh sách nông trại",
+            defaultMessage: "Không thể tải danh sách địa điểm",
           }),
           variant: "destructive",
         })
@@ -303,7 +307,7 @@ export function FarmerFarmManager() {
 
       toast({
         title: "Đã chọn ảnh",
-        description: "Ảnh sẽ được tải lên sau khi bạn thêm nông trại.",
+        description: "Ảnh sẽ được tải lên sau khi bạn thêm địa điểm.",
       })
 
       e.target.value = ""
@@ -314,10 +318,10 @@ export function FarmerFarmManager() {
       setSubmitting(true)
       const uploadPromises = newFiles.map((file) => FarmService.uploadImage(editingFarmId, file))
       const results = await Promise.all(uploadPromises)
-      
+
       const newImageUrls = results.map((res) => res.data)
       handleFieldChange("images", [...formData.images, ...newImageUrls])
-      
+
       toast({
         title: "Thành công",
         description: "Đã tải ảnh lên.",
@@ -370,7 +374,7 @@ export function FarmerFarmManager() {
     if (!farmId) {
       toast({
         title: "Lỗi",
-        description: "Không tìm thấy mã nông trại để chỉnh sửa",
+        description: "Không tìm thấy mã địa điểm để chỉnh sửa",
         variant: "destructive",
       })
       return
@@ -391,6 +395,19 @@ export function FarmerFarmManager() {
       longitude: null,
     }))
     setShowLocationSuggestions(true)
+  }
+
+  // When province changes, update address and clear lat/lng
+  const handleProvinceChange = (provinceCode: number) => {
+    setSelectedProvince(provinceCode)
+    const provinceObj = provinces.find((p) => p.code === provinceCode)
+    setFormData((current) => ({
+      ...current,
+      address: provinceObj ? provinceObj.name : "",
+      latitude: null,
+      longitude: null,
+    }))
+    setShowLocationSuggestions(false)
   }
 
   const selectOSMLocation = (place: OSMPlace) => {
@@ -460,7 +477,7 @@ export function FarmerFarmManager() {
       setPendingDeleteFarm(null)
       toast({
         title: "Lỗi",
-        description: "Không tìm thấy mã nông trại để xóa",
+        description: "Không tìm thấy mã địa điểm để xóa",
         variant: "destructive",
       })
       return
@@ -477,13 +494,13 @@ export function FarmerFarmManager() {
 
       toast({
         title: "Thành công",
-        description: "Đã xóa nông trại",
+        description: "Đã xóa địa điểm",
       })
     } catch (error: any) {
       toast({
         title: "Lỗi",
         description: handleApiError(error, {
-          defaultMessage: "Không thể xóa nông trại",
+          defaultMessage: "Không thể xóa địa điểm",
         }),
         variant: "destructive",
       })
@@ -504,7 +521,7 @@ export function FarmerFarmManager() {
     if (!formData.locationName.trim() || !formData.address.trim()) {
       toast({
         title: "Thiếu thông tin",
-        description: "Vui lòng nhập tên địa điểm và địa chỉ nông trại",
+        description: "Vui lòng nhập tên địa điểm và địa chỉ địa điểm",
         variant: "destructive",
       })
       return
@@ -566,8 +583,8 @@ export function FarmerFarmManager() {
             }
           } catch {
             toast({
-              title: "Tạo nông trại thành công",
-              description: "Không thể tải một số ảnh. Bạn có thể tải lại khi chỉnh sửa nông trại.",
+              title: "Tạo địa điểm thành công",
+              description: "Không thể tải một số ảnh. Bạn có thể tải lại khi chỉnh sửa địa điểm.",
               variant: "destructive",
             })
           }
@@ -579,13 +596,13 @@ export function FarmerFarmManager() {
 
       toast({
         title: "Thành công",
-        description: editingFarmId ? "Đã cập nhật nông trại" : "Đã thêm nông trại mới",
+        description: editingFarmId ? "Đã cập nhật địa điểm" : "Đã thêm địa điểm mới",
       })
     } catch (error: any) {
       toast({
         title: "Lỗi",
         description: handleApiError(error, {
-          defaultMessage: editingFarmId ? "Không thể cập nhật nông trại" : "Không thể tạo nông trại",
+          defaultMessage: editingFarmId ? "Không thể cập nhật địa điểm" : "Không thể tạo địa điểm",
         }),
         variant: "destructive",
       })
@@ -597,11 +614,11 @@ export function FarmerFarmManager() {
   return (
     <>
       <div className="grid gap-6 xl:grid-row-[1.1fr_0.9fr]">
-        
+
 
         <Card>
           <CardHeader>
-            <CardTitle>Danh sách địa điểm</CardTitle>
+            <CardTitle>Danh sách  </CardTitle>
             <CardDescription>Theo dõi toàn bộ địa điểm canh tác đang gắn với tài khoản của bạn</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -635,9 +652,9 @@ export function FarmerFarmManager() {
                         <p className="text-sm text-muted-foreground">{farm.address}</p>
                         <div className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-2 mt-1">
                           <span className="flex items-center gap-1.5 line-clamp-1">
-                            <span className="font-medium text-foreground">Loại:</span> {farm.farmTypeName || (farm.farmType === 1 ? "Chăn nuôi" : "Trồng trọt")}
+                            <span className="font-medium text-foreground">Loại:</span> {farm.farmType === 1 ? "Chăn nuôi" : farm.farmType === 2 ? "Trồng trọt" : "Nuôi trồng thủy hải sản"}
                           </span>
-                          {farm.farmType === 2 ? (
+                          {farm.farmType === 2 || farm.farmType === 3 ? (
                             <span className="flex items-center gap-1.5 line-clamp-1">
                               <span className="font-medium text-foreground">Diện tích:</span> {farm.areaSize ? `${farm.areaSize} m²` : "Không có"}
                             </span>
@@ -712,7 +729,7 @@ export function FarmerFarmManager() {
                 <PlusCircleIcon className="h-4 w-4" />
               </div>
               <h4 className="text-sm font-semibold">
-                Thêm địa điểm mới
+                Thêm mới
               </h4>
             </div>
             <CollapsibleTrigger asChild>
@@ -729,263 +746,242 @@ export function FarmerFarmManager() {
                 <CardDescription>Quản lý các địa điểm canh tác và chọn địa điểm mặc định cho hồ sơ của bạn</CardDescription>
               </CardHeader>
               <CardContent>
-              <form onSubmit={handleSubmit} className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="locationName">Tên địa điểm</Label>
-                    <Input
-                      id="locationName"
-                      value={formData.locationName}
-                      onChange={(event) => handleFieldChange("locationName", event.target.value)}
-                      placeholder="vd: Khu ruộng số 1"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
+                <form onSubmit={handleSubmit} className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                  <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Loại nông trại</Label>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant={formData.farmType === 2 ? "default" : "outline"}
-                          className={`flex-1 ${formData.farmType === 2 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
-                          onClick={() => {
-                            handleFieldChange("farmType", 2)
-                            handleFieldChange("livestockCount", 0) // Reset livestock count when switching to crop
-                          }}
-                        >
-                          Trồng trọt
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={formData.farmType === 1 ? "default" : "outline"}
-                          className={`flex-1 ${formData.farmType === 1 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
-                          onClick={() => {
-                            handleFieldChange("farmType", 1)
-                            handleFieldChange("areaSize", 0) // Reset area size when switching to livestock
-                          }}
-                        >
-                          Chăn nuôi
-                        </Button>
-                      </div>
-                    </div>
-
-                    {formData.farmType === 2 ? (
-                      <div className="space-y-2">
-                        <Label htmlFor="areaSize">Diện tích (m²)</Label>
-                        <Input
-                          id="areaSize"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={formData.areaSize || ""}
-                          onChange={(event) => handleFieldChange("areaSize", Number(event.target.value))}
-                          placeholder="vd: 1000"
-                        />
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Label htmlFor="livestockCount">Số lượng vật nuôi (con)</Label>
-                        <Input
-                          id="livestockCount"
-                          type="number"
-                          min="0"
-                          value={formData.livestockCount || ""}
-                          onChange={(event) => handleFieldChange("livestockCount", Number(event.target.value))}
-                          placeholder="vd: 500"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="address">Địa chỉ</Label>
-                    <div className="relative">
+                      <Label htmlFor="locationName">Tên địa điểm</Label>
                       <Input
-                        id="address"
-                        value={formData.address}
-                        onChange={(event) => handleAddressChange(event.target.value)}
-                        onFocus={() => setShowLocationSuggestions(true)}
-                        onBlur={() => {
-                          window.setTimeout(() => {
-                            setShowLocationSuggestions(false)
-                          }, 150)
-                        }}
-                        placeholder="vd: Ấp 3, xã Tân Phú, Đồng Tháp"
+                        id="locationName"
+                        value={formData.locationName}
+                        onChange={(event) => handleFieldChange("locationName", event.target.value)}
+                        placeholder="vd: Khu ruộng số 1"
                       />
+                    </div>
 
-                      {showLocationSuggestions && (isSearchingLocation || locationSuggestions.length > 0) ? (
-                        <div className="absolute top-full z-20 mt-2 w-full rounded-lg border bg-background shadow-lg">
-                          {isSearchingLocation ? (
-                            <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Đang tìm gợi ý địa chỉ từ OSM...
-                            </div>
-                          ) : (
-                            <div className="py-1">
-                              {locationSuggestions.map((place, index) => (
-                                <button
-                                  key={`${place.display_name}-${place.lat}-${place.lon}-${index}`}
-                                  type="button"
-                                  className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
-                                  onClick={() => selectOSMLocation(place)}
-                                >
-                                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-agro-green" />
-                                  <span>{place.display_name}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Lĩnh vực canh tác</Label>
+                        <div className="flex gap-2 w-full">
+                          <Button
+                            type="button"
+                            variant={formData.farmType === 2 ? "default" : "outline"}
+                            className={`flex-1 min-w-0 ${formData.farmType === 2 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
+                            onClick={() => {
+                              handleFieldChange("farmType", 2)
+                              handleFieldChange("livestockCount", 0)
+                            }}
+                          >
+                            Trồng trọt
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={formData.farmType === 1 ? "default" : "outline"}
+                            className={`flex-1 min-w-0 ${formData.farmType === 1 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
+                            onClick={() => {
+                              handleFieldChange("farmType", 1)
+                              handleFieldChange("areaSize", 0)
+                            }}
+                          >
+                            Chăn nuôi
+                          </Button>
                         </div>
-                      ) : null}
+                        <Button
+                          type="button"
+                          variant={formData.farmType === 3 ? "default" : "outline"}
+                          className={`flex-1 min-w-0 w-full ${formData.farmType === 3 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
+                          onClick={() => {
+                            handleFieldChange("farmType", 3)
+                            handleFieldChange("livestockCount", 0)
+                          }}
+                        >
+                          Nuôi trồng thủy hải sản
+                        </Button>
+                      </div>
+
+                      {/* Field logic: Crop (2) and Aquaculture (3) use areaSize, Livestock (1) uses livestockCount */}
+                      {formData.farmType === 1 ? (
+                        <div className="space-y-2">
+                          <Label htmlFor="livestockCount">Số lượng (con)</Label>
+                          <Input
+                            id="livestockCount"
+                            type="number"
+                            min="0"
+                            value={formData.livestockCount || ""}
+                            onChange={(event) => handleFieldChange("livestockCount", Number(event.target.value))}
+                            placeholder="vd: 500"
+                          />
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <Label htmlFor="areaSize">Diện tích (m²)</Label>
+                          <Input
+                            id="areaSize"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={formData.areaSize || ""}
+                            onChange={(event) => handleFieldChange("areaSize", Number(event.target.value))}
+                            placeholder="vd: 1000"
+                          />
+                        </div>
+                      )}
                     </div>
-                    {formData.latitude !== null && formData.longitude !== null ? (
-                      <p className="text-xs text-muted-foreground">
-                        Tọa độ: {Number(formData.latitude).toFixed(6)}, {Number(formData.longitude).toFixed(6)}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        Chọn địa chỉ từ gợi ý hoặc bấm trực tiếp trên bản đồ để ghim vị trí.
-                      </p>
-                    )}
 
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Hình ảnh (Tối đa 3 ảnh)</Label>
-                      <span className="text-xs text-muted-foreground">
-                        {formData.images.length + pendingImages.length}/3
-                      </span>
+                    <div className="space-y-2">
+                      <AddressForm
+                        value={{
+                          province: formData.province || "",
+                          ward: formData.ward || "",
+                          detailedAddress: formData.detailedAddress || ""
+                        }}
+                        onChange={({ province, ward, detailedAddress }) => {
+                          setFormData((current) => ({
+                            ...current,
+                            province,
+                            ward,
+                            detailedAddress,
+                            // Compose a full address string for OSM/geocoding if needed
+                            address: [detailedAddress, ward, province].filter(Boolean).join(", ")
+                          }))
+                        }}
+                      />
                     </div>
-                    {formData.images.length + pendingImages.length > 0 && (
-                      <div className="flex gap-4 overflow-x-auto pb-2">
-                        {formData.images.map((img, index) => (
-                          <div key={`${img}-${index}`} className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border">
-                            <Image src={img} alt={`Farm image ${index + 1}`} fill className="object-cover" unoptimized />
-                            <button
-                              type="button"
-                              onClick={() => removeImage(index)}
-                              className="absolute right-1 top-1 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ))}
-                        {pendingImages.map((pendingImage, index) => {
-                          const combinedIndex = formData.images.length + index
 
-                          return (
-                            <div key={`${pendingImage.previewUrl}-${index}`} className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border">
-                              <Image src={pendingImage.previewUrl} alt={`Pending farm image ${combinedIndex + 1}`} fill className="object-cover" unoptimized />
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Hình ảnh địa điểm (Tối đa 3 ảnh)</Label>
+                        <span className="text-xs text-muted-foreground">
+                          {formData.images.length + pendingImages.length}/3
+                        </span>
+                      </div>
+                      {formData.images.length + pendingImages.length > 0 && (
+                        <div className="flex gap-4 overflow-x-auto pb-2">
+                          {formData.images.map((img, index) => (
+                            <div key={`${img}-${index}`} className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border">
+                              <Image src={img} alt={`Farm image ${index + 1}`} fill className="object-cover" unoptimized />
                               <button
                                 type="button"
-                                onClick={() => removeImage(combinedIndex)}
+                                onClick={() => removeImage(index)}
                                 className="absolute right-1 top-1 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
                               >
                                 <X className="h-3 w-3" />
                               </button>
                             </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                    {formData.images.length + pendingImages.length < 3 && (
-                      <label className="flex h-24 w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed hover:bg-muted/50">
-                        <UploadCloud className="h-6 w-6 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">Nhấn để tải ảnh lên</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={handleImageUpload}
-                        />
-                      </label>
-                    )}
-                    {!editingFarmId && pendingImages.length > 0 ? (
-                      <p className="text-xs text-muted-foreground italic">
-                        Ảnh sẽ được tải lên tự động sau khi thêm nông trại.
-                      </p>
-                    ) : null}
-                  </div>
+                          ))}
+                          {pendingImages.map((pendingImage, index) => {
+                            const combinedIndex = formData.images.length + index
 
-                  <div className="flex items-center justify-between rounded-lg border px-4 py-3">
-                    <div>
-                      <p className="font-medium">Đặt làm địa điểm mặc định</p>
-                      <p className="text-sm text-muted-foreground">Địa điểm này sẽ được ưu tiên khi tạo bài đăng mới</p>
-                    </div>
-                    <Switch
-                      checked={formData.isPrimary}
-                      onCheckedChange={(checked) => handleFieldChange("isPrimary", checked)}
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <Button
-                      type="submit"
-                      disabled={submitting}
-                      className="bg-agro-green text-white hover:bg-agro-green-dark"
-                    >
-                      {submitting ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Đang xử lý...
-                        </>
-                      ) : (
-                        <>
-                          {editingFarmId ? <Pencil className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
-                          {editingFarmId ? "Lưu cập nhật" : "Thêm nông trại"}
-                        </>
+                            return (
+                              <div key={`${pendingImage.previewUrl}-${index}`} className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border">
+                                <Image src={pendingImage.previewUrl} alt={`Pending farm image ${combinedIndex + 1}`} fill className="object-cover" unoptimized />
+                                <button
+                                  type="button"
+                                  onClick={() => removeImage(combinedIndex)}
+                                  className="absolute right-1 top-1 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
                       )}
-                    </Button>
-                    <Button type="button" variant="outline" onClick={resetForm} disabled={submitting}>
-                      {editingFarmId ? "Hủy chỉnh sửa" : "Làm mới form"}
-                    </Button>
-                  </div>
-                </div>
+                      {formData.images.length + pendingImages.length < 3 && (
+                        <label className="flex h-24 w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed hover:bg-muted/50">
+                          <UploadCloud className="h-6 w-6 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Nhấn để tải ảnh lên</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={handleImageUpload}
+                          />
+                        </label>
+                      )}
+                      {!editingFarmId && pendingImages.length > 0 ? (
+                        <p className="text-xs text-muted-foreground italic">
+                          Ảnh sẽ được tải lên tự động sau khi thêm địa điểm.
+                        </p>
+                      ) : null}
+                    </div>
 
-                {/* map */}
-                <div className="overflow-hidden rounded-lg border bg-muted/20 lg:sticky lg:top-4 w-full min-h-105 lg:h-full flex flex-col">
-                  <OsmLocationPicker
-                    latitude={formData.latitude}
-                    longitude={formData.longitude}
-                    onPick={handleMapPick}
-                    className="flex-1 min-h-90"
-                  />
-                  <div className="flex items-center justify-between px-3 py-2 text-xs text-muted-foreground">
-                    <span>Bấm vào bản đồ để ghim vị trí nông trại</span>
-                    {formData.latitude !== null && formData.longitude !== null ? (
-                      <a
-                        href={buildOsmDetailUrl(Number(formData.latitude), Number(formData.longitude))}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-medium text-agro-green hover:underline"
+                    <div className="flex items-center justify-between rounded-lg border px-4 py-3">
+                      <div>
+                        <p className="font-medium">Đặt làm địa điểm mặc định</p>
+                        <p className="text-sm text-muted-foreground">Địa điểm này sẽ được ưu tiên khi tạo bài đăng mới</p>
+                      </div>
+                      <Switch
+                        checked={formData.isPrimary}
+                        onCheckedChange={(checked) => handleFieldChange("isPrimary", checked)}
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <Button
+                        type="submit"
+                        disabled={submitting}
+                        className="bg-agro-green text-white hover:bg-agro-green-dark"
                       >
-                        Mở trên OSM
-                      </a>
-                    ) : (
-                      <span>Chưa chọn tọa độ</span>
-                    )}
+                        {submitting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Đang xử lý...
+                          </>
+                        ) : (
+                          <>
+                            {editingFarmId ? <Pencil className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
+                            {editingFarmId ? "Lưu cập nhật" : "Thêm địa điểm"}
+                          </>
+                        )}
+                      </Button>
+                      <Button type="button" variant="outline" onClick={resetForm} disabled={submitting}>
+                        {editingFarmId ? "Hủy chỉnh sửa" : "Làm mới form"}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </form>
-            </CardContent>
 
-          </Card>
+                  {/* map */}
+                  <div className="overflow-hidden rounded-lg border bg-muted/20 lg:sticky lg:top-4 w-full min-h-105 lg:h-full flex flex-col">
+                    <OsmLocationPicker
+                      latitude={formData.latitude}
+                      longitude={formData.longitude}
+                      onPick={handleMapPick}
+                      className="flex-1 min-h-90"
+                    />
+                    <div className="flex items-center justify-between px-3 py-2 text-xs text-muted-foreground">
+                      <span>Bấm vào bản đồ để ghim vị trí địa điểm</span>
+                      {formData.latitude !== null && formData.longitude !== null ? (
+                        <a
+                          href={buildOsmDetailUrl(Number(formData.latitude), Number(formData.longitude))}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium text-agro-green hover:underline"
+                        >
+                          Mở trên OSM
+                        </a>
+                      ) : (
+                        <span>Chưa chọn tọa độ</span>
+                      )}
+                    </div>
+                  </div>
+                </form>
+              </CardContent>
+
+            </Card>
           </CollapsibleContent>
         </Collapsible>
 
-        
+
       </div>
 
       <AlertDialog open={Boolean(pendingDeleteFarm)} onOpenChange={(open) => !open && setPendingDeleteFarm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xóa nông trại?</AlertDialogTitle>
+            <AlertDialogTitle>Xóa địa điểm?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingDeleteFarm
-                ? `Nông trại ${pendingDeleteFarm.locationName} sẽ bị xóa khỏi tài khoản của bạn. Hành động này không thể hoàn tác.`
+                ? `địa điểm ${pendingDeleteFarm.locationName} sẽ bị xóa khỏi tài khoản của bạn. Hành động này không thể hoàn tác.`
                 : "Hành động này không thể hoàn tác."}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1002,7 +998,7 @@ export function FarmerFarmManager() {
                   Đang xóa...
                 </>
               ) : (
-                "Xóa nông trại"
+                "Xóa địa điểm"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -1065,9 +1061,9 @@ export function FarmerFarmManager() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <span className="text-muted-foreground block mb-1">Loại:</span>
-                    <p className="font-medium text-base">{viewingFarmDetails.farmTypeName || (viewingFarmDetails.farmType === 1 ? "Chăn nuôi" : "Trồng trọt")}</p>
+                    <p className="font-medium text-base">{viewingFarmDetails.farmType === 1 ? "Chăn nuôi" : viewingFarmDetails.farmType === 2 ? "Trồng trọt" : "Nuôi trồng thủy hải sản"}</p>
                   </div>
-                  {viewingFarmDetails.farmType === 2 ? (
+                  {viewingFarmDetails.farmType === 2 || viewingFarmDetails.farmType === 3 ? (
                     <div>
                       <span className="text-muted-foreground block mb-1">Diện tích:</span>
                       <p className="font-medium text-base">{viewingFarmDetails.areaSize ? `${viewingFarmDetails.areaSize} m²` : "Không có"}</p>

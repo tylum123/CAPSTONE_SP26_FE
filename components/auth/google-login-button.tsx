@@ -2,11 +2,12 @@
 
 import { GoogleLogin } from '@react-oauth/google';
 import { authService } from '@/libs/api/services/auth.service';
+import { farmerService } from '@/libs/api/services/farmer.service';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState } from 'react';
 import { handleAuthError } from '@/libs/utils/error-handler';
-import { useAuth } from '@/stores/auth.store';
+import { useAuth } from '@/libs/stores/auth.store';
 
 interface GoogleLoginButtonProps {
   roleId: number;
@@ -57,8 +58,24 @@ export function GoogleLoginButton({ roleId, showDivider = false, onSuccess, onEr
         // Extract user data and tokens from response
         const userData = response.data;
         const accessToken = userData.token || '';
+        // @ts-ignore
         const refreshToken = userData.refresh_token || '';
         const role = normalizeRole(userData.role);
+
+        if (userData.isVerified === false) {
+          toast({
+            title: "Tài khoản chưa xác thực",
+            description: "Vui lòng xác thực email của bạn. Nếu cần thiết, hãy đăng ký và nhận lại mã OTP.",
+            variant: "destructive",
+          });
+
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("user_email");
+          localStorage.removeItem("refresh_token");
+          localStorage.removeItem("user");
+
+          return;
+        }
 
         if (!role) {
           toast({
@@ -84,11 +101,13 @@ export function GoogleLoginButton({ roleId, showDivider = false, onSuccess, onEr
           onError?.(new Error('Worker role is mobile-only'));
           return;
         }
-        
+
         // Create user object for auth context
         const user = {
+          // @ts-ignore
           id: userData.id || '',
           email: userData.email || '',
+          // @ts-ignore
           fullName: userData.fullName || '',
           role,
         };
@@ -100,8 +119,32 @@ export function GoogleLoginButton({ roleId, showDivider = false, onSuccess, onEr
           title: "Thành công",
           description: response.message || "Đăng nhập thành công",
         });
-        
+
         onSuccess?.();
+
+        try {
+          if (role === 'farmer') {
+            const profileRes = await farmerService.getProfile();
+            const profile = profileRes.data;
+            if (!profile?.contactName && !profile?.address) {
+              router.push('/farmer/setup-profile');
+              return;
+            }
+          }
+        } catch (profileError: any) {
+          const statusCode = profileError?.response?.status;
+          const backendMessage = profileError?.response?.data?.message;
+          const isProfileMissing =
+            statusCode === 500 &&
+            typeof backendMessage === "string" &&
+            backendMessage.toLowerCase().includes("farmer profile not found");
+
+          if (isProfileMissing || statusCode === 404) {
+            router.push("/farmer/setup-profile");
+            return;
+          }
+        }
+
         router.push(role === 'admin' ? '/admin' : '/farmer/dashboard');
       } else {
         toast({

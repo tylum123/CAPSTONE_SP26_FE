@@ -1,11 +1,11 @@
 import axiosInstance from '../axios-instance'
-import { API_ENDPOINTS } from '../config'
+import { API_ENDPOINTS } from '../endpoints/config'
 import type {
   ApiResponse,
   JobCategory,
   CreateJobCategoryRequest,
   UpdateJobCategoryRequest,
-} from '../types'
+} from '@/libs/types'
 
 export const jobCategoryService = {
   getJobCategories: async (): Promise<ApiResponse<JobCategory[]>> => {

@@ -8,7 +8,7 @@ import { Briefcase, Users, DollarSign, Clock, ChevronRight, Star, Cloud, Droplet
 import Link from "next/link"
 import { useState, useEffect, useRef } from "react"
 import { farmerService } from "@/libs/api/services/farmer.service"
-import type { FarmerProfile } from "@/libs/api/types"
+import type { FarmerProfile } from "@/libs/types"
 import { useWeather } from "@/hooks/use-weather"
 import Image from "next/image"
 import { ActivityChart, JobStatusChart } from "@/components/farmer/dashboard-charts"
@@ -126,11 +126,11 @@ export default function FarmerDashboard() {
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-sky-500/10 p-6 md:p-8 border border-emerald-100 dark:border-emerald-900/20 shadow-sm transition-all hover:shadow-md group">
         <div className="absolute top-0 right-0 -mr-20 -mt-20 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl opacity-50 group-hover:bg-emerald-500/20 transition-all duration-500" />
         <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-64 w-64 rounded-full bg-teal-500/10 blur-3xl opacity-50 group-hover:bg-teal-500/20 transition-all duration-500" />
-        
+
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-3xl flex items-center gap-3">
-              Chào ngày mới, <span className="text-agro-green">{profile?.contactName || 'Bạn'}</span>! 
+              Chào ngày mới, <span className="text-agro-green">{profile?.contactName || 'Bạn'}</span>!
             </h1>
             <p className="text-muted-foreground text-lg flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-amber-400 animate-pulse" />
@@ -169,7 +169,7 @@ export default function FarmerDashboard() {
       </div>
 
       {/* Stats Cards */}
-      
+
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Applications */}
@@ -178,7 +178,7 @@ export default function FarmerDashboard() {
             <div className="flex items-center justify-between p-2 rounded-lg bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm border shadow-sm transition-all hover:shadow-md">
               <div className="flex items-center gap-2 px-2">
                 <div className="p-1.5 rounded-full bg-agro-green/10 text-agro-green">
-                   <Users className="h-4 w-4" />
+                  <Users className="h-4 w-4" />
                 </div>
                 <h4 className="text-sm font-semibold">
                   Ứng viên mới cần duyệt
@@ -192,63 +192,63 @@ export default function FarmerDashboard() {
               </CollapsibleTrigger>
             </div>
             <CollapsibleContent className="space-y-2">
-             <Card className="shadow-sm border-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-lg">Danh sách</CardTitle>
-              <Link href="/farmer/applications">
-                <Button variant="ghost" size="sm" className="text-agro-green">
-                  Xem tất cả
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {recentApplications.map((app) => (
-                  <div key={app.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-agro-green/10 flex items-center justify-center">
-                        <span className="text-agro-green font-semibold">{app.workerName.charAt(0)}</span>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">{app.workerName}</p>
-                          <div className="flex items-center gap-0.5">
-                            <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
-                            <span className="text-xs">{app.rating}</span>
+              <Card className="shadow-sm border-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-lg">Danh sách</CardTitle>
+                  <Link href="/farmer/applications">
+                    <Button variant="ghost" size="sm" className="text-agro-green">
+                      Xem tất cả
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </Link>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {recentApplications.map((app) => (
+                      <div key={app.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-agro-green/10 flex items-center justify-center">
+                            <span className="text-agro-green font-semibold">{app.workerName.charAt(0)}</span>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{app.workerName}</p>
+                              <div className="flex items-center gap-0.5">
+                                <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
+                                <span className="text-xs">{app.rating}</span>
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {app.job} • {app.distance}
+                            </p>
+                            <div className="flex gap-1 mt-1">
+                              {app.skills.map((skill, i) => (
+                                <Badge key={i} variant="secondary" className="text-xs py-0">
+                                  {skill}
+                                </Badge>
+                              ))}
+                            </div>
                           </div>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          {app.job} • {app.distance}
-                        </p>
-                        <div className="flex gap-1 mt-1">
-                          {app.skills.map((skill, i) => (
-                            <Badge key={i} variant="secondary" className="text-xs py-0">
-                              {skill}
-                            </Badge>
-                          ))}
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {app.appliedAt}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" className="text-xs h-7 bg-transparent">
+                              Xem
+                            </Button>
+                            <Button size="sm" className="text-xs h-7 bg-agro-green hover:bg-agro-green-dark text-white">
+                              Duyệt
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        {app.appliedAt}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="text-xs h-7 bg-transparent">
-                          Xem
-                        </Button>
-                        <Button size="sm" className="text-xs h-7 bg-agro-green hover:bg-agro-green-dark text-white">
-                          Duyệt
-                        </Button>
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
             </CollapsibleContent>
           </Collapsible>
         </div>
@@ -264,132 +264,132 @@ export default function FarmerDashboard() {
                 Lịch mùa vụ & Thời tiết
               </h4>
             </div>
-             <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="w-8 h-8 p-0 rounded-full hover:bg-muted transition-transform duration-200 data-[state=open]:rotate-180">
-                  <ChevronDown className="h-4 w-4" />
-                  <span className="sr-only">Toggle</span>
-                </Button>
-              </CollapsibleTrigger>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-8 h-8 p-0 rounded-full hover:bg-muted transition-transform duration-200 data-[state=open]:rotate-180">
+                <ChevronDown className="h-4 w-4" />
+                <span className="sr-only">Toggle</span>
+              </Button>
+            </CollapsibleTrigger>
           </div>
           <CollapsibleContent className="space-y-2">
             <Card className="shadow-sm border-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Chi tiết</CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleRefreshWeather}
-              disabled={isRefreshing}
-              className="h-8 w-8 p-0"
-            >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {/* Current Weather */}
-            {!weatherLoading && currentWeather && (
-              <div className="mb-4 p-3 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 rounded-lg animate-in fade-in slide-in-from-top-2 duration-500">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground animate-in fade-in slide-in-from-left-2 duration-300">
-                      {currentWeather.city}
-                    </p>
-                    <p className="text-3xl font-bold animate-in fade-in zoom-in-50 duration-500 delay-100">
-                      {Math.round(currentWeather.temperature)}°C
-                    </p>
-                    <p className="text-xs text-muted-foreground capitalize animate-in fade-in slide-in-from-left-2 duration-300 delay-200">
-                      {currentWeather.description}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground/70 mt-1">
-                      {lastUpdated && `Cập nhật: ${lastUpdated.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-center animate-in fade-in slide-in-from-right-2 duration-500 delay-150">
-                    <Image
-                      src={currentWeather.iconUrl}
-                      alt={currentWeather.description}
-                      width={64}
-                      height={64}
-                      className="animate-bounce-slow"
-                      unoptimized
-                    />
-                    <div className="flex gap-3 text-xs text-muted-foreground mt-1">
-                      <div className="flex items-center gap-1 hover:scale-110 transition-transform">
-                        <Droplets className="h-3 w-3" />
-                        {currentWeather.humidity}%
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-lg">Chi tiết</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRefreshWeather}
+                  disabled={isRefreshing}
+                  className="h-8 w-8 p-0"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {/* Current Weather */}
+                {!weatherLoading && currentWeather && (
+                  <div className="mb-4 p-3 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 rounded-lg animate-in fade-in slide-in-from-top-2 duration-500">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground animate-in fade-in slide-in-from-left-2 duration-300">
+                          {currentWeather.city}
+                        </p>
+                        <p className="text-3xl font-bold animate-in fade-in zoom-in-50 duration-500 delay-100">
+                          {Math.round(currentWeather.temperature)}°C
+                        </p>
+                        <p className="text-xs text-muted-foreground capitalize animate-in fade-in slide-in-from-left-2 duration-300 delay-200">
+                          {currentWeather.description}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground/70 mt-1">
+                          {lastUpdated && `Cập nhật: ${lastUpdated.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-1 hover:scale-110 transition-transform">
-                        <Wind className="h-3 w-3" />
-                        {currentWeather.windSpeed}m/s
+                      <div className="flex flex-col items-center animate-in fade-in slide-in-from-right-2 duration-500 delay-150">
+                        <Image
+                          src={currentWeather.iconUrl}
+                          alt={currentWeather.description}
+                          width={64}
+                          height={64}
+                          className="animate-bounce-slow"
+                          unoptimized
+                        />
+                        <div className="flex gap-3 text-xs text-muted-foreground mt-1">
+                          <div className="flex items-center gap-1 hover:scale-110 transition-transform">
+                            <Droplets className="h-3 w-3" />
+                            {currentWeather.humidity}%
+                          </div>
+                          <div className="flex items-center gap-1 hover:scale-110 transition-transform">
+                            <Wind className="h-3 w-3" />
+                            {currentWeather.windSpeed}m/s
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
-
-            <Calendar
-              mode="single"
-              selected={date}
-              onSelect={setDate}
-              className="rounded-md w-full"
-              modifiers={{
-                scheduled: scheduledDates,
-              }}
-              modifiersStyles={{
-                scheduled: {
-                  backgroundColor: "oklch(0.55 0.15 145 / 0.2)",
-                  color: "oklch(0.55 0.15 145)",
-                  fontWeight: "bold",
-                },
-              }}
-              components={{
-                DayButton: ({ day, ...props }) => (
-                  <button
-                    {...props}
-                    className={`${props.className} ${currentWeather ? 'cursor-pointer' : ''}`}
-                    onClick={(e) => {
-                      setDate(day.date);
-                      if (currentWeather) {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const popupWidth = 320;
-                        const popupHeight = 400;
-
-                        let x = rect.right + 10;
-                        if (x + popupWidth > window.innerWidth) {
-                          x = rect.left - popupWidth - 10;
-                        }
-
-                        let y = rect.top;
-                        if (y + popupHeight > window.innerHeight) {
-                          y = window.innerHeight - popupHeight - 20;
-                        }
-
-                        setWeatherPopup({ date: day.date, position: { x, y } });
-                      }
-                    }}
-                  >
-                    {day.date.getDate()}
-                  </button>
-                ),
-              }}
-            />
-            <div className="mt-3 pt-3 border-t">
-              <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-                <div className="flex items-center gap-1.5">
-                  <span className="inline-block w-3 h-3 rounded bg-agro-green/20" />
-                  <span>Ngày có thuê người làm</span>
-                </div>
-                {currentWeather && (
-                  <div className="flex items-center gap-1.5">
-                    <Cloud className="h-3 w-3 text-blue-500" />
-                    <span>Click ngày bất kỳ để xem thời tiết</span>
-                  </div>
                 )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={setDate}
+                  className="rounded-md w-full"
+                  modifiers={{
+                    scheduled: scheduledDates,
+                  }}
+                  modifiersStyles={{
+                    scheduled: {
+                      backgroundColor: "oklch(0.55 0.15 145 / 0.2)",
+                      color: "oklch(0.55 0.15 145)",
+                      fontWeight: "bold",
+                    },
+                  }}
+                  components={{
+                    DayButton: ({ day, ...props }) => (
+                      <button
+                        {...props}
+                        className={`${props.className} ${currentWeather ? 'cursor-pointer' : ''}`}
+                        onClick={(e) => {
+                          setDate(day.date);
+                          if (currentWeather) {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const popupWidth = 320;
+                            const popupHeight = 400;
+
+                            let x = rect.right + 10;
+                            if (x + popupWidth > window.innerWidth) {
+                              x = rect.left - popupWidth - 10;
+                            }
+
+                            let y = rect.top;
+                            if (y + popupHeight > window.innerHeight) {
+                              y = window.innerHeight - popupHeight - 20;
+                            }
+
+                            setWeatherPopup({ date: day.date, position: { x, y } });
+                          }
+                        }}
+                      >
+                        {day.date.getDate()}
+                      </button>
+                    ),
+                  }}
+                />
+                <div className="mt-3 pt-3 border-t">
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-3 rounded bg-agro-green/20" />
+                      <span>Ngày có thuê người làm</span>
+                    </div>
+                    {currentWeather && (
+                      <div className="flex items-center gap-1.5">
+                        <Cloud className="h-3 w-3 text-blue-500" />
+                        <span>Click ngày bất kỳ để xem thời tiết</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </CollapsibleContent>
         </Collapsible>
       </div>

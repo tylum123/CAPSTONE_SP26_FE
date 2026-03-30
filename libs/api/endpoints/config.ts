@@ -11,6 +11,8 @@ export const API_ENDPOINTS = {
   AUTH: {
     LOGIN: '/login',
     REGISTER: '/register',
+    VERIFY_REGISTER: '/verify-email',
+    RESEND_OTP: '/resend-verification',
     GOOGLE_LOGIN: '/google-login',
     LOGOUT: '/logout',
     REFRESH_TOKEN: '/refresh',
@@ -31,10 +33,9 @@ export const API_ENDPOINTS = {
     CREATE_JOB: '/job/post',
     UPDATE_JOB: (id: string) => `/job/post/${id}`,
     DELETE_JOB: (id: string) => `/job/post/${id}`,
-    APPLICANTS: '/farmer/applicants',
-    APPLICANT_DETAIL: (id: string) => `/farmer/applicants/${id}`,
-    APPROVE_APPLICANT: (id: string) => `/farmer/applicants/${id}/approve`,
-    REJECT_APPLICANT: (id: string) => `/farmer/applicants/${id}/reject`,
+    JOB_APPLICATIONS_BY_POST: (jobPostId: string) => `/job/application/post/${jobPostId}`,
+    APPLICATION_DETAIL: (id: string) => `/job/application/${id}`,
+    RESPOND_APPLICANT: (id: string) => `/job/application/respond/${id}`,
     PAYMENTS: '/farmer/payments',
     PAYMENT_DETAIL: (id: string) => `/farmer/payments/${id}`,
   },
@@ -63,14 +64,24 @@ export const API_ENDPOINTS = {
     // STATISTICS: '/admin/statistics',
   },
 
+  // User
+  USER: {
+    PROFILE: '/profile',
+    UPDATE_PROFILE: '/profile/update',
+    CHANGE_PASSWORD: '/profile/change-password',
+    UPLOAD_AVATAR: '/profile/upload-avatar',
+  },
+
   // Common
   SKILL: {
     SKILLS: '/skills',
+    SKILLS_CATEGORY: (categoryId: string) => `/skills/category/${categoryId}`,
     SKILL_DETAIL: (id: string) => `/skills/${id}`,
     CREATE_SKILL: '/skills',
     UPDATE_SKILL: (id: string) => `/skills/${id}`,
     DELETE_SKILL: (id: string) => `/skills/${id}`,
   },
+
   JOB_CATEGORY: {
     LIST: '/job/category',
     DETAIL: (id: string) => `/job/category/${id}`,
@@ -78,6 +89,7 @@ export const API_ENDPOINTS = {
     UPDATE: (id: string) => `/job/category/${id}`,
     DELETE: (id: string) => `/job/category/${id}`,
   },
+
   MEDIA: {
     UPLOAD_IMAGE: '/media/upload/image',
     UPLOAD_IMAGES: '/media/upload/images',
@@ -88,6 +100,34 @@ export const API_ENDPOINTS = {
     DELETE_RESOURCE: '/media/delete/resource',
     DELETE_RESOURCES: '/media/delete/resources',
   },
+
+  PAYMENT: {
+    GET: (id: string) => `/payment/${id}`,
+    CREATE: '/payment',
+    CANCEL: (id: string) => `/payment/${id}/cancel`,
+    CALLBACK: 'payment/callback',
+    VERIFY: 'payment/verify'
+  },
+
+  WALLET: {
+    GET_ALL: '/wallet', // ADMIN
+    GET_DETAIL: (id: string) => `/wallet/${id}`, // ADMIN
+    CURRENT: '/wallet/me',
+  },
+
+  WALLET_TRANSACTION: {
+    GET_ALL: '/wallet-transaction', // ADMIN
+    GET_DETAIL: (id: string) => `/wallet-transaction/${id}`,
+    GET_BY_WALLET: (walletId: string) => `/wallet-transaction/wallet/${walletId}`,
+  },
+
+  WITHDRAWAL: {
+    CREATE: '/withdraw',
+    CURRENT: '/withdraw',
+    GET_BY_ID: (id: string) => `/withdraw/${id}`,
+    ACCOUNT_BALANCE: '/withdraw/account-balance',
+  },
+
   NOTIFICATIONS: '/notifications',
   MESSAGES: '/messages',
   UPLOAD: '/upload',

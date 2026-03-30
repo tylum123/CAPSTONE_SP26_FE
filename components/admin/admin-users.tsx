@@ -23,9 +23,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Checkbox } from "@/components/ui/checkbox"
 import { adminService } from "@/libs/api/services/admin.service"
-import type { GetUserResponse } from "@/libs/api/types"
+import type { GetUserResponse } from "@/libs/types"
 import { useToast } from "@/hooks/use-toast"
-import { handleApiError } from "@/lib/utils/error-handler"
+import { handleApiError } from "@/libs/utils/error-handler"
 
 type UserWithRoleMetadata = GetUserResponse & {
   roleId?: number | string

@@ -1,6 +1,6 @@
 import axiosInstance from '../axios-instance';
-import { API_ENDPOINTS } from '../config';
-import type { ApiResponse, PaginatedResponse, GetUserResponse, UpdateUserRequest } from '../types';
+import { API_ENDPOINTS } from '../endpoints/config';
+import type { ApiResponse, PaginatedResponse, GetUserResponse, UpdateUserRequest } from '@/libs/types';
 
 const ROLE_TO_ID: Record<string, number> = {
   admin: 1,

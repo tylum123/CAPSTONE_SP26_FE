@@ -1,0 +1,2 @@
+tsconfig.json(45,9): error TS5090: Non-relative paths are not allowed when 'baseUrl' is not set. Did you forget a leading './'?
+tsconfig.json(51,9): error TS5090: Non-relative paths are not allowed when 'baseUrl' is not set. Did you forget a leading './'?

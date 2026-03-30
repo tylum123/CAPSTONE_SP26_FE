@@ -1,6 +1,6 @@
 import axiosInstance from '../axios-instance';
-import { API_ENDPOINTS } from '../config';
-import type { ApiResponse, PaginatedResponse, Notification, Message } from '../types';
+import { API_ENDPOINTS } from '../endpoints/config';
+import type { ApiResponse, PaginatedResponse, Notification, Message } from '@/libs/types';
 
 export const commonService = {
   /**

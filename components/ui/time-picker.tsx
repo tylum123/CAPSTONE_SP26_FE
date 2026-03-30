@@ -11,7 +11,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { cn } from "@/libs/utils"
+import { cn } from "@/libs/utils/utils"
 
 interface TimePickerProps {
   value?: string
@@ -54,7 +54,7 @@ export function TimePicker({
       <PopoverContent className="w-auto p-0" align="start">
         <div className="flex h-[300px] w-[200px] divide-x">
           <ScrollArea className="w-1/2">
-             <div className="flex flex-col p-2">
+            <div className="flex flex-col p-2">
               <span className="mb-2 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Giờ
               </span>
@@ -75,10 +75,10 @@ export function TimePicker({
                   </Button>
                 )
               })}
-             </div>
+            </div>
           </ScrollArea>
           <ScrollArea className="w-1/2">
-             <div className="flex flex-col p-2">
+            <div className="flex flex-col p-2">
               <span className="mb-2 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Phút
               </span>
@@ -100,7 +100,7 @@ export function TimePicker({
                   </Button>
                 )
               })}
-             </div>
+            </div>
           </ScrollArea>
         </div>
       </PopoverContent>

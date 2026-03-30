@@ -1,1 +1,1 @@
-export { useAuth } from "@/stores/auth.store";
+export { useAuth } from "@/libs/stores/auth.store";

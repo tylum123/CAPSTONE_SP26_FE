@@ -1,7 +1,6 @@
-import { id } from "date-fns/locale";
 import axiosInstance from "../axios-instance";
-import { API_ENDPOINTS } from "../config";
-import type { ApiResponse, GetFarmResponse, UpdateFarmRequest } from "../types";
+import { API_ENDPOINTS } from "../endpoints/config";
+import type { ApiResponse, GetFarmResponse, UpdateFarmRequest } from "@/libs/types";
 
 const createFormData = (field: string, files: File | File[]) => {
   const formData = new FormData()
@@ -46,8 +45,8 @@ export const FarmService = {
 
   uploadImage: async (id: string, file: File): Promise<ApiResponse<string>> => {
     const formData = createFormData('file', file)
-    const response = await axiosInstance.post(API_ENDPOINTS.FARM.UPLOAD_IMAGE(id), formData, 
-  {     headers: { 'Content-Type': 'multipart/form-data' } });
+    const response = await axiosInstance.post(API_ENDPOINTS.FARM.UPLOAD_IMAGE(id), formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } });
     return response.data;
   },
 };

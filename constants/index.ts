@@ -6,11 +6,11 @@
 // Application routes
 export const ROUTES = {
   HOME: "/",
-  
+
   // Auth routes
   LOGIN: "/auth/login",
   REGISTER: "/auth/register",
-  
+
   // Farmer routes
   FARMER: "/farmer",
   FARMER_DASHBOARD: "/farmer/dashboard",
@@ -21,7 +21,7 @@ export const ROUTES = {
   FARMER_MESSAGES: "/farmer/messages",
   FARMER_PAYMENTS: "/farmer/payments",
   FARMER_SETTINGS: "/farmer/settings",
-  
+
   // Worker routes
   WORKER: "/worker",
   WORKER_DASHBOARD: "/worker/dashboard",
@@ -30,7 +30,7 @@ export const ROUTES = {
   WORKER_MESSAGES: "/worker/messages",
   WORKER_PROFILE: "/worker/profile",
   WORKER_SETTINGS: "/worker/settings",
-  
+
   // Admin routes
   ADMIN: "/admin",
   ADMIN_USERS: "/admin/users",
@@ -43,17 +43,6 @@ export const ROLES = {
   FARMER: "farmer",
   WORKER: "worker",
   ADMIN: "admin",
-} as const;
-
-// API endpoints (base paths)
-export const API_ENDPOINTS = {
-  AUTH: "/auth",
-  USERS: "/users",
-  JOBS: "/jobs",
-  APPLICATIONS: "/applications",
-  MESSAGES: "/messages",
-  PAYMENTS: "/payments",
-  DISPUTES: "/disputes",
 } as const;
 
 // Local storage keys

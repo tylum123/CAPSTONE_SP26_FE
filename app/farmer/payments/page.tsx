@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -8,71 +8,82 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Wallet, Plus, ArrowDownLeft, ArrowUpRight, CheckCircle, Clock, AlertCircle } from "lucide-react"
-
-const walletBalance = 2500000
-const escrowBalance = 1750000
-
-const pendingPayments = [
-  {
-    id: 1,
-    workerName: "Trần Văn Bình",
-    job: "Gặt lúa 2 ngày",
-    amount: 700000,
-    completedAt: "16/01/2026",
-    status: "pending",
-  },
-  {
-    id: 2,
-    workerName: "Lê Thị Cẩm",
-    job: "Phun thuốc trừ sâu",
-    amount: 400000,
-    completedAt: "18/01/2026",
-    status: "pending",
-  },
-]
-
-const transactions = [
-  {
-    id: 1,
-    type: "deposit",
-    title: "Nạp tiền vào ví",
-    description: "Chuyển khoản ngân hàng",
-    amount: 5000000,
-    date: "10/01/2026",
-    status: "completed",
-  },
-  {
-    id: 2,
-    type: "escrow",
-    title: "Escrow - Gặt lúa 2 ngày",
-    description: "Tạm giữ cho công việc",
-    amount: -1750000,
-    date: "12/01/2026",
-    status: "completed",
-  },
-  {
-    id: 3,
-    type: "release",
-    title: "Thanh toán cho Phạm Văn Dũng",
-    description: "Hoàn thành - Làm đất",
-    amount: -1140000,
-    date: "08/01/2026",
-    status: "completed",
-  },
-  {
-    id: 4,
-    type: "deposit",
-    title: "Nạp tiền vào ví",
-    description: "Ví Momo",
-    amount: 2000000,
-    date: "05/01/2026",
-    status: "completed",
-  },
-]
+import { Wallet, Plus, ArrowDownLeft, ArrowUpRight, Clock } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { PaymentService } from "@/libs/api/services/payment.service"
+import { WalletService } from "@/libs/api/services/wallet.service"
+import type { WalletDTO, WalletTransactionDTO } from "@/libs/types/wallet.types"
 
 export default function PaymentsPage() {
   const [depositAmount, setDepositAmount] = useState("")
+  const [isDepositing, setIsDepositing] = useState(false)
+  const { toast } = useToast()
+
+  const [wallet, setWallet] = useState<WalletDTO | null>(null)
+  const [transactions, setTransactions] = useState<WalletTransactionDTO[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchWalletData = async () => {
+      try {
+        setIsLoading(true)
+        const walletRes = await WalletService.getMyWallet()
+        if (walletRes.data) {
+          setWallet(walletRes.data)
+          const txRes = await WalletService.getTransactionsByWallet(walletRes.data.id, 1, 50)
+          
+          if (txRes.data) {
+            // Check if PaginatedResponse or direct array
+            const txItems = Array.isArray(txRes.data) ? txRes.data : (txRes.data as any).items || [];
+            setTransactions(txItems)
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch wallet data:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchWalletData()
+  }, [])
+
+  const handleDeposit = async () => {
+    if (!depositAmount || Number(depositAmount) <= 0) {
+      toast({
+        title: "Lỗi",
+        description: "Vui lòng nhập số tiền hợp lệ",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsDepositing(true)
+    try {
+      const response = await PaymentService.create({
+        totalAmount: Number(depositAmount),
+        description: "Nạp tiền vào ví AgroTemp",
+      })
+
+      if (response.data?.checkoutUrl) {
+        window.location.href = response.data.checkoutUrl
+      } else {
+        toast({
+          title: "Lỗi",
+          description: "Không thể tạo link thanh toán",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: "Lỗi",
+        description: "Đã có lỗi xảy ra khi tạo giao dịch",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDepositing(false)
+    }
+  }
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
@@ -88,7 +99,11 @@ export default function PaymentsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Số dư ví</p>
-                <p className="text-3xl font-bold text-agro-green">{walletBalance.toLocaleString()}đ</p>
+                {isLoading ? (
+                  <p className="text-3xl font-bold text-agro-green animate-pulse">...</p>
+                ) : (
+                  <p className="text-3xl font-bold text-agro-green">{(wallet?.balance || 0).toLocaleString()}đ</p>
+                )}
               </div>
               <div className="p-4 rounded-full bg-agro-green/10">
                 <Wallet className="h-8 w-8 text-agro-green" />
@@ -131,23 +146,19 @@ export default function PaymentsPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Phương thức thanh toán</Label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Button variant="outline" className="flex-col h-20 bg-transparent">
-                        <img src="/vnpay-logo-blue.jpg" alt="VNPay" className="h-8 w-8 mb-1" />
-                        <span className="text-xs">VNPay</span>
-                      </Button>
-                      <Button variant="outline" className="flex-col h-20 bg-transparent">
-                        <img src="/momo-logo-pink.jpg" alt="Momo" className="h-8 w-8 mb-1" />
-                        <span className="text-xs">Momo</span>
-                      </Button>
-                      <Button variant="outline" className="flex-col h-20 bg-transparent">
-                        <span className="text-2xl mb-1">🏦</span>
-                        <span className="text-xs">Ngân hàng</span>
+                    <div className="grid grid-cols-1 gap-2">
+                      <Button variant="outline" className="flex-col h-20 bg-agro-green/5 border-agro-green">
+                        <span className="text-2xl mb-1 text-agro-green font-bold text-center">PayOS</span>
+                        <span className="text-xs">Chuyển khoản / Quét QR</span>
                       </Button>
                     </div>
                   </div>
-                  <Button className="w-full bg-agro-green hover:bg-agro-green-dark text-white">
-                    Xác nhận nạp tiền
+                  <Button
+                    className="w-full bg-agro-green hover:bg-agro-green-dark text-white"
+                    onClick={handleDeposit}
+                    disabled={isDepositing}
+                  >
+                    {isDepositing ? "Đang xử lý..." : "Xác nhận nạp tiền"}
                   </Button>
                 </div>
               </DialogContent>
@@ -160,7 +171,11 @@ export default function PaymentsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Số dư Escrow</p>
-                <p className="text-3xl font-bold text-agro-orange">{escrowBalance.toLocaleString()}đ</p>
+                {isLoading ? (
+                  <p className="text-3xl font-bold text-agro-orange animate-pulse">...</p>
+                ) : (
+                  <p className="text-3xl font-bold text-agro-orange">{(wallet?.lockedBalance || 0).toLocaleString()}đ</p>
+                )}
               </div>
               <div className="p-4 rounded-full bg-agro-orange/10">
                 <Clock className="h-8 w-8 text-agro-orange" />
@@ -173,37 +188,7 @@ export default function PaymentsPage() {
         </Card>
       </div>
 
-      {/* Pending Payments */}
-      {pendingPayments.length > 0 && (
-        <Card className="border-yellow-300 bg-yellow-50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-yellow-600" />
-              Chờ xác nhận hoàn thành ({pendingPayments.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {pendingPayments.map((payment) => (
-                <div key={payment.id} className="flex items-center justify-between p-3 bg-white rounded-lg">
-                  <div>
-                    <p className="font-medium">{payment.workerName}</p>
-                    <p className="text-sm text-muted-foreground">{payment.job}</p>
-                    <p className="text-xs text-muted-foreground">Hoàn thành: {payment.completedAt}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-agro-orange">{payment.amount.toLocaleString()}đ</p>
-                    <Button size="sm" className="mt-2 bg-agro-green hover:bg-agro-green-dark text-white">
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Xác nhận & Thanh toán
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+
 
       {/* Transaction History */}
       <Card>
@@ -221,47 +206,50 @@ export default function PaymentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions.map((tx) => (
-                <TableRow key={tx.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`p-2 rounded-full ${
-                          tx.type === "deposit"
-                            ? "bg-agro-green/10"
-                            : tx.type === "escrow"
-                              ? "bg-agro-orange/10"
-                              : "bg-blue-100"
-                        }`}
-                      >
-                        {tx.type === "deposit" ? (
-                          <ArrowDownLeft className="h-4 w-4 text-agro-green" />
-                        ) : (
-                          <ArrowUpRight
-                            className={`h-4 w-4 ${tx.type === "escrow" ? "text-agro-orange" : "text-blue-600"}`}
-                          />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium">{tx.title}</p>
-                        <p className="text-xs text-muted-foreground">{tx.description}</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{tx.date}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="bg-agro-green/10 text-agro-green">
-                      Hoàn thành
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <span className={tx.amount > 0 ? "text-agro-green" : "text-foreground"}>
-                      {tx.amount > 0 ? "+" : ""}
-                      {tx.amount.toLocaleString()}đ
-                    </span>
+              {transactions.length === 0 && !isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                    Không có giao dịch nào
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                transactions.map((tx) => (
+                  <TableRow key={tx.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`p-2 rounded-full ${tx.amount > 0
+                            ? "bg-agro-green/10"
+                            : "bg-agro-orange/10"
+                            }`}
+                        >
+                          {tx.amount > 0 ? (
+                            <ArrowDownLeft className="h-4 w-4 text-agro-green" />
+                          ) : (
+                            <ArrowUpRight className="h-4 w-4 text-agro-orange" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium">{tx.referenceCode}</p>
+                          <p className="text-xs text-muted-foreground">{tx.description}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>{new Date(tx.createdAt).toLocaleDateString("vi-VN")}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="bg-agro-green/10 text-agro-green">
+                        Hoàn thành
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span className={tx.amount > 0 ? "text-agro-green" : "text-foreground"}>
+                        {tx.amount > 0 ? "+" : ""}
+                        {tx.amount.toLocaleString()}đ
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

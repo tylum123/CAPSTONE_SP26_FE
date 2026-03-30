@@ -47,6 +47,10 @@
       "@/constants/*": [
         "./constants/*"
       ],
+      "@/types": [
+        "./types",
+        "./types/index"
+      ],
       "@/types/*": [
         "./types/*"
       ],

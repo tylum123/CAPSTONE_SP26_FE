@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { farmerService } from "@/libs/api/services/farmer.service"
-import type { FarmerProfile } from "@/libs/api/types"
+import type { FarmerProfile } from "@/libs/types"
 
 export function FarmerDashboard() {
   const [profile, setProfile] = useState<FarmerProfile | null>(null)

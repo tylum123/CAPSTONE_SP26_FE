@@ -1,5 +1,5 @@
 import { axiosInstance } from '@/libs/api/axios-instance';
-import type { BeWeatherData, DailyWeather } from '@/types/weather.types';
+import type { BeWeatherData, DailyWeather } from '@/libs/types/weather.types';
 
 const WEATHER_BASE = '/weather';
 

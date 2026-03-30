@@ -28,8 +28,9 @@ import {
   Home,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { FarmerProfile, farmerService, authService } from "@/libs/api"
-import { useAuth } from "@/stores/auth.store";
+import { farmerService, authService } from "@/libs/api/services"
+import type { FarmerProfile } from "@/libs/types"
+import { useAuth } from "@/libs/stores/auth.store";
 import { AnimatedBubbles } from "@/components/farmer/animated-bubbles";
 
 export default function FarmerLayout({
@@ -45,9 +46,9 @@ export default function FarmerLayout({
 
   const navItems = [
     { icon: LayoutDashboard, label: "Tổng quan", href: "/farmer/dashboard" },
-    { icon: Leaf, label: "Công việc", href: "/farmer/jobs" },
+    { icon: Leaf, label: "Bài đăng", href: "/farmer/jobs" },
     { icon: PlusCircle, label: "Đăng tin", href: "/farmer/create-job" },
-    { icon: MessageCircle, label: "Tin nhắn", href: "/farmer/messages"},
+    { icon: MessageCircle, label: "Tin nhắn", href: "/farmer/messages" },
     { icon: Wallet, label: "Thanh toán", href: "/farmer/payments" },
   ];
   const [profile, setProfile] = useState<FarmerProfile | null>(null)
@@ -67,16 +68,28 @@ export default function FarmerLayout({
       try {
         const response = await farmerService.getProfile();
         setProfile(response.data);
-        setIsProfileMissing(false);
+        // Also check if any requisite fields are missing 
+        if (!response.data?.contactName && !response.data?.address) {
+          setIsProfileMissing(true);
+          if (!pathname.startsWith("/farmer/setup-profile")) {
+            router.replace("/farmer/setup-profile");
+          }
+        } else {
+          setIsProfileMissing(false);
+        }
       } catch (error: any) {
         const statusCode = error?.response?.status;
-        if (statusCode === 500) {
+        const backendMessage = error?.response?.data?.message;
+
+        const profileNotFound = (statusCode === 500 && typeof backendMessage === "string" && backendMessage.toLowerCase().includes("farmer profile not found")) || statusCode === 404;
+
+        if (profileNotFound) {
           setIsProfileMissing(true);
           setProfile(null);
 
           // Force users with missing profile to complete settings first.
-          if (!pathname.startsWith("/farmer/settings")) {
-            router.replace("/farmer/settings?setup=required");
+          if (!pathname.startsWith("/farmer/setup-profile")) {
+            router.replace("/farmer/setup-profile");
           }
         } else {
           console.error("Failed to fetch farmer profile:", error);
@@ -90,8 +103,8 @@ export default function FarmerLayout({
   }, [isAuthenticated, pathname, router]);
 
   useEffect(() => {
-    if (isAuthenticated && isProfileMissing && !pathname.startsWith("/farmer/settings")) {
-      router.replace("/farmer/settings?setup=required");
+    if (isAuthenticated && isProfileMissing && !pathname.startsWith("/farmer/setup-profile")) {
+      router.replace("/farmer/setup-profile");
     }
   }, [isAuthenticated, isProfileMissing, pathname, router]);
 
@@ -149,11 +162,10 @@ export default function FarmerLayout({
                   <Link key={item.href} href={item.href}>
                     <Button
                       variant={isActive ? "default" : "ghost"}
-                      className={`gap-2 ${
-                        isActive
-                          ? "bg-agro-green text-white hover:bg-agro-green-dark"
-                          : "text-foreground hover:bg-gray-200"
-                      }`}
+                      className={`gap-2 ${isActive
+                        ? "bg-agro-green text-white hover:bg-agro-green-dark"
+                        : "text-foreground hover:bg-gray-200"
+                        }`}
                     >
                       <item.icon className="h-4 w-4" />
                       {item.label}
@@ -233,9 +245,8 @@ export default function FarmerLayout({
                           <Link key={item.href} href={item.href}>
                             <Button
                               variant={isActive ? "default" : "ghost"}
-                              className={`w-full justify-start gap-3 ${
-                                isActive ? "bg-agro-green text-white" : ""
-                              }`}
+                              className={`w-full justify-start gap-3 ${isActive ? "bg-agro-green text-white" : ""
+                                }`}
                             >
                               <item.icon className="h-5 w-5" />
                               {item.label}

@@ -9,24 +9,38 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Upload, Save, Loader2, RotateCcw } from "lucide-react"
-import { handleApiError } from "@/lib/utils/error-handler"
-import { FarmerProfile, UpdateFarmerRequest } from "@/libs/api/types"
+import { Upload, Save, Loader2, RotateCcw, CalendarIcon } from "lucide-react"
+import { handleApiError } from "@/libs/utils/error-handler"
+import { FarmerProfile, UpdateFarmerRequest } from "@/libs/types"
 import { farmerService } from "@/libs/api/services/farmer.service"
 import { cloudinaryService } from "@/libs/api/services/cloudinary.service"
 import { useToast } from "@/hooks/use-toast"
+import { AddressForm } from "@/components/address-form"
+import { format } from "date-fns"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/libs/utils/utils";
+import { vi } from "date-fns/locale"
 
-export default function SettingsPage() {  
+export default function SettingsPage() {
   const [profile, setProfile] = useState<FarmerProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState("")
   const avatarInputRef = useRef<HTMLInputElement>(null)
+
+  const [addressObj, setAddressObj] = useState({
+    province: "",
+    ward: "",
+    detailedAddress: "",
+  })
+  const [editingAddress, setEditingAddress] = useState(false)
+
   const [formData, setFormData] = useState<UpdateFarmerRequest>({
     contactName: "",
-    contactNumber: "",
-    farmType: "",
+    address: "",
+    dateOfBirth: "",
     avatarUrl: "",
   })
 
@@ -45,16 +59,30 @@ export default function SettingsPage() {
       try {
         setLoading(true)
         const response = await farmerService.getProfile()
+        console.log("Profile response:", response)
         if (response.data) {
           setProfile(response.data)
           const initialAvatar = response.data.avatarUrl || ""
           setAvatarPreview(initialAvatar)
           setFormData({
             contactName: response.data.contactName || "",
-            contactNumber: response.data.user?.phoneNumber || "",
-            farmType: "", // Removed from new response type
+            address: response.data.address || "",
+            dateOfBirth: response.data.dateOfBirth || "",
             avatarUrl: initialAvatar,
           })
+
+          if (response.data.address) {
+            const parts = response.data.address.split(",").map(p => p.trim())
+            if (parts.length >= 3) {
+              setAddressObj({
+                province: parts[parts.length - 1],
+                ward: parts[parts.length - 2],
+                detailedAddress: parts.slice(0, parts.length - 2).join(", ")
+              })
+            } else {
+              setAddressObj(prev => ({ ...prev, detailedAddress: response.data.address || "" }))
+            }
+          }
         }
       } catch (error: any) {
         console.error("Failed to load profile:", error)
@@ -99,7 +127,20 @@ export default function SettingsPage() {
   const handleSave = async () => {
     try {
       setSaving(true)
-      const response = await farmerService.updateProfile(formData)
+
+      const fullAddressParts = [
+        addressObj.detailedAddress,
+        addressObj.ward,
+        addressObj.province
+      ].filter(Boolean)
+      const fullAddress = fullAddressParts.join(", ")
+
+      const dataToSave = {
+        ...formData,
+        address: fullAddress || formData.address
+      }
+
+      const response = await farmerService.updateProfile(dataToSave)
       if (response.data) {
         setProfile(response.data)
         setAvatarPreview(response.data.avatarUrl || "")
@@ -221,6 +262,73 @@ export default function SettingsPage() {
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="name">Họ và tên</Label>
+                    {profile && formData.contactName !== (profile.contactName || "") && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-0 text-muted-foreground hover:text-agro-green"
+                        onClick={() => handleInputChange("contactName", profile.contactName || "")}
+                      >
+                        <RotateCcw className="mr-1 h-3 w-3" />
+                        <span className="text-xs">Hoàn tác</span>
+                      </Button>
+                    )}
+                  </div>
+                  <Input
+                    id="name"
+                    value={formData.contactName || ""}
+                    onChange={(e) => handleInputChange("contactName", e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2 flex flex-col">
+                  <Label htmlFor="dateOfBirth" className="font-medium text-gray-700">
+                    Ngày sinh
+                  </Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal bg-gray-50/50 border-gray-200 focus:bg-white focus:border-agro-green focus:ring-agro-green/20 h-9",
+                          !formData.dateOfBirth && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-5 w-5 opacity-50" />
+                        {formData.dateOfBirth ? (
+                          format(new Date(formData.dateOfBirth), "dd/MM/yyyy")
+                        ) : (
+                          <span>Chọn ngày sinh (dd/mm/yyyy)</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={formData.dateOfBirth ? new Date(formData.dateOfBirth) : undefined}
+                        onSelect={(date) =>
+                          handleInputChange("dateOfBirth", date ? format(date, "yyyy-MM-dd") : "")
+                        }
+                        disabled={(date) =>
+                          date > new Date() || date < new Date("1900-01-01")
+                        }
+                        initialFocus
+                        locale={vi}
+                        captionLayout="dropdown-buttons"
+                        fromYear={1900}
+                        toYear={new Date().getFullYear()}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
@@ -240,34 +348,40 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="address">Địa chỉ chính</Label>
-                <Input
-                  id="address"
-                  value={profile?.user?.address || ""}
-                  disabled
-                />
-              </div>  
-              
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="name">Họ và tên</Label>
-                  {profile && formData.contactName !== (profile.contactName || "") && (
+                <Label>Địa chỉ</Label>
+                {!editingAddress ? (
+                  <div className="flex items-center gap-4 bg-gray-50/50 rounded-xl p-4 border border-gray-100">
+                    <div className="flex-1 text-base text-gray-700 text-sm">
+                      {profile?.address ? profile.address : <span className="text-muted-foreground">Chưa có địa chỉ</span>}
+                    </div>
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      className="h-auto p-0 text-muted-foreground hover:text-agro-green"
-                      onClick={() => handleInputChange("contactName", profile.contactName || "")}
+                      className="shrink-0"
+                      onClick={() => setEditingAddress(true)}
                     >
-                      <RotateCcw className="mr-1 h-3 w-3" />
-                      <span className="text-xs">Hoàn tác</span>
+                      Thay đổi địa chỉ
                     </Button>
-                  )}
-                </div>
-                <Input
-                  id="name"
-                  value={formData.contactName || ""}
-                  onChange={(e) => handleInputChange("contactName", e.target.value)}
-                />
+                  </div>
+                ) : (
+                  <div className="bg-gray-50/50 rounded-xl p-4 border border-gray-100 space-y-2">
+                    <AddressForm
+                      value={addressObj}
+                      onChange={setAddressObj}
+                      required={false}
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => setEditingAddress(false)}
+                        className="shrink-0"
+                      >
+                        Huỷ
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { weatherService } from '@/libs/api/services/weather.service';
-import type { BeWeatherData, DailyWeather } from '@/types/weather.types';
+import type { BeWeatherData, DailyWeather } from '@/libs/types/weather.types';
 
 interface UseWeatherOptions {
   city?: string;

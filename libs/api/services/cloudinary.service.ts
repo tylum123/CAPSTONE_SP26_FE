@@ -1,6 +1,6 @@
 import axiosInstance from '../axios-instance'
-import { API_ENDPOINTS } from '../config'
-import type { ApiResponse } from '../types'
+import { API_ENDPOINTS } from '../endpoints/config'
+import type { ApiResponse } from '@/libs/types'
 
 const getAuthHeaders = () => {
 	const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
