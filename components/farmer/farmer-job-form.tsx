@@ -2,7 +2,9 @@
 
 import { type KeyboardEvent, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Check, CheckCheck, ChevronsUpDown, MapPin, Plus, X, Calendar as CalendarIcon, Briefcase, FileText, CalendarRange, CheckSquare, Award, Gift, AlignLeft, Layout, Clock, Info, DollarSign, DollarSignIcon, ChevronLeft, ChevronRight } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
+import { ArrowLeft, Check, CheckCheck, ChevronsUpDown, MapPin, Plus, X, Calendar as CalendarIcon, Briefcase, FileText, CalendarRange, CheckSquare, Award, Gift, AlignLeft, Layout, Clock, Info, DollarSign, DollarSignIcon, ChevronLeft, ChevronRight, User, Users } from "lucide-react"
 import { eachDayOfInterval, format, isSameDay, startOfDay } from "date-fns"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -172,6 +174,8 @@ const extractEditableDescription = (rawDescription: string) => {
 }
 
 export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
+  const router = useRouter()
+  const { toast } = useToast()
   const [isFarmManagerDialogOpen, setIsFarmManagerDialogOpen] = useState(false)
   const isEditMode = mode === "edit" && Boolean(jobId)
 
@@ -945,13 +949,25 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       setPostedJob(postedPayload)
     } catch (error: any) {
       const apiMessage = error?.response?.data?.message
-      setSubmitError(
-        typeof apiMessage === "string"
-          ? apiMessage
-          : isEditMode
-            ? "Không thể cập nhật tin công việc. Vui lòng thử lại."
-            : "Không thể đăng tin công việc. Vui lòng thử lại.",
-      )
+      let errorMessage = isEditMode
+        ? "Không thể cập nhật tin công việc. Vui lòng thử lại."
+        : "Không thể đăng tin công việc. Vui lòng thử lại."
+
+      if (typeof apiMessage === "string") {
+        if (apiMessage.includes("Insufficient wallet balance to create job post. Please top up your wallet.")) {
+          errorMessage = "Số dư ví không đủ để đăng tin. Vui lòng nạp thêm tiền vào ví."
+          toast({
+            title: "Số dư không đủ",
+            description: "Ví của bạn không đủ số dư để đăng tin. Hệ thống đang chuyển hướng đến trang nạp tiền...",
+            variant: "destructive",
+          })
+          router.push("/farmer/payments")
+        } else {
+          errorMessage = apiMessage
+        }
+      }
+
+      setSubmitError(errorMessage)
     } finally {
       setIsSubmitting(false)
     }
@@ -1737,11 +1753,15 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                       </div>
                       <div className="space-y-1">
                         <p className="text-xs font-semibold text-muted-foreground uppercase">Số lượng</p>
-                        <div className="flex items-center font-medium"><Users className="mr-1 h-4 w-4" /> {workersNeededNumber} người</div>
+                        <div className="flex items-center font-medium"><User className="mr-1 h-4 w-4" /> {workersNeededNumber} người</div>
                       </div>
                       <div className="space-y-1">
                         <p className="text-xs font-semibold text-muted-foreground uppercase">Địa điểm</p>
                         <div className="flex items-center font-medium truncate" title={selectedFarmLabel}><MapPin className="mr-1 h-4 w-4" /> {selectedFarmLabel}</div>
+                      </div>
+                      <div className="space-y-1 bg-primary/10 p-3 rounded-md col-span-2 md:col-span-4 flex items-center justify-between border border-primary/20 mt-2">
+                        <span className="font-semibold text-primary uppercase text-sm">Tổng chi phí dự kiến:</span>
+                        <span className="text-xl font-bold text-primary">{formatCurrency(scheduleType === "contract" ? incomeNumber : incomeNumber * workersNeededNumber * selectedDailyDaysCount)}</span>
                       </div>
                     </div>
                   </div>
