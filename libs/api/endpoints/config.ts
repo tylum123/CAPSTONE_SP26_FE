@@ -27,17 +27,20 @@ export const API_ENDPOINTS = {
     UPDATEPROFILE: '/farmer',
     UPDATEAVATAR: '/farmer/upload-avatar',
     DASHBOARD: '/farmer/dashboard',
-    JOBS: '/job/post',
-    JOB_ID: (id: string) => `/job/post/${id}`,
+  },
+
+  JOBS: {
+    GET: '/job/post',
+    DETAIL: (id: string) => `/job/post/${id}`,
     FILTERED_JOBS: '/job/post/filter',
-    CREATE_JOB: '/job/post',
-    UPDATE_JOB: (id: string) => `/job/post/${id}`,
-    DELETE_JOB: (id: string) => `/job/post/${id}`,
+    CREATE: '/job/post',
+    UPDATE: (id: string) => `/job/post/${id}`,
+    DELETE: (id: string) => `/job/post/${id}`,
     JOB_APPLICATIONS_BY_POST: (jobPostId: string) => `/job/application/post/${jobPostId}`,
     APPLICATION_DETAIL: (id: string) => `/job/application/${id}`,
     RESPOND_APPLICANT: (id: string) => `/job/application/respond/${id}`,
-    PAYMENTS: '/farmer/payments',
-    PAYMENT_DETAIL: (id: string) => `/farmer/payments/${id}`,
+    SAVE_DRAFT: '/job/post/draft',
+    GET_DRAFTS: '/job/post/drafts'
   },
 
   // Farm
@@ -103,10 +106,10 @@ export const API_ENDPOINTS = {
 
   PAYMENT: {
     GET: (id: string) => `/payment/${id}`,
-    CREATE: '/payment',
+    CREATE: '/payment/',
     CANCEL: (id: string) => `/payment/${id}/cancel`,
-    CALLBACK: 'payment/callback',
-    VERIFY: 'payment/verify'
+    CALLBACK: '/payment/callback',
+    VERIFY: '/payment/verify'
   },
 
   WALLET: {

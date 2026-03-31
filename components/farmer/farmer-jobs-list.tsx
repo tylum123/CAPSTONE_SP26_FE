@@ -47,6 +47,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
+import { jobService } from "@/libs/api/services/jobs.service"
 
 export function FarmerJobsList() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -211,14 +212,14 @@ export function FarmerJobsList() {
 
         let response
         if (hasFilters) {
-          response = await farmerService.getFilteredJobs({
+          response = await jobService.getFilteredJobs({
             title: searchQuery || undefined,
             category: (filterCategory && filterCategory !== "all-categories") ? filterCategory : undefined,
             address: (filterAddress && filterAddress !== "all-provinces") ? filterAddress : undefined,
             skill: filterSkills.length > 0 ? filterSkills : undefined,
           })
         } else {
-          response = await farmerService.getJobs()
+          response = await jobService.getJobs()
         }
 
         const payload = response.data as Job[] | { data?: Job[]; items?: Job[] }
@@ -328,7 +329,7 @@ export function FarmerJobsList() {
   const handleDeleteJob = async (job: Job) => {
     try {
       setDeletingJobId(job.id)
-      await farmerService.deleteJob(job.id)
+      await jobService.deleteJob(job.id)
       setJobs((currentJobs) => currentJobs.filter((currentJob) => currentJob.id !== job.id))
       setJobPendingDelete(null)
     } catch (deleteError) {

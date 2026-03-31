@@ -6,7 +6,8 @@ import type {
     PaymentRequest,
     CancelPaymentDTO,
     PaymentCallbackRequestParams,
-    VerifyPaymentDTO
+    VerifyPaymentDTO,
+    VerifyPaymentData
 } from "@/libs/types/payment.types";
 
 export const PaymentService = {
@@ -20,19 +21,22 @@ export const PaymentService = {
         return response.data;
     },
 
-    cancel: async (id: string): Promise<ApiResponse<CancelPaymentDTO>> => {
-        // Assuming cancel might be a POST or PUT request depending on your backend
-        const response = await axiosInstance.post(API_ENDPOINTS.PAYMENT.CANCEL(id));
+    cancel: async (id: string, cancellationReason?: string): Promise<ApiResponse<CancelPaymentDTO>> => {
+        const url = cancellationReason
+            ? `${API_ENDPOINTS.PAYMENT.CANCEL(id)}?cancellationReason=${encodeURIComponent(cancellationReason)}`
+            : API_ENDPOINTS.PAYMENT.CANCEL(id);
+        const response = await axiosInstance.post(url);
         return response.data;
     },
 
     callback: async (params: PaymentCallbackRequestParams): Promise<ApiResponse<any>> => {
-        // Typically callback might be handled via backend webhooks, but if frontend is polling/sending
+        // Frontend can use this to check payment status after redirect
         const response = await axiosInstance.get(API_ENDPOINTS.PAYMENT.CALLBACK, { params });
         return response.data;
     },
 
-    verify: async (data: any): Promise<ApiResponse<VerifyPaymentDTO>> => {
+    verifyWebhook: async (data: VerifyPaymentData): Promise<ApiResponse<VerifyPaymentDTO>> => {
+        // Typically not called by frontend, PayOS webhook hits this
         const response = await axiosInstance.post(API_ENDPOINTS.PAYMENT.VERIFY, data);
         return response.data;
     }

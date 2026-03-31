@@ -1,8 +1,10 @@
 "use client"
 
-import { type KeyboardEvent, useEffect, useMemo, useState } from "react"
+import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Check, CheckCheck, ChevronsUpDown, MapPin, Plus, X, Calendar as CalendarIcon, Briefcase, FileText, CalendarRange, CheckSquare, Award, Gift, AlignLeft, Layout, Clock, Info, DollarSign, DollarSignIcon, ChevronLeft, ChevronRight } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
+import { ArrowLeft, Check, CheckCheck, ChevronsUpDown, MapPin, Plus, X, Calendar as CalendarIcon, Briefcase, FileText, CalendarRange, CheckSquare, Award, Gift, AlignLeft, Layout, Clock, Info, DollarSign, DollarSignIcon, ChevronLeft, ChevronRight, User, Users } from "lucide-react"
 import { eachDayOfInterval, format, isSameDay, startOfDay } from "date-fns"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -32,6 +34,8 @@ import { skillService } from "@/libs/api/services/skill.service"
 import type { CreateJobRequest, GetFarmResponse, Job, JobCategory, Skill, UpdateJobRequest } from "@/libs/types"
 import { cn } from "@/libs/utils/utils"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@radix-ui/react-collapsible"
+import { jobService } from "@/libs/api/services/jobs.service"
+import { JobDraftDialog, LeavingPromptDialog } from "@/components/farmer/job-draft-dialog"
 
 type WorkScheduleType = "contract" | "daily"
 
@@ -172,8 +176,20 @@ const extractEditableDescription = (rawDescription: string) => {
 }
 
 export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
+  const router = useRouter()
+  const { toast } = useToast()
   const [isFarmManagerDialogOpen, setIsFarmManagerDialogOpen] = useState(false)
   const isEditMode = mode === "edit" && Boolean(jobId)
+
+  // Draft dialogs
+  const [isDraftDialogOpen, setIsDraftDialogOpen] = useState(false)
+  const [isLeavingPromptOpen, setIsLeavingPromptOpen] = useState(false)
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
+  const [isDirty, setIsDirty] = useState(false)
+  // Stores the URL to navigate to after user decides on the leaving prompt
+  const pendingNavigationUrl = useRef<string | null>(null)
+  // Mirror of isDirty as a ref so callbacks always read the latest value without stale closures
+  const isDirtyRef = useRef(false)
 
   const [step, setStep] = useState<1 | 2>(1)
   const [title, setTitle] = useState("")
@@ -233,6 +249,31 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
 
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [postedJob, setPostedJob] = useState<PostedJobPreview | null>(null)
+
+  // Keep ref in sync with state so callbacks always see the latest value
+  useEffect(() => {
+    isDirtyRef.current = isDirty
+  }, [isDirty])
+
+  // Mark form dirty whenever the user changes any field (skip first mount via isMounted guard)
+  const isMountedRef = useRef(false)
+  useEffect(() => {
+    if (!isMountedRef.current) {
+      isMountedRef.current = true
+      return
+    }
+    if (!isDirty) {
+      setIsDirty(true)
+      isDirtyRef.current = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    title, description, income, workersNeeded, location,
+    requirements, benefits, selectedSkillIds, selectedFarmId,
+    selectedJobCategoryId, scheduleType, contractStartDate, contractEndDate,
+    selectedDailyDates, dailyStartTime, dailyEndTime, isUrgent,
+  ])
+
 
   const workersNeededNumber = Number.parseInt(workersNeeded, 10) || 0
   const incomeNumber = Number.parseInt(income, 10) || 0
@@ -435,7 +476,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
 
       try {
         setIsLoadingExistingJob(true)
-        const response = await farmerService.getJobDetail(jobId)
+        const response = await jobService.getJobDetail(jobId)
         const existingJob = response.data as Job
 
         setTitle(existingJob.title ?? "")
@@ -913,8 +954,8 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       setIsSubmitting(true)
       setSubmitError(null)
       const response = isEditMode && jobId
-        ? await farmerService.updateJob(jobId, payload)
-        : await farmerService.createJob({
+        ? await jobService.updateJob(jobId, payload)
+        : await jobService.createJob({
           ...(payload as CreateJobRequest),
           publishedAt: nowISO,
           createdAt: nowISO,
@@ -945,13 +986,25 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       setPostedJob(postedPayload)
     } catch (error: any) {
       const apiMessage = error?.response?.data?.message
-      setSubmitError(
-        typeof apiMessage === "string"
-          ? apiMessage
-          : isEditMode
-            ? "Không thể cập nhật tin công việc. Vui lòng thử lại."
-            : "Không thể đăng tin công việc. Vui lòng thử lại.",
-      )
+      let errorMessage = isEditMode
+        ? "Không thể cập nhật tin công việc. Vui lòng thử lại."
+        : "Không thể đăng tin công việc. Vui lòng thử lại."
+
+      if (typeof apiMessage === "string") {
+        if (apiMessage.includes("Insufficient wallet balance to create job post. Please top up your wallet.")) {
+          errorMessage = "Số dư ví không đủ để đăng tin. Vui lòng nạp thêm tiền vào ví."
+          toast({
+            title: "Số dư không đủ",
+            description: "Ví của bạn không đủ số dư để đăng tin. Hệ thống đang chuyển hướng đến trang nạp tiền...",
+            variant: "destructive",
+          })
+          router.push("/farmer/payments")
+        } else {
+          errorMessage = apiMessage
+        }
+      }
+
+      setSubmitError(errorMessage)
     } finally {
       setIsSubmitting(false)
     }
@@ -981,7 +1034,168 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
     clearAllSelectedDailyDates()
     setSubmitError(null)
     setPostedJob(null)
+    setIsDirty(false)
+    isDirtyRef.current = false
   }
+
+  // ─── Draft helpers ───────────────────────────────────────────────────────
+
+  const buildDraftPayload = useCallback((): CreateJobRequest => {
+    const now = new Date()
+    const nowISO = now.toISOString()
+    const nowDateOnly = toDateOnlyFromDate(now)
+
+    const formatTimeOnly = (t: string) => (t.length === 5 ? `${t}:00` : t)
+
+    let startDate = nowDateOnly
+    let endDate = nowDateOnly
+    let startTime = formatTimeOnly(dailyStartTime || "09:00")
+    let endTime = formatTimeOnly(dailyEndTime || "17:00")
+
+    if (scheduleType === "contract") {
+      startDate = toDateOnlyString(contractStartDate) ?? nowDateOnly
+      endDate = toDateOnlyString(contractEndDate) ?? nowDateOnly
+    } else if (normalizedSelectedDailyDates.length > 0) {
+      startDate = toDateOnlyFromDate(normalizedSelectedDailyDates[0])
+      endDate = toDateOnlyFromDate(normalizedSelectedDailyDates[normalizedSelectedDailyDates.length - 1])
+      startTime = formatTimeOnly(dailyStartTime)
+      endTime = formatTimeOnly(dailyEndTime)
+    }
+
+    return {
+      skillIds: selectedSkillIds,
+      farmId: selectedFarmId || DEFAULT_FARM_ID,
+      jobCategoryId: selectedJobCategoryId || DEFAULT_JOB_CATEGORY_ID,
+      jobTypeId: scheduleType === "daily" ? JOB_TYPE_DAILY_ID : JOB_TYPE_CONTRACT_ID,
+      title: title.trim() || "(Bản nháp)",
+      description: description.trim(),
+      address: location.trim(),
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      selectedDays: normalizedSelectedDailyDates.map((d) => toDateOnlyFromDate(d)),
+      requirements,
+      privileges: benefits,
+      wageAmount: incomeNumber,
+      workersNeeded: workersNeededNumber || 1,
+      workersAccepted: 0,
+      isUrgent,
+      statusId: 1, // Draft status
+      publishedAt: nowISO,
+      createdAt: nowISO,
+      updatedAt: nowISO,
+    }
+  }, [
+    title, description, income, location, selectedSkillIds, selectedFarmId,
+    selectedJobCategoryId, scheduleType, contractStartDate, contractEndDate,
+    dailyStartTime, dailyEndTime, normalizedSelectedDailyDates, requirements,
+    benefits, incomeNumber, workersNeededNumber, isUrgent,
+  ])
+
+  const saveDraft = useCallback(async () => {
+    try {
+      setIsSavingDraft(true)
+      const payload = buildDraftPayload()
+      await jobService.saveDraft(payload)
+      setIsDirty(false)
+      isDirtyRef.current = false
+      toast({
+        title: "Đã lưu bản nháp",
+        description: "Bản nháp của bạn đã được lưu thành công.",
+      })
+    } catch {
+      toast({
+        title: "Lưu thất bại",
+        description: "Không thể lưu bản nháp. Vui lòng thử lại.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingDraft(false)
+    }
+  }, [buildDraftPayload, toast])
+
+  const loadDraft = useCallback((draft: Job) => {
+    setTitle(draft.title ?? "")
+    setDescription(extractEditableDescription(draft.description ?? ""))
+    setIncome(String(draft.wageAmount ?? ""))
+    setWorkersNeeded(String(draft.workersNeeded ?? 1))
+    setLocation(draft.address ?? "")
+    setRequirements(draft.requirements?.length ? draft.requirements : ["Có sức khỏe tốt"])
+    setBenefits(draft.privileges?.length ? draft.privileges : ["Bao ăn"])
+    setSelectedSkillIds((draft.jobSkillRequirements ?? []).map((s) => s.id).filter(Boolean))
+    setSelectedJobCategoryId(draft.jobCategory?.id ?? DEFAULT_JOB_CATEGORY_ID)
+    setSelectedFarmId(draft.farm?.farmId || (draft.farm as any)?.id || DEFAULT_FARM_ID)
+    setIsUrgent(Boolean(draft.isUrgent))
+    setDailyStartTime(draft.startTime?.slice(0, 5) ?? "09:00")
+    setDailyEndTime(draft.endTime?.slice(0, 5) ?? "17:00")
+
+    if (draft.jobTypeId === JOB_TYPE_DAILY_ID) {
+      setScheduleType("daily")
+      setContractStartDate("")
+      setContractEndDate("")
+      const dates = (draft.selectedDays ?? [])
+        .map((d) => { const dd = new Date(d); return Number.isNaN(dd.getTime()) ? null : startOfDay(dd) })
+        .filter((d): d is Date => d !== null)
+      setSelectedDailyDates(dates)
+    } else {
+      setScheduleType("contract")
+      setSelectedDailyDates([])
+      setContractStartDate(draft.startDate ? formatDateDDMMYYYY(draft.startDate) : "")
+      setContractEndDate(draft.endDate ? formatDateDDMMYYYY(draft.endDate) : "")
+    }
+
+    setStep(1)
+    toast({ title: "Đã tải bản nháp", description: `"${draft.title}" đã được tải vào form.` })
+  }, [toast])
+
+  // ─── Navigation interception ──────────────────────────────────────────────
+
+  // Intercept browser tab close / refresh
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirtyRef.current && !postedJob) {
+        e.preventDefault()
+        e.returnValue = ""
+      }
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+  }, [postedJob])
+
+  // Uses the ref (not state) so the callback never captures a stale dirty value
+  const handleNavigateAway = useCallback((url: string) => {
+    if (isDirtyRef.current && !postedJob) {
+      pendingNavigationUrl.current = url
+      setIsLeavingPromptOpen(true)
+    } else {
+      router.push(url)
+    }
+  }, [router, postedJob])
+
+  const handleLeavingPromptSaveDraft = useCallback(async () => {
+    await saveDraft()
+    setIsLeavingPromptOpen(false)
+    if (pendingNavigationUrl.current) {
+      router.push(pendingNavigationUrl.current)
+      pendingNavigationUrl.current = null
+    }
+  }, [saveDraft, router])
+
+  const handleLeavingPromptLeave = useCallback(() => {
+    setIsLeavingPromptOpen(false)
+    setIsDirty(false)
+    isDirtyRef.current = false
+    if (pendingNavigationUrl.current) {
+      router.push(pendingNavigationUrl.current)
+      pendingNavigationUrl.current = null
+    }
+  }, [router])
+
+  const handleLeavingPromptStay = useCallback(() => {
+    setIsLeavingPromptOpen(false)
+    pendingNavigationUrl.current = null
+  }, [])
 
   if (isLoadingExistingJob) {
     return (
@@ -995,10 +1209,13 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
     <div className="mx-auto max-w-6xl space-y-8 pb-12">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" asChild className="rounded-full h-10 w-10 border-muted-foreground/20">
-            <Link href="/farmer/jobs">
-              <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-            </Link>
+          <Button
+            variant="outline"
+            size="icon"
+            className="rounded-full h-10 w-10 border-muted-foreground/20"
+            onClick={() => handleNavigateAway("/farmer/jobs")}
+          >
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">
@@ -1013,24 +1230,57 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
         </div>
 
         {!postedJob && (
-          <div className="flex items-center rounded-lg border bg-card p-1 shadow-sm">
-            <div
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-md transition-all",
-                step === 1 ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"
-              )}
+          <div className="flex items-center gap-3">
+            {/* Draft buttons */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 hover:text-foreground"
+              onClick={() => setIsDraftDialogOpen(true)}
             >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/20 text-xs font-bold">1</span>
-              <span className="text-sm font-medium">Soạn thảo</span>
-            </div>
-            <div
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-md transition-all",
-                step === 2 ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"
-              )}
+              <FileText className="h-4 w-4" />
+              Bản nháp
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={saveDraft}
+              disabled={isSavingDraft}
             >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/20 text-xs font-bold">2</span>
-              <span className="text-sm font-medium">Xác nhận</span>
+              {isSavingDraft ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent inline-block" />
+                  Đang lưu...
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4" />
+                  Lưu nháp
+                </>
+              )}
+            </Button>
+
+            {/* Step indicator */}
+            <div className="flex items-center rounded-lg border bg-card p-1 shadow-sm">
+              <div
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-md transition-all",
+                  step === 1 ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"
+                )}
+              >
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/20 text-xs font-bold">1</span>
+                <span className="text-sm font-medium">Soạn thảo</span>
+              </div>
+              <div
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-md transition-all",
+                  step === 2 ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"
+                )}
+              >
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/20 text-xs font-bold">2</span>
+                <span className="text-sm font-medium">Xác nhận</span>
+              </div>
             </div>
           </div>
         )}
@@ -1737,11 +1987,15 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                       </div>
                       <div className="space-y-1">
                         <p className="text-xs font-semibold text-muted-foreground uppercase">Số lượng</p>
-                        <div className="flex items-center font-medium"><Users className="mr-1 h-4 w-4" /> {workersNeededNumber} người</div>
+                        <div className="flex items-center font-medium"><User className="mr-1 h-4 w-4" /> {workersNeededNumber} người</div>
                       </div>
                       <div className="space-y-1">
                         <p className="text-xs font-semibold text-muted-foreground uppercase">Địa điểm</p>
                         <div className="flex items-center font-medium truncate" title={selectedFarmLabel}><MapPin className="mr-1 h-4 w-4" /> {selectedFarmLabel}</div>
+                      </div>
+                      <div className="space-y-1 bg-primary/10 p-3 rounded-md col-span-2 md:col-span-4 flex items-center justify-between border border-primary/20 mt-2">
+                        <span className="font-semibold text-primary uppercase text-sm">Tổng chi phí dự kiến:</span>
+                        <span className="text-xl font-bold text-primary">{formatCurrency(scheduleType === "contract" ? incomeNumber : incomeNumber * workersNeededNumber * selectedDailyDaysCount)}</span>
                       </div>
                     </div>
                   </div>
@@ -1833,6 +2087,19 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
           )}
         </div>
       )}
+      {/* Draft Dialogs */}
+      <JobDraftDialog
+        open={isDraftDialogOpen}
+        onOpenChange={setIsDraftDialogOpen}
+        onLoadDraft={loadDraft}
+      />
+      <LeavingPromptDialog
+        open={isLeavingPromptOpen}
+        onSaveDraft={handleLeavingPromptSaveDraft}
+        onLeaveWithoutSave={handleLeavingPromptLeave}
+        onStay={handleLeavingPromptStay}
+        isSaving={isSavingDraft}
+      />
     </div>
   )
 }
