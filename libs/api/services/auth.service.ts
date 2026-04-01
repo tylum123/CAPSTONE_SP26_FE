@@ -26,6 +26,9 @@ export const authService = {
     if (response.data.data.token) {
       localStorage.setItem('access_token', response.data.data.token);
       localStorage.setItem('user_email', response.data.data.email);
+      if (response.data.data.expiresAt) {
+        localStorage.setItem('token_expires_at', response.data.data.expiresAt);
+      }
     }
 
     return response.data;
@@ -41,6 +44,9 @@ export const authService = {
     if (response.data.data?.token) {
       localStorage.setItem('access_token', response.data.data.token);
       localStorage.setItem('user_email', response.data.data.email);
+      if (response.data.data.expiresAt) {
+        localStorage.setItem('token_expires_at', response.data.data.expiresAt);
+      }
     }
 
     return response.data;
@@ -69,6 +75,9 @@ export const authService = {
     if (response.data.data.token) {
       localStorage.setItem('access_token', response.data.data.token);
       localStorage.setItem('user_email', response.data.data.email);
+      if (response.data.data.expiresAt) {
+        localStorage.setItem('token_expires_at', response.data.data.expiresAt);
+      }
     }
 
     return response.data;

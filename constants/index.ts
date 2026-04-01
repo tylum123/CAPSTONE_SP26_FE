@@ -50,6 +50,7 @@ export const STORAGE_KEYS = {
   ACCESS_TOKEN: "access_token",
   REFRESH_TOKEN: "refresh_token",
   USER: "user",
+  TOKEN_EXPIRES_AT: "token_expires_at",
 } as const;
 
 // Pagination defaults

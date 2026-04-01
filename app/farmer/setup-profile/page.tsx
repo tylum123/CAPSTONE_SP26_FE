@@ -8,9 +8,6 @@ import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Upload, Loader2, CalendarIcon, MapPin, User, FileText } from "lucide-react";
@@ -21,10 +18,6 @@ import { cloudinaryService } from "@/libs/api/services/cloudinary.service";
 import { useToast } from "@/hooks/use-toast";
 import { AddressForm } from "@/components/address-form";
 import { format } from "date-fns";
-import { vi } from "date-fns/locale";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/libs/utils/utils";
 
 export default function SetupProfilePage() {
   const router = useRouter();
@@ -221,45 +214,92 @@ export default function SetupProfilePage() {
                       />
                     </div>
 
-                    <div className="space-y-2 flex flex-col">
+                    <div className="space-y-2">
                       <Label htmlFor="dateOfBirth" className="font-medium text-gray-700">
                         Ngày sinh
                       </Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal bg-gray-50/50 border-gray-200 focus:bg-white focus:border-agro-green focus:ring-agro-green/20 h-11",
-                              !formData.dateOfBirth && "text-muted-foreground"
-                            )}
+                      <div className="grid grid-cols-3 gap-3">
+                        {/* Day */}
+                        <div className="relative">
+                          <select
+                            id="dob-day"
+                            value={formData.dateOfBirth ? new Date(formData.dateOfBirth).getDate().toString() : ""}
+                            onChange={(e) => {
+                              const currentDate = formData.dateOfBirth ? new Date(formData.dateOfBirth) : new Date(2000, 0, 1);
+                              const day = parseInt(e.target.value);
+                              if (!isNaN(day)) {
+                                currentDate.setDate(day);
+                                handleInputChange("dateOfBirth", format(currentDate, "yyyy-MM-dd"));
+                              }
+                            }}
+                            className="w-full h-11 rounded-md border border-gray-200 bg-gray-50/50 px-3 text-sm focus:border-agro-green focus:ring-2 focus:ring-agro-green/20 focus:bg-white outline-none appearance-none cursor-pointer transition-colors"
                           >
-                            <CalendarIcon className="mr-2 h-5 w-5 opacity-50" />
-                            {formData.dateOfBirth ? (
-                              format(new Date(formData.dateOfBirth), "dd/MM/yyyy")
-                            ) : (
-                              <span>Chọn ngày sinh (dd/mm/yyyy)</span>
-                            )}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={formData.dateOfBirth ? new Date(formData.dateOfBirth) : undefined}
-                            onSelect={(date) =>
-                              handleInputChange("dateOfBirth", date ? format(date, "yyyy-MM-dd") : "")
-                            }
-                            disabled={(date) =>
-                              date > new Date() || date < new Date("1900-01-01")
-                            }
-                            initialFocus
-                            locale={vi}
-                            captionLayout="dropdown-buttons"
-                            fromYear={1900}
-                            toYear={new Date().getFullYear()}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                            <option value="" disabled>Ngày</option>
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                              <option key={d} value={d}>{d.toString().padStart(2, "0")}</option>
+                            ))}
+                          </select>
+                          <CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                        </div>
+
+                        {/* Month */}
+                        <div className="relative">
+                          <select
+                            id="dob-month"
+                            value={formData.dateOfBirth ? (new Date(formData.dateOfBirth).getMonth() + 1).toString() : ""}
+                            onChange={(e) => {
+                              const currentDate = formData.dateOfBirth ? new Date(formData.dateOfBirth) : new Date(2000, 0, 1);
+                              const month = parseInt(e.target.value) - 1;
+                              if (!isNaN(month)) {
+                                currentDate.setMonth(month);
+                                handleInputChange("dateOfBirth", format(currentDate, "yyyy-MM-dd"));
+                              }
+                            }}
+                            className="w-full h-11 rounded-md border border-gray-200 bg-gray-50/50 px-3 text-sm focus:border-agro-green focus:ring-2 focus:ring-agro-green/20 focus:bg-white outline-none appearance-none cursor-pointer transition-colors"
+                          >
+                            <option value="" disabled>Tháng</option>
+                            {[
+                              "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4",
+                              "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8",
+                              "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12",
+                            ].map((label, i) => (
+                              <option key={i} value={i + 1}>{label}</option>
+                            ))}
+                          </select>
+                          <svg className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" /></svg>
+                        </div>
+
+                        {/* Year */}
+                        <div className="relative">
+                          <select
+                            id="dob-year"
+                            value={formData.dateOfBirth ? new Date(formData.dateOfBirth).getFullYear().toString() : ""}
+                            onChange={(e) => {
+                              const currentDate = formData.dateOfBirth ? new Date(formData.dateOfBirth) : new Date(2000, 0, 1);
+                              const year = parseInt(e.target.value);
+                              if (!isNaN(year)) {
+                                currentDate.setFullYear(year);
+                                handleInputChange("dateOfBirth", format(currentDate, "yyyy-MM-dd"));
+                              }
+                            }}
+                            className="w-full h-11 rounded-md border border-gray-200 bg-gray-50/50 px-3 text-sm focus:border-agro-green focus:ring-2 focus:ring-agro-green/20 focus:bg-white outline-none appearance-none cursor-pointer transition-colors"
+                          >
+                            <option value="" disabled>Năm</option>
+                            {Array.from(
+                              { length: new Date().getFullYear() - 1930 + 1 },
+                              (_, i) => new Date().getFullYear() - i
+                            ).map((y) => (
+                              <option key={y} value={y}>{y}</option>
+                            ))}
+                          </select>
+                          <svg className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" /></svg>
+                        </div>
+                      </div>
+                      {formData.dateOfBirth && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Ngày sinh đã chọn: <span className="font-medium text-gray-700">{format(new Date(formData.dateOfBirth), "dd/MM/yyyy")}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

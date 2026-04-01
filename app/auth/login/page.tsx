@@ -193,7 +193,7 @@ export default function LoginPage() {
         };
 
         // Update auth context
-        login(user, accessToken, refreshToken);
+        login(user, accessToken, refreshToken, (userData as any).expiresAt);
 
         toast({
           title: "Thành công",

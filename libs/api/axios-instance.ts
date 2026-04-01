@@ -69,6 +69,7 @@ axiosInstance.interceptors.response.use(
         if (typeof window !== 'undefined') {
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
+          localStorage.removeItem('token_expires_at');
           window.location.href = '/auth/login';
         }
         return Promise.reject(refreshError);
