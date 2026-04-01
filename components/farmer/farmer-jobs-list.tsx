@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Users, Clock, Banknote, MapPin, Copy, Calendar, Inbox, LayoutGrid, LayoutList, Loader2, Filter, ChevronLeft, ChevronRight } from "lucide-react"
+import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Users, Clock, Banknote, MapPin, Copy, Calendar, Inbox, LayoutGrid, LayoutList, Loader2, Filter, ChevronLeft, ChevronRight, ArrowUpDown, ArrowDownUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -70,6 +70,7 @@ export function FarmerJobsList() {
   const [applicationsError, setApplicationsError] = useState<string | null>(null)
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null)
   const [jobPendingDelete, setJobPendingDelete] = useState<Job | null>(null)
+  const [sortByDatesDescending, setSortByDatesDescending] = useState(true)
 
   // For combo boxes
   const [categories, setCategories] = useState<JobCategory[]>([])
@@ -212,14 +213,15 @@ export function FarmerJobsList() {
 
         let response
         if (hasFilters) {
-          response = await jobService.getFilteredJobs({
+          response = await jobService.getFilteredJobsByFarmer({
             title: searchQuery || undefined,
             category: (filterCategory && filterCategory !== "all-categories") ? filterCategory : undefined,
             address: (filterAddress && filterAddress !== "all-provinces") ? filterAddress : undefined,
             skill: filterSkills.length > 0 ? filterSkills : undefined,
+            sortByDatesDescending,
           })
         } else {
-          response = await jobService.getJobs()
+          response = await jobService.getMyJobPosts()
         }
 
         const payload = response.data as Job[] | { data?: Job[]; items?: Job[] }
@@ -250,22 +252,31 @@ export function FarmerJobsList() {
     }
 
     void loadJobs()
-  }, [searchQuery, filterCategory, filterAddress, filterSkills])
+  }, [searchQuery, filterCategory, filterAddress, filterSkills, sortByDatesDescending])
 
-  const filteredJobs = useMemo(() => jobs.filter((job) => {
-    const matchesSearch = [job.title, job.address, job.description]
-      .filter(Boolean)
-      .some((value) => value.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredJobs = useMemo(() => {
+    const filtered = jobs.filter((job) => {
+      const matchesSearch = [job.title, job.address, job.description]
+        .filter(Boolean)
+        .some((value) => value.toLowerCase().includes(searchQuery.toLowerCase()))
 
-    const status = normalizeStatus(job.status)
-    const matchesTab =
-      activeTab === "all" ||
-      (activeTab === "active" && status === "active") ||
-      (activeTab === "filled" && status === "filled") ||
-      (activeTab === "completed" && status === "completed")
+      const status = normalizeStatus(job.status)
+      const matchesTab =
+        activeTab === "all" ||
+        (activeTab === "active" && status === "active") ||
+        (activeTab === "filled" && status === "filled") ||
+        (activeTab === "completed" && status === "completed")
 
-    return matchesSearch && matchesTab
-  }), [activeTab, jobs, searchQuery])
+      return matchesSearch && matchesTab
+    })
+
+    // Client-side sort fallback (for the non-filtered getMyJobPosts path)
+    return [...filtered].sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime() || 0
+      const dateB = new Date(b.createdAt).getTime() || 0
+      return sortByDatesDescending ? dateB - dateA : dateA - dateB
+    })
+  }, [activeTab, jobs, searchQuery, sortByDatesDescending])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -386,6 +397,17 @@ export function FarmerJobsList() {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Sort Toggle */}
+          <Button
+            variant="outline"
+            onClick={() => setSortByDatesDescending(prev => !prev)}
+            className="h-10 shrink-0 gap-2"
+            title={sortByDatesDescending ? "Mới nhất trước" : "Cũ nhất trước"}
+          >
+            <ArrowDownUp className="h-4 w-4" />
+            <span className="hidden sm:inline">{sortByDatesDescending ? "Mới nhất" : "Cũ nhất"}</span>
+          </Button>
 
           {/* Filter Button */}
           <Button variant="outline" onClick={() => setIsFilterDialogOpen(true)} className="h-10 shrink-0">

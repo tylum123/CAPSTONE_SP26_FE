@@ -18,6 +18,16 @@ export const jobService = {
         return response.data;
     },
 
+    getMyJobPosts: async (): Promise<ApiResponse<Job[]>> => {
+        const response = await axiosInstance.get(API_ENDPOINTS.JOBS.MY_JOB_POSTS);
+        return response.data;
+    },
+
+    getJobsByFarmer: async (farmerId: string): Promise<ApiResponse<Job[]>> => {
+        const response = await axiosInstance.get(API_ENDPOINTS.JOBS.GET_BY_FARMER(farmerId));
+        return response.data;
+    },
+
     getJobDetail: async (id: string): Promise<ApiResponse<Job>> => {
         const response = await axiosInstance.get(API_ENDPOINTS.JOBS.DETAIL(id));
         return response.data;
@@ -38,8 +48,20 @@ export const jobService = {
         category?: string;
         address?: string;
         skill?: string[];
+        sortByDatesDescending: boolean;
     }): Promise<ApiResponse<Job[]>> => {
         const response = await axiosInstance.get(API_ENDPOINTS.JOBS.FILTERED_JOBS, { params });
+        return response.data;
+    },
+
+    getFilteredJobsByFarmer: async (params?: {
+        title?: string;
+        category?: string;
+        address?: string;
+        skill?: string[];
+        sortByDatesDescending: boolean;
+    }): Promise<ApiResponse<Job[]>> => {
+        const response = await axiosInstance.get(API_ENDPOINTS.JOBS.FILTERED_JOBS_BY_FARMER, { params });
         return response.data;
     },
 
