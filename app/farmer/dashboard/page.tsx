@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
-import { Briefcase, Users, DollarSign, Clock, ChevronRight, Star, Cloud, Droplets, Wind, X, RefreshCw, ChevronDown, Plus, Sparkles } from "lucide-react"
+import { Briefcase, Users, DollarSign, Clock, ChevronRight, Star, Cloud, Droplets, Wind, X, RefreshCw, ChevronDown, Plus, Sparkles, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect, useRef } from "react"
 import { farmerService } from "@/libs/api/services/farmer.service"
@@ -13,36 +13,13 @@ import { useWeather } from "@/hooks/use-weather"
 import Image from "next/image"
 import { ActivityChart, JobStatusChart } from "@/components/farmer/dashboard-charts"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { jobApplicationService } from "@/libs/api/services/jobApplication.service"
+import { ApplicationStatusId } from "@/libs/types"
+import type { ApplicationDTO } from "@/libs/types"
+import { formatDistanceToNow } from "date-fns"
+import { vi } from "date-fns/locale"
+import { toast } from "sonner"
 
-const recentApplications = [
-  {
-    id: 1,
-    workerName: "Trần Văn Bình",
-    job: "Gặt lúa 2 ngày",
-    rating: 4.8,
-    distance: "0.8km",
-    skills: ["Thu hoạch", "Máy gặt"],
-    appliedAt: "5 phút trước",
-  },
-  {
-    id: 2,
-    workerName: "Lê Thị Cẩm",
-    job: "Phun thuốc trừ sâu",
-    rating: 4.5,
-    distance: "1.2km",
-    skills: ["Phun thuốc", "Bón phân"],
-    appliedAt: "15 phút trước",
-  },
-  {
-    id: 3,
-    workerName: "Phạm Văn Dũng",
-    job: "Gặt lúa 2 ngày",
-    rating: 4.9,
-    distance: "2.5km",
-    skills: ["Thu hoạch", "Làm đất"],
-    appliedAt: "30 phút trước",
-  },
-]
 
 const scheduledDates = [
   new Date('2026-01-15'),
@@ -58,6 +35,8 @@ export default function FarmerDashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const popupRef = useRef<HTMLDivElement>(null)
+  const [pendingApplications, setPendingApplications] = useState<ApplicationDTO[]>([])
+  const [isLoadingApplications, setIsLoadingApplications] = useState(false)
   const { currentWeather, loading: weatherLoading, refetch } = useWeather({
     useCurrentUserAddress: true,
   })
@@ -107,6 +86,46 @@ export default function FarmerDashboard() {
 
     fetchProfile()
   }, [])
+ 
+  const fetchPendingApplications = async () => {
+    try {
+      setIsLoadingApplications(true)
+      const response = await jobApplicationService.getFarmerApplications({
+        statusId: ApplicationStatusId.Pending
+      })
+      setPendingApplications(response.data)
+    } catch (error) {
+      console.error('Failed to fetch pending applications:', error)
+    } finally {
+      setIsLoadingApplications(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchPendingApplications()
+  }, [])
+
+  const handleApproveApplication = async (applicationId: string) => {
+    try {
+      await jobApplicationService.approveApplicant(applicationId)
+      toast.success("Hồ sơ đã được duyệt")
+      await fetchPendingApplications()
+    } catch (error) {
+      console.error('Failed to approve application:', error)
+      toast.error("Không thể duyệt hồ sơ")
+    }
+  }
+
+  const handleRejectApplication = async (applicationId: string) => {
+    try {
+      await jobApplicationService.rejectApplicant(applicationId)
+      toast.info("Đã từ chối hồ sơ")
+      await fetchPendingApplications()
+    } catch (error) {
+      console.error('Failed to reject application:', error)
+      toast.error("Không thể từ chối hồ sơ")
+    }
+  }
 
   const stats = [
     { label: "Tổng việc đã đăng", value: profile?.totalJobsPosted?.toString() || "0", icon: Briefcase, color: "text-agro-green", bgColor: "bg-agro-green/10" },
@@ -204,48 +223,69 @@ export default function FarmerDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {recentApplications.map((app) => (
-                      <div key={app.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-agro-green/10 flex items-center justify-center">
-                            <span className="text-agro-green font-semibold">{app.workerName.charAt(0)}</span>
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium">{app.workerName}</p>
-                              <div className="flex items-center gap-0.5">
-                                <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
-                                <span className="text-xs">{app.rating}</span>
-                              </div>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              {app.job} • {app.distance}
-                            </p>
-                            <div className="flex gap-1 mt-1">
-                              {app.skills.map((skill, i) => (
-                                <Badge key={i} variant="secondary" className="text-xs py-0">
-                                  {skill}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            {app.appliedAt}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" className="text-xs h-7 bg-transparent">
-                              Xem
-                            </Button>
-                            <Button size="sm" className="text-xs h-7 bg-agro-green hover:bg-agro-green-dark text-white">
-                              Duyệt
-                            </Button>
-                          </div>
-                        </div>
+                    {isLoadingApplications ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-agro-green" />
                       </div>
-                    ))}
+                    ) : pendingApplications.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                        <Users className="h-12 w-12 mb-4 opacity-20" />
+                        <p className="text-sm">Chưa có ứng viên mới nào cần duyệt.</p>
+                      </div>
+                    ) : (
+                      pendingApplications.map((app) => (
+                        <div key={app.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full overflow-hidden border bg-agro-green/10 flex items-center justify-center">
+                              {app.worker?.avatarUrl ? (
+                                <Image src={app.worker.avatarUrl} alt={app.worker.fullName} width={40} height={40} className="object-cover" />
+                              ) : (
+                                <span className="text-agro-green font-semibold">{app.worker?.fullName?.charAt(0) || "?"}</span>
+                              )}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium">{app.worker?.fullName || "Ẩn danh"}</p>
+                                <div className="flex items-center gap-0.5">
+                                  <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
+                                  <span className="text-xs">{app.worker?.averageRating?.toFixed(1) || "5.0"}</span>
+                                </div>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {app.jobPost?.title || "Công việc"} • {app.worker?.primaryLocation || "Lân cận"}
+                              </p>
+                              {app.worker?.experienceLevel && (
+                                <div className="flex gap-1 mt-1">
+                                  <Badge variant="secondary" className="text-[10px] py-0 px-1 font-normal">
+                                    {app.worker.experienceLevel}
+                                  </Badge>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              {formatDistanceToNow(new Date(app.appliedAt), { addSuffix: true, locale: vi })}
+                            </div>
+                            <div className="flex gap-2">
+                              <Link href={`/farmer/jobs/${app.jobPostId}`}>
+                                <Button size="sm" variant="outline" className="text-xs h-7 bg-transparent px-2">
+                                  Xem
+                                </Button>
+                              </Link>
+                              <Button
+                                size="sm"
+                                onClick={() => handleApproveApplication(app.id)}
+                                className="text-xs h-7 bg-agro-green hover:bg-agro-green-dark text-white px-2"
+                              >
+                                Duyệt
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>

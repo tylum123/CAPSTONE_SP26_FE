@@ -39,6 +39,7 @@ export const API_ENDPOINTS = {
     CREATE: '/job/post',
     UPDATE: (id: string) => `/job/post/${id}`,
     DELETE: (id: string) => `/job/post/${id}`,
+    JOB_APPLICATIONS: '/job/application',
     JOB_APPLICATIONS_BY_POST: (jobPostId: string) => `/job/application/post/${jobPostId}`,
     APPLICATION_DETAIL: (id: string) => `/job/application/${id}`,
     RESPOND_APPLICANT: (id: string) => `/job/application/respond/${id}`,

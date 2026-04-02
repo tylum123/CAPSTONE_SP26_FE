@@ -4,8 +4,14 @@ import { API_ENDPOINTS } from "../endpoints/config";
 
 export const jobApplicationService = {
     /**
- * Get all job application for farmer's job posts
- */
+     * Get all job application for farmer's job posts with optional status filtering
+     */
+    getFarmerApplications: async (params?: { statusId?: number }): Promise<ApiResponse<ApplicationDTO[]>> => {
+        const response = await axiosInstance.get(API_ENDPOINTS.JOBS.JOB_APPLICATIONS, { params });
+        return response.data;
+    },
+
+
     getJobApplicationsByPost: async (params?: {
         jobId?: string;
         includeAll?: boolean;
