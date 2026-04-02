@@ -24,14 +24,6 @@
 
 ## Tính năng chính
 
-### Cho Người lao động (Worker)
-
-- **Tìm kiếm thông minh** - Tìm việc theo GPS, lọc theo khoảng cách, lương, loại công việc
-- **Ứng tuyển nhanh** - Ứng tuyển chỉ trong vài phút
-- **Ví điện tử** - Nhận lương qua VNPay/Momo an toàn
-- **Hệ thống đánh giá** - Xây dựng reputation qua rating
-- **Chat trực tiếp** - Liên hệ nông dân để làm rõ công việc
-
 ### Cho Nông dân (Farmer)
 
 - **Đăng tin tuyển dụng** - Tạo và quản lý tin tuyển dụng dễ dàng
@@ -89,7 +81,7 @@
 - **PostCSS** - CSS processing
 
 ---
-
+<!-- 
 ## Cấu trúc dự án
 
 ```
@@ -170,7 +162,7 @@ CAPSTONE_SP25_FE/
 └── pnpm-lock.yaml           # Lock file
 ```
 
----
+--- -->
 
 ## Cài đặt
 
@@ -211,15 +203,9 @@ Tạo file `.env.local`:
 
 ```env
 # API Configuration (sẽ cập nhật khi có backend)
-NEXT_PUBLIC_API_URL=http://localhost:5000
+NEXT_PUBLIC_API_URL=http://localhost:5057
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
-# Analytics (optional)
-NEXT_PUBLIC_VERCEL_ANALYTICS_ID=your_analytics_id
-
-# Payment Gateways (sẽ cập nhật)
-NEXT_PUBLIC_VNPAY_URL=
-NEXT_PUBLIC_MOMO_URL=
 ```
 
 ### Run Development Server
@@ -279,7 +265,7 @@ npx shadcn@latest add sheet
 
 ### Project Conventions
 
-- **Components**: PascalCase (`WorkerDashboard.tsx`)
+- **Components**: PascalCase (`farmerDashboard.tsx`)
 - **Utilities**: kebab-case (`format-currency.ts`)
 - **Hooks**: use-\* prefix (`use-auth.ts`)
 - **Server Components**: Default (no "use client")
@@ -352,7 +338,7 @@ import { cn } from '@/libs/utils'
 
 ---
 
-## Roadmap
+<!-- ## Roadmap
 
 ### Phase 1: UI/UX Foundation ✅ (Current)
 
@@ -390,7 +376,7 @@ import { cn } from '@/libs/utils'
 - [ ] Advanced filtering & search
 - [ ] Export reports (PDF/Excel)
 
----
+--- -->
 
 ## 🤝 Contributing
 
@@ -425,9 +411,9 @@ git push origin feat/your-feature
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
----
+<!-- --- -->
 
-## 👨‍💻 Team
+<!-- ## 👨‍💻 Team
 
 **CAPSTONE_SP25** - FPT University
 
@@ -442,7 +428,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Repository**: [https://github.com/tylum123/CAPSTONE_SP25_FE](https://github.com/tylum123/CAPSTONE_SP25_FE)
 - **Issues**: [GitHub Issues](https://github.com/tylum123/CAPSTONE_SP25_FE/issues)
-- **Email**: your.email@example.com
+- **Email**: [EMAIL_ADDRESS]
 
 ---
 
@@ -452,7 +438,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [shadcn/ui](https://ui.shadcn.com/) - UI Component System
 - [Radix UI](https://www.radix-ui.com/) - Headless UI Components
 - [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS
-- [Vercel](https://vercel.com/) - Deployment Platform
+- [Vercel](https://vercel.com/) - Deployment Platform -->
 
 ---
 
