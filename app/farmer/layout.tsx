@@ -27,11 +27,13 @@ import {
   Loader2,
   Home,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { farmerService, authService } from "@/libs/api/services"
+import { useEffect, useState, useCallback, useRef } from "react";
+import { farmerService, authService, notificationService } from "@/libs/api/services"
 import type { FarmerProfile } from "@/libs/types"
+import type { NotificationDTO } from "@/libs/types/notifications.types";
 import { useAuth } from "@/libs/stores/auth.store";
 import { AnimatedBubbles } from "@/components/farmer/animated-bubbles";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function FarmerLayout({
   children,
@@ -43,6 +45,52 @@ export default function FarmerLayout({
   const { isAuthenticated, isLoading, logout } = useAuth();
   const [checkingProfile, setCheckingProfile] = useState(false);
   const [isProfileMissing, setIsProfileMissing] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationDTO[]>([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await notificationService.getAll();
+      const data: NotificationDTO[] = res.data?.data ?? res.data ?? [];
+      setNotifications(data);
+    } catch {
+      // silently ignore notification fetch errors
+    }
+  }, []);
+
+  const handleMarkRead = async (id: string) => {
+    try {
+      await notificationService.markRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, isRead: true, readAt: new Date().toISOString() } : n))
+      );
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await notificationService.markAllRead();
+      setNotifications((prev) =>
+        prev.map((n) => ({ ...n, isRead: true, readAt: new Date().toISOString() }))
+      );
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleDeleteNotif = async (id: string) => {
+    try {
+      await notificationService.delete(id);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    } catch {
+      // ignore
+    }
+  };
 
   const navItems = [
     { icon: LayoutDashboard, label: "Tổng quan", href: "/farmer/dashboard" },
@@ -59,6 +107,25 @@ export default function FarmerLayout({
       router.push("/auth/login");
     }
   }, [isAuthenticated, isLoading, router]);
+
+  // Fetch notifications on mount and poll every 60s
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 60_000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, fetchNotifications]);
+
+  // Close notification panel when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    };
+    if (notifOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [notifOpen]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -177,10 +244,94 @@ export default function FarmerLayout({
 
             {/* Right Side - Notifications & Profile */}
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-agro-orange rounded-full" />
-              </Button>
+              {/* Notification Bell */}
+              <div className="relative" ref={notifRef}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative"
+                  onClick={() => setNotifOpen((prev) => !prev)}
+                  aria-label="Thông báo"
+                >
+                  <Bell className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 min-w-[16px] h-4 px-0.5 bg-agro-orange text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </Button>
+
+                {/* Notification Dropdown Panel */}
+                {notifOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-4 py-3 border-b">
+                      <span className="font-semibold text-sm">Thông báo</span>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllRead}
+                          className="text-xs text-agro-green hover:underline font-medium"
+                        >
+                          Đánh dấu tất cả đã đọc
+                        </button>
+                      )}
+                    </div>
+
+                    {/* List */}
+                    <div className="max-h-[400px] overflow-y-auto divide-y divide-border">
+                      {notifications.length === 0 ? (
+                        <div className="py-8 text-center text-sm text-muted-foreground">
+                          Không có thông báo nào
+                        </div>
+                      ) : (
+                        notifications.map((notif) => (
+                          <div
+                            key={notif.id}
+                            className={`flex gap-3 px-4 py-3 hover:bg-muted/40 transition-colors ${!notif.isRead ? "bg-agro-green/5" : ""
+                              }`}
+                          >
+                            {/* Unread dot */}
+                            <span
+                              className={`mt-1.5 flex-shrink-0 w-2 h-2 rounded-full ${!notif.isRead ? "bg-agro-orange" : "bg-transparent"
+                                }`}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium leading-snug truncate">{notif.title}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{notif.message}</p>
+                              <div className="flex items-center gap-3 mt-1.5">
+                                <span className="text-[11px] text-muted-foreground">
+                                  {new Date(notif.sentAt).toLocaleString("vi-VN", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                                {!notif.isRead && (
+                                  <button
+                                    onClick={() => handleMarkRead(notif.id)}
+                                    className="text-[11px] text-agro-green hover:underline"
+                                  >
+                                    Đánh dấu đã đọc
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            {/* Delete button */}
+                            <button
+                              onClick={() => handleDeleteNotif(notif.id)}
+                              className="flex-shrink-0 text-muted-foreground hover:text-destructive transition-colors text-xs mt-1"
+                              aria-label="Xoá thông báo"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

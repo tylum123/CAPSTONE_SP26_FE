@@ -15,8 +15,10 @@ function Calendar({
   className,
   classNames,
   showOutsideDays = true,
-  captionLayout = 'label',
+  captionLayout = 'dropdown',
   buttonVariant = 'ghost',
+  startMonth,
+  endMonth,
   formatters,
   components,
   ...props
@@ -24,6 +26,11 @@ function Calendar({
   buttonVariant?: React.ComponentProps<typeof Button>['variant']
 }) {
   const defaultClassNames = getDefaultClassNames()
+
+  // Default year range: 10 years back / 10 years forward from today
+  const now = new Date()
+  const defaultStartMonth = startMonth ?? new Date(now.getFullYear() - 10, 0)
+  const defaultEndMonth = endMonth ?? new Date(now.getFullYear() + 10, 11)
 
   return (
     <DayPicker
@@ -35,6 +42,8 @@ function Calendar({
         className,
       )}
       captionLayout={captionLayout}
+      startMonth={defaultStartMonth}
+      endMonth={defaultEndMonth}
       formatters={{
         formatMonthDropdown: (date) =>
           date.toLocaleString('vi-VN', { month: 'long' }),

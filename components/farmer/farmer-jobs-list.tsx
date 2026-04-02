@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Users, Clock, Banknote, MapPin, Copy, Calendar, Inbox, LayoutGrid, LayoutList, Loader2, Filter, ChevronLeft, ChevronRight } from "lucide-react"
+import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Users, Clock, Banknote, MapPin, Copy, Calendar, Inbox, LayoutGrid, LayoutList, Loader2, Filter, ChevronLeft, ChevronRight, ArrowUpDown, ArrowDownUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
 import { jobService } from "@/libs/api/services/jobs.service"
+import { jobApplicationService } from "@/libs/api/services/jobApplication.service"
 
 export function FarmerJobsList() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -70,6 +71,7 @@ export function FarmerJobsList() {
   const [applicationsError, setApplicationsError] = useState<string | null>(null)
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null)
   const [jobPendingDelete, setJobPendingDelete] = useState<Job | null>(null)
+  const [sortByDatesDescending, setSortByDatesDescending] = useState(true)
 
   // For combo boxes
   const [categories, setCategories] = useState<JobCategory[]>([])
@@ -101,8 +103,18 @@ export function FarmerJobsList() {
     return new Intl.DateTimeFormat("vi-VN").format(date)
   }
 
-  const normalizeStatus = (status?: string) => {
+  const normalizeStatus = (status?: string, startDate?: string) => {
     const normalized = (status ?? "").toLowerCase()
+
+    // If job start date has reached or passed today, it's considered past deadline/completed
+    if (startDate) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const jobStart = new Date(startDate)
+      if (jobStart <= today) {
+        return "passed"
+      }
+    }
 
     if (["open", "active", "published", "recruiting"].includes(normalized)) {
       return "active"
@@ -212,14 +224,15 @@ export function FarmerJobsList() {
 
         let response
         if (hasFilters) {
-          response = await jobService.getFilteredJobs({
+          response = await jobService.getFilteredJobsByFarmer({
             title: searchQuery || undefined,
             category: (filterCategory && filterCategory !== "all-categories") ? filterCategory : undefined,
             address: (filterAddress && filterAddress !== "all-provinces") ? filterAddress : undefined,
             skill: filterSkills.length > 0 ? filterSkills : undefined,
+            sortByDatesDescending,
           })
         } else {
-          response = await jobService.getJobs()
+          response = await jobService.getFilteredJobsByFarmer()
         }
 
         const payload = response.data as Job[] | { data?: Job[]; items?: Job[] }
@@ -250,22 +263,32 @@ export function FarmerJobsList() {
     }
 
     void loadJobs()
-  }, [searchQuery, filterCategory, filterAddress, filterSkills])
+  }, [searchQuery, filterCategory, filterAddress, filterSkills, sortByDatesDescending])
 
-  const filteredJobs = useMemo(() => jobs.filter((job) => {
-    const matchesSearch = [job.title, job.address, job.description]
-      .filter(Boolean)
-      .some((value) => value.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredJobs = useMemo(() => {
+    const filtered = jobs.filter((job) => {
+      const matchesSearch = [job.title, job.address, job.description]
+        .filter(Boolean)
+        .some((value) => value.toLowerCase().includes(searchQuery.toLowerCase()))
 
-    const status = normalizeStatus(job.status)
-    const matchesTab =
-      activeTab === "all" ||
-      (activeTab === "active" && status === "active") ||
-      (activeTab === "filled" && status === "filled") ||
-      (activeTab === "completed" && status === "completed")
+      const status = normalizeStatus(job.status, job.startDate)
+      const matchesTab =
+        activeTab === "all" ||
+        (activeTab === "active" && status === "active") ||
+        (activeTab === "filled" && status === "filled") ||
+        (activeTab === "completed" && status === "completed") ||
+        (activeTab === "passed" && status === "passed")
 
-    return matchesSearch && matchesTab
-  }), [activeTab, jobs, searchQuery])
+      return matchesSearch && matchesTab
+    })
+
+    // Client-side sort fallback (for the non-filtered getMyJobPosts path)
+    return [...filtered].sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime() || 0
+      const dateB = new Date(b.createdAt).getTime() || 0
+      return sortByDatesDescending ? dateB - dateA : dateA - dateB
+    })
+  }, [activeTab, jobs, searchQuery, sortByDatesDescending])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -277,6 +300,12 @@ export function FarmerJobsList() {
         return (
           <Badge variant="outline" className="bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800/60 dark:text-slate-400 border-slate-200 dark:border-slate-700">
             Hoàn thành
+          </Badge>
+        )
+      case "passed":
+        return (
+          <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-400 border-rose-200">
+            Quá hạn
           </Badge>
         )
       default:
@@ -304,7 +333,7 @@ export function FarmerJobsList() {
     setApplications([])
 
     try {
-      const response = await farmerService.getJobApplicationsByPost({
+      const response = await jobApplicationService.getJobApplicationsByPost({
         jobId: job.id,
         includeAll: true,
       })
@@ -371,25 +400,41 @@ export function FarmerJobsList() {
         </div>
 
         {/* Right Controls */}
-        <div className="flex items-center gap-3 w-full sm:w-auto overflow-x-auto">
+        <div className="flex items-center gap-3 pl-3 sm:w-auto overflow-x-auto">
           {/* Status Select */}
-          <div className="w-full sm:w-[160px] shrink-0">
+          <div className="w-full sm:w-[180px] shrink-0">
             <Select value={activeTab} onValueChange={setActiveTab}>
-              <SelectTrigger className="h-10 font-medium">
-                <SelectValue placeholder="Trạng thái" />
+              <SelectTrigger className="h-10 font-medium bg-white dark:bg-slate-900 border-slate-200">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <SelectValue placeholder="Trạng thái" />
+                </div>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                <SelectItem value="all">Tất cả bài đăng</SelectItem>
                 <SelectItem value="active">Đang tuyển</SelectItem>
-                <SelectItem value="filled">Đã đủ</SelectItem>
-                <SelectItem value="completed">Hoàn thành</SelectItem>
+                <SelectItem value="filled">Đã đủ / Full</SelectItem>
+                <SelectItem value="completed">Đã xong</SelectItem>
+                <SelectItem value="passed">Quá hạn</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Filter Button */}
-          <Button variant="outline" onClick={() => setIsFilterDialogOpen(true)} className="h-10 shrink-0">
-            <Filter className="mr-2 h-4 w-4" /> Bộ lọc
+          <div className="h-8 w-[1px] bg-slate-200 dark:bg-slate-800 hidden sm:block mx-1" />
+
+          {/* Sort Button */}
+          <Button
+            variant="outline"
+            onClick={() => setSortByDatesDescending(prev => !prev)}
+            className="h-10 shrink-0 gap-2 font-medium bg-white dark:bg-slate-900 border-slate-200"
+          >
+            <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+            <span className="hidden lg:inline">{sortByDatesDescending ? "Mới nhất" : "Cũ nhất"}</span>
+          </Button>
+
+          {/* Advanced Filter Button */}
+          <Button variant="outline" onClick={() => setIsFilterDialogOpen(true)} className="h-10 shrink-0 font-medium bg-white dark:bg-slate-900 border-slate-200">
+            <Search className="mr-2 h-4 w-4 text-muted-foreground" /> Bộ lọc
           </Button>
 
           {/* View Toggles */}
@@ -577,7 +622,7 @@ export function FarmerJobsList() {
                   <div className="flex flex-wrap items-start gap-3 justify-between">
                     <div className="flex flex-wrap items-center gap-3 flex-1">
                       <h3 className="text-xl font-bold text-foreground hover:text-primary transition-colors cursor-pointer line-clamp-1" title={job.title}>{job.title}</h3>
-                      {getStatusBadge(normalizeStatus(job.status))}
+                      {getStatusBadge(normalizeStatus(job.status, job.startDate))}
                     </div>
                     {viewMode === "grid" && (
                       <div className="flex items-center gap-1 shrink-0 bg-slate-50 dark:bg-slate-900 rounded-md p-1 border">
@@ -637,7 +682,7 @@ export function FarmerJobsList() {
                     </div>
                   </div>
 
-                  {normalizeStatus(job.status) !== "completed" && (
+                  {normalizeStatus(job.status, job.startDate) !== "completed" && (
                     <div className={`max-w-md bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800 mt-2 ${viewMode === "grid" ? "w-full" : ""}`}>
                       <div className="mb-2 flex items-center justify-between text-xs font-medium">
                         <span className="text-muted-foreground uppercase tracking-wider text-[10px]">Tiến độ</span>

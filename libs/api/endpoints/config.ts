@@ -31,11 +31,15 @@ export const API_ENDPOINTS = {
 
   JOBS: {
     GET: '/job/post',
+    MY_JOB_POSTS: '/job/post/farmer/history',
+    GET_BY_FARMER: (farmerId: string) => `/job/post/farmer/${farmerId}`,
     DETAIL: (id: string) => `/job/post/${id}`,
     FILTERED_JOBS: '/job/post/filter',
+    FILTERED_JOBS_BY_FARMER: '/job/post/filter/farmer',
     CREATE: '/job/post',
     UPDATE: (id: string) => `/job/post/${id}`,
     DELETE: (id: string) => `/job/post/${id}`,
+    JOB_APPLICATIONS: '/job/application',
     JOB_APPLICATIONS_BY_POST: (jobPostId: string) => `/job/application/post/${jobPostId}`,
     APPLICATION_DETAIL: (id: string) => `/job/application/${id}`,
     RESPOND_APPLICANT: (id: string) => `/job/application/respond/${id}`,
@@ -131,8 +135,21 @@ export const API_ENDPOINTS = {
     ACCOUNT_BALANCE: '/withdraw/account-balance',
   },
 
-  NOTIFICATIONS: '/notifications',
-  MESSAGES: '/messages',
+  NOTIFICATIONS: {
+    GET_ALL: '/notification',
+    MARK_READ: '/notification/read',
+    MARK_ALL_READ: '/notification/read-all',
+    GET_ALL_UNREAD: '/notification/unread',
+    DELETE: (id: string) => `/notification/${id}`
+  },
+
+
+  MESSAGES: {
+    GET: '/messages',
+    SEND: '/messages',
+    READ: '/messages/read'
+  },
+
   UPLOAD: '/upload',
 } as const;
 

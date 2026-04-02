@@ -30,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="vi">
+    <html lang="vi" className="scroll-smooth">
       <body className={`font-sans antialiased`} suppressHydrationWarning>
         <LoadingProvider>
           <IntroScreenWrapper />
