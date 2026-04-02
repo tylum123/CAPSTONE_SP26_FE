@@ -21,6 +21,8 @@ import {
 import { farmerService } from "@/libs/api/services/farmer.service"
 import { ApplicationStatusId } from "@/libs/types"
 import type { ApplicationDTO, Job, PaginatedResponse, RespondApplicationRequest } from "@/libs/types"
+import { jobService } from "@/libs/api/services/jobs.service"
+import { jobApplicationService } from "@/libs/api/services/jobApplication.service"
 
 const APP_STATUS = {
   pending: ApplicationStatusId.Pending,
@@ -107,8 +109,17 @@ export default function FarmerJobDetailPage() {
     return "Đã hủy"
   }
 
-  const normalizeStatus = (status?: string) => {
+  const normalizeStatus = (status?: string, startDate?: string) => {
     const normalized = (status ?? "").toLowerCase()
+
+    if (startDate) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const jobStart = new Date(startDate)
+      if (jobStart <= today) {
+        return "passed"
+      }
+    }
 
     if (["open", "active", "published", "recruiting"].includes(normalized)) {
       return "active"
@@ -125,7 +136,7 @@ export default function FarmerJobDetailPage() {
     return "active"
   }
 
-  const status = useMemo(() => normalizeStatus(job?.status), [job?.status])
+  const status = useMemo(() => normalizeStatus(job?.status, job?.startDate), [job?.status, job?.startDate])
 
   const jobStatusBadge = useMemo(() => {
     switch (status) {
@@ -135,6 +146,8 @@ export default function FarmerJobDetailPage() {
         return <Badge className="bg-amber-100 text-amber-800 border-amber-200">Đã đủ người</Badge>
       case "completed":
         return <Badge variant="outline">Hoàn thành</Badge>
+      case "passed":
+        return <Badge className="bg-rose-100 text-rose-800 border-rose-200">Quá hạn</Badge>
       default:
         return null
     }
@@ -145,7 +158,7 @@ export default function FarmerJobDetailPage() {
       setIsLoadingApplications(true)
       setApplicationsError(null)
 
-      const response = await farmerService.getJobApplicationsByPost({
+      const response = await jobApplicationService.getJobApplicationsByPost({
         jobId: currentJobId,
         includeAll: true,
       })
@@ -190,7 +203,8 @@ export default function FarmerJobDetailPage() {
         setIsRespondDialogOpen(true)
       }
 
-      const response = await farmerService.getApplicationDetail(applicationId)
+      const response = await jobApplicationService.getApplicationDetail(applicationId)
+      console.log(response.data)
       setSelectedApplication(response.data)
       setResponseMessage(response.data.responseMessage ?? "")
       setResponseStatus(response.data.statusId === APP_STATUS.rejected ? APP_STATUS.rejected : APP_STATUS.accepted)
@@ -225,13 +239,13 @@ export default function FarmerJobDetailPage() {
         responseMessage: responseMessage.trim() || undefined,
       }
 
-      await farmerService.respondApplicant(selectedApplication.id, payload)
+      await jobApplicationService.respondApplicant(selectedApplication.id, payload)
 
       if (jobId) {
         await loadApplications(jobId)
       }
 
-      const latest = await farmerService.getApplicationDetail(selectedApplication.id)
+      const latest = await jobApplicationService.getApplicationDetail(selectedApplication.id)
       setSelectedApplication(latest.data)
       setResponseMessage(latest.data.responseMessage ?? "")
     } catch (respondError) {
@@ -253,7 +267,7 @@ export default function FarmerJobDetailPage() {
       try {
         setIsLoading(true)
         setError(null)
-        const response = await farmerService.getJobDetail(jobId)
+        const response = await jobService.getJobDetail(jobId)
         setJob(response.data)
       } catch (fetchError) {
         console.error(fetchError)
@@ -444,8 +458,8 @@ export default function FarmerJobDetailPage() {
           <div className="lg:col-span-1">
             <Card className="lg:sticky lg:top-6">
               <CardHeader>
-                <CardTitle className="text-base">Ứng tuyển cho bài đăng</CardTitle>
-                <CardDescription>{applications.length} hồ sơ ứng tuyển</CardDescription>
+                <CardTitle className="text-base">Những ứng viên bài đăng</CardTitle>
+                <CardDescription>Hiện có {applications.length} hồ sơ ứng tuyển</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {isLoadingApplications ? (
@@ -487,6 +501,7 @@ export default function FarmerJobDetailPage() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => void openApplicationRespond(application.id)}
+                                disabled={application.statusId !== APP_STATUS.pending}
                               >
                                 <MailIcon className="h-4 w-4" />
                                 <span className="sr-only">Phản hồi ứng viên</span>
@@ -550,9 +565,9 @@ export default function FarmerJobDetailPage() {
               <div className="space-y-4 text-sm">
                 <div className="rounded-lg border p-4">
                   <p className="font-semibold text-base">{selectedApplication.worker?.fullName || "Ứng viên"}</p>
-                  <p className="text-muted-foreground">SĐT: {selectedApplication.worker?.phoneNumber || "-"}</p>
-                  <p className="text-muted-foreground">Email: {selectedApplication.worker?.email || "-"}</p>
-                  <p className="text-muted-foreground">Địa điểm: {selectedApplication.worker?.primaryLocation || "-"}</p>
+                  <p className="text-muted-foreground">SĐT: {selectedApplication.worker?.phoneNumber || "Không có"}</p>
+                  <p className="text-muted-foreground">Email: {selectedApplication.worker?.email || "Không có"}</p>
+                  <p className="text-muted-foreground">Địa điểm: {selectedApplication.worker?.primaryLocation || "Không có"}</p>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -642,7 +657,7 @@ export default function FarmerJobDetailPage() {
               <>
                 <div className="rounded-lg border p-4 text-sm">
                   <p className="font-semibold">{selectedApplication.worker?.fullName || "Ứng viên"}</p>
-                  <p className="text-muted-foreground">SĐT: {selectedApplication.worker?.phoneNumber || "-"}</p>
+                  <p className="text-muted-foreground">SĐT: {selectedApplication.worker?.phoneNumber || "Không có"}</p>
                   <div className="mt-2">{statusBadge(selectedApplication.statusId)}</div>
                 </div>
 

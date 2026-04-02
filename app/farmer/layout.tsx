@@ -278,59 +278,57 @@ export default function FarmerLayout({
                     </div>
 
                     {/* List */}
-                    <ScrollArea className="max-h-80">
+                    <div className="max-h-[400px] overflow-y-auto divide-y divide-border">
                       {notifications.length === 0 ? (
                         <div className="py-8 text-center text-sm text-muted-foreground">
                           Không có thông báo nào
                         </div>
                       ) : (
-                        <ul className="divide-y divide-border">
-                          {notifications.map((notif) => (
-                            <li
-                              key={notif.id}
-                              className={`flex gap-3 px-4 py-3 hover:bg-muted/40 transition-colors ${!notif.isRead ? "bg-agro-green/5" : ""
+                        notifications.map((notif) => (
+                          <div
+                            key={notif.id}
+                            className={`flex gap-3 px-4 py-3 hover:bg-muted/40 transition-colors ${!notif.isRead ? "bg-agro-green/5" : ""
+                              }`}
+                          >
+                            {/* Unread dot */}
+                            <span
+                              className={`mt-1.5 flex-shrink-0 w-2 h-2 rounded-full ${!notif.isRead ? "bg-agro-orange" : "bg-transparent"
                                 }`}
-                            >
-                              {/* Unread dot */}
-                              <span
-                                className={`mt-1.5 flex-shrink-0 w-2 h-2 rounded-full ${!notif.isRead ? "bg-agro-orange" : "bg-transparent"
-                                  }`}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium leading-snug truncate">{notif.title}</p>
-                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{notif.message}</p>
-                                <div className="flex items-center gap-3 mt-1.5">
-                                  <span className="text-[11px] text-muted-foreground">
-                                    {new Date(notif.sentAt).toLocaleString("vi-VN", {
-                                      day: "2-digit",
-                                      month: "2-digit",
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    })}
-                                  </span>
-                                  {!notif.isRead && (
-                                    <button
-                                      onClick={() => handleMarkRead(notif.id)}
-                                      className="text-[11px] text-agro-green hover:underline"
-                                    >
-                                      Đánh dấu đã đọc
-                                    </button>
-                                  )}
-                                </div>
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium leading-snug truncate">{notif.title}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{notif.message}</p>
+                              <div className="flex items-center gap-3 mt-1.5">
+                                <span className="text-[11px] text-muted-foreground">
+                                  {new Date(notif.sentAt).toLocaleString("vi-VN", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                                {!notif.isRead && (
+                                  <button
+                                    onClick={() => handleMarkRead(notif.id)}
+                                    className="text-[11px] text-agro-green hover:underline"
+                                  >
+                                    Đánh dấu đã đọc
+                                  </button>
+                                )}
                               </div>
-                              {/* Delete button */}
-                              <button
-                                onClick={() => handleDeleteNotif(notif.id)}
-                                className="flex-shrink-0 text-muted-foreground hover:text-destructive transition-colors text-xs mt-1"
-                                aria-label="Xoá thông báo"
-                              >
-                                ✕
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
+                            </div>
+                            {/* Delete button */}
+                            <button
+                              onClick={() => handleDeleteNotif(notif.id)}
+                              className="flex-shrink-0 text-muted-foreground hover:text-destructive transition-colors text-xs mt-1"
+                              aria-label="Xoá thông báo"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))
                       )}
-                    </ScrollArea>
+                    </div>
                   </div>
                 )}
               </div>

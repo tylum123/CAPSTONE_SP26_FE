@@ -112,12 +112,18 @@ export function WhyChooseSection() {
         </div>
 
         {/* Bottom Callout */}
-        {/* <div className={`mt-20 flex justify-center transition-all duration-1000 delay-500 ${isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}>
+        {/* Bottom Callout */}
+        <div className={`mt-20 flex justify-center transition-all duration-1000 delay-500 ${isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}>
           <div className="flex items-center gap-6 rounded-3xl bg-white/50 backdrop-blur-sm border border-white p-6 shadow-sm">
             <div className="flex -space-x-3">
-              {[1, 2, 3, 4].map((i) => (
+              {[
+                "https://unavatar.io/twitter/sindresorhus",
+                "https://unavatar.io/github/shadcn",
+                "https://unavatar.io/twitter/jack",
+                "https://unavatar.io/github/leeerob",
+              ].map((src, i) => (
                 <div key={i} className="h-10 w-10 overflow-hidden rounded-full border-2 border-white bg-gray-200">
-                  <img src={`/placeholder.svg?height=40&width=40`} alt="User" />
+                  <img src={src} alt={`User ${i + 1}`} className="h-full w-full object-cover" />
                 </div>
               ))}
             </div>
@@ -126,7 +132,7 @@ export function WhyChooseSection() {
               <p className="text-xs text-muted-foreground">Phủ sóng rộng khắp 63 tỉnh thành Việt Nam</p>
             </div>
           </div>
-        </div> */}
+        </div>
       </div>
     </section>
   );
