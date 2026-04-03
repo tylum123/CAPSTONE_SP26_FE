@@ -4,7 +4,7 @@ import type { BeWeatherData, DailyWeather } from '@/libs/types/weather.types';
 const WEATHER_BASE = '/weather';
 
 class WeatherService {
-  async getCurrentWeather(city: string = 'Hanoi'): Promise<BeWeatherData> {
+  async getCurrentWeather(city: string = 'Ho Chi Minh City'): Promise<BeWeatherData> {
     const response = await axiosInstance.get<{ data: BeWeatherData }>(`${WEATHER_BASE}/city`, {
       params: { city },
     });
@@ -19,8 +19,18 @@ class WeatherService {
   }
 
   async getWeatherByCurrentUserAddress(): Promise<BeWeatherData> {
-    const response = await axiosInstance.get<{ data: BeWeatherData }>(`${WEATHER_BASE}/me`);
-    return response.data.data;
+    try {
+      const response = await axiosInstance.get<{ data: BeWeatherData }>(`${WEATHER_BASE}/me`);
+      return response.data.data;
+    } catch (error: any) {
+      // Fallback to default city if user has no address/profile
+      if (error?.response?.status === 400) {
+        console.warn("Failed to get weather by user address, falling back to default city.");
+        return this.getCurrentWeather();
+      }
+      // Re-throw other errors
+      throw error;
+    }
   }
 
   getWeatherIconUrl(iconCode: string): string {

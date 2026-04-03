@@ -53,11 +53,13 @@ export default function FarmerLayout({
 
   const fetchNotifications = useCallback(async () => {
     try {
-      const res = await notificationService.getAll();
-      const data: NotificationDTO[] = res.data?.data ?? res.data ?? [];
-      setNotifications(data);
+      const res = await notificationService.getAll({ pageNumber: 1, pageSize: 99 });
+      // The actual array is likely nested under res.data.data
+      const data: NotificationDTO[] = res.data?.data ?? [];
+      setNotifications(Array.isArray(data) ? data : []);
     } catch {
       // silently ignore notification fetch errors
+      setNotifications([]); // Ensure state is an array on error
     }
   }, []);
 

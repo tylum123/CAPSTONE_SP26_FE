@@ -28,3 +28,25 @@ export interface FarmerProfile {
     isVerified: boolean;
   };
 }
+
+export interface DashboardStats {
+  profile: FarmerProfile;
+  wallet: {
+    availableBalance: number;
+    lockedBalance: number;
+  }
+  counters: {
+    pendingApplications: number;
+    workReportsToApprove: number;
+    totalWorkersCurrentlyHired: number;
+  }
+  activeJobs: {
+    id: string;
+    title: string;
+    workersNeeded: number;
+    workersAccepted: number;
+    isUrgent: boolean;
+    statusId: number;
+    createdAt: string;
+  }[];
+}
