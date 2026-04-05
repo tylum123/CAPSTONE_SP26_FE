@@ -28,7 +28,7 @@ export function HeroSection() {
   }, []);
 
   return (
-    <section className="relative min-h-[92vh] overflow-hidden">
+    <section className="relative min-h-[100vh] overflow-hidden">
       {/* Ken Burns background */}
       <div className="absolute inset-0 overflow-hidden">
         <div
@@ -62,9 +62,10 @@ export function HeroSection() {
         {/* Headline */}
         <h1
           ref={headlineRef}
-          className="reveal-hidden mb-6 max-w-4xl text-balance text-4xl font-extrabold leading-[1.1] text-white md:text-6xl lg:text-7xl"
+          className="reveal-hidden mb-6 max-w-4xl text-balance text-3xl font-extrabold leading-[1.1] text-white md:text-6xl lg:text-7xl"
         >
-          Tìm Việc Nhanh,{" "}
+          Tìm Việc Nhanh,
+          <div></div>
           <span className="relative inline-block">
             <span className="text-gradient-orange">Thuê Người Dễ</span>
             {/* Underline decoration */}
@@ -155,7 +156,7 @@ export function HeroSection() {
                       Tải ứng dụng AgroTemp
                     </DialogTitle>
                     <DialogDescription className="text-muted-foreground text-base">
-                      Quét mã QR dưới đây để tải ứng dụng trên thiết bị di động (Android & iOS)
+                      Quét mã QR dưới đây để tải ứng dụng trên thiết bị di động (Android)
                     </DialogDescription>
                   </DialogHeader>
                   <div className="flex flex-col items-center justify-center gap-8 py-10">
@@ -180,7 +181,7 @@ export function HeroSection() {
                       </div>
                       <div className="w-full h-px bg-gray-100 px-10" />
                       <div className="flex gap-4">
-                        <img src="/google-play-store-badge.png" alt="Get it on Google Play" className="h-12 cursor-pointer hover:scale-105 transition-transform" />
+                        <img src="/amazon-appstore-badge-english-black.png" alt="Get it on Google Play" className="h-12 cursor-pointer hover:scale-105 transition-transform" />
                       </div>
                     </div>
                   </div>
@@ -191,11 +192,8 @@ export function HeroSection() {
         </div>
 
         {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2">
+        <div className="absolute bottom-0 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2">
           <span className="text-xs font-medium tracking-widest text-white/50 uppercase">Khám phá</span>
-          <div className="h-10 w-6 rounded-full border-2 border-white/40 p-1">
-            <div className="h-2 w-1 mx-auto rounded-full bg-white/80 animate-scroll-dot" />
-          </div>
           <ChevronDown className="h-4 w-4 text-white/40 animate-bounce" />
         </div>
       </div>

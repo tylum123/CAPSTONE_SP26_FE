@@ -16,7 +16,7 @@ export function Footer() {
           <div className="relative z-10 flex flex-col items-center justify-between gap-8 md:flex-row">
             <div className="text-center md:text-left">
               <h3 className="mb-2 text-2xl font-black md:text-3xl">Bắt đầu hành trình số hóa cùng AgroTemp</h3>
-              <p className="text-agro-green-dark font-bold text-lg">Đăng ký và tìm kiếm lao động ngay bây giờ!</p>
+              <p className="text-agro-white font-light text-lg">Đăng ký và tìm kiếm lao động ngay bây giờ!</p>
             </div>
             <div className="flex gap-4">
               <Link href="/auth/register?type=farmer">
@@ -114,11 +114,11 @@ export function Footer() {
           <div className="space-y-8">
             <h3 className="text-lg font-black uppercase tracking-widest text-agro-green">Trải nghiệm di động</h3>
             <div className="flex gap-4 items-center">
-              <div className="h-28 w-28 rounded-2xl bg-white p-2 shadow-2xl">
+              <div className="h-28 w-28 rounded-2xl bg-white p-2">
                 <img src="/qrcode.png" alt="Download QR" className="h-full w-full object-contain" />
               </div>
-              <div className="space-y-2 rounded-[0.5rem] overflow-hidden">
-                <img src="/google-play-store-badge.png" alt="Google Play" className="h-10 cursor-pointer hover:opacity-80 transition-opacity" />
+              <div className="space-y-2 overflow-hidden">
+                <img src="/amazon-appstore-badge-english-black.png" alt="Google Play" className="h-10 cursor-pointer hover:opacity-80 transition-opacity" />
               </div>
             </div>
             {/* <div className="pt-6 border-t border-white/10">

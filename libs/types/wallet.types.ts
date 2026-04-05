@@ -8,12 +8,20 @@ export interface WalletDTO {
     updateAt?: string;
 }
 
+export enum TransactionType {
+    DEPOSIT = 1,
+    WITHDRAW = 2,
+    JOB_PAYMENT = 3,
+    REFUND = 4,
+    JOB_LOCK = 5
+}
+
 export interface WalletTransactionDTO {
     id: string;
     walletId: string;
     wallet?: WalletDTO;
     jobDetailId?: string;
-    type: string | number;
+    type: TransactionType;
     amount: number;
     balanceAfter: number;
     referenceCode: string;

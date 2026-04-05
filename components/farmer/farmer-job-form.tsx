@@ -1677,7 +1677,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                         })()
                       }
                     }}>
-                      <DialogContent className="sm:max-w-[900px] w-[95vw] max-h-[90vh] overflow-y-auto">
+                      <DialogContent className="sm:max-w-[1200px] w-[95vw] max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                           <DialogTitle>Quản lý địa điểm</DialogTitle>
                         </DialogHeader>

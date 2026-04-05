@@ -112,8 +112,7 @@ export function WhyChooseSection() {
         </div>
 
         {/* Bottom Callout */}
-        {/* Bottom Callout */}
-        <div className={`mt-20 flex justify-center transition-all duration-1000 delay-500 ${isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}>
+        {/* <div className={`mt-20 flex justify-center transition-all duration-1000 delay-500 ${isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}>
           <div className="flex items-center gap-6 rounded-3xl bg-white/50 backdrop-blur-sm border border-white p-6 shadow-sm">
             <div className="flex -space-x-3">
               {[
@@ -132,7 +131,7 @@ export function WhyChooseSection() {
               <p className="text-xs text-muted-foreground">Phủ sóng rộng khắp 63 tỉnh thành Việt Nam</p>
             </div>
           </div>
-        </div>
+        </div> */}
       </div>
     </section>
   );

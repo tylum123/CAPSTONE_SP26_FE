@@ -51,7 +51,9 @@ export function OsmLocationPicker({ latitude, longitude, onPick, className }: Os
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map)
 
-    // Do NOT add map click handler
+    map.on("click", (e: L.LeafletMouseEvent) => {
+      onPick(e.latlng.lat, e.latlng.lng)
+    })
 
     mapRef.current = map
 

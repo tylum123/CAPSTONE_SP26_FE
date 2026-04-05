@@ -105,7 +105,7 @@ export function StatsSection() {
                       <img
                         src={partner.logo || "/payOS.jpg"}
                         alt={partner.name}
-                        className="h-full w-full object-contain filter drop-shadow-sm transition-transform duration-300 group-hover/partner:scale-110"
+                        className="h-full w-full scale-130 object-contain transition-transform duration-300 group-hover/partner:scale-140"
                       />
                     </div>
                   </div>

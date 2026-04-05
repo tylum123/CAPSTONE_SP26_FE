@@ -197,7 +197,7 @@ export default function LoginPage() {
 
         toast({
           title: "Thành công",
-          description: response.message || "Đăng nhập thành công. Đang kiểm tra thông tin...",
+          description: "Đăng nhập thành công. Đang kiểm tra thông tin...",
           variant: "default",
         });
 

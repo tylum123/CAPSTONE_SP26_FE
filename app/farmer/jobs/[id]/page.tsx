@@ -163,6 +163,8 @@ export default function FarmerJobDetailPage() {
         includeAll: true,
       })
 
+      console.log(response.data)
+
       const payload = response.data as
         | PaginatedResponse<ApplicationDTO>
         | ApplicationDTO[]

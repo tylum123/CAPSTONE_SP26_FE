@@ -81,88 +81,6 @@
 - **PostCSS** - CSS processing
 
 ---
-<!-- 
-## Cấu trúc dự án
-
-```
-CAPSTONE_SP25_FE/
-│
-├── app/                        # Next.js App Router
-│   ├── page.tsx               # Landing page (/)
-│   ├── layout.tsx             # Root layout + metadata
-│   ├── globals.css            # Global styles
-│   │
-│   ├── admin/                 # Admin portal routes
-│   │   ├── page.tsx          # /admin - Dashboard
-│   │   ├── users/            # User management
-│   │   ├── disputes/         # Dispute resolution
-│   │   └── settings/         # Admin settings
-│   │
-│   ├── farmer/                # Farmer dashboard routes
-│   │   ├── page.tsx          # /farmer - Dashboard
-│   │   ├── jobs/             # Job postings
-│   │   │   └── new/          # Create new job
-│   │   ├── applicants/       # Review applicants
-│   │   └── payments/         # Payment management
-│   │
-│   └── worker/                # Worker mobile app routes
-│       ├── page.tsx          # /worker - Home
-│       ├── search/           # Job search
-│       ├── jobs/             # My jobs
-│       ├── wallet/           # Wallet
-│       └── profile/          # Profile & ratings
-│
-├── components/                # React components
-│   ├── ui/                   # 45+ shadcn/ui components
-│   │   ├── button.tsx
-│   │   ├── card.tsx
-│   │   ├── dialog.tsx
-│   │   └── ...
-│   │
-│   ├── landing/              # Landing page sections
-│   │   ├── landing-hero.tsx
-│   │   ├── landing-features.tsx
-│   │   └── ...
-│   │
-│   ├── farmer/               # Farmer-specific components
-│   │   ├── farmer-layout.tsx
-│   │   ├── farmer-dashboard.tsx
-│   │   └── ...
-│   │
-│   ├── worker/               # Worker-specific components
-│   │   ├── worker-mobile-layout.tsx
-│   │   ├── worker-home-screen.tsx
-│   │   └── ...
-│   │
-│   └── admin/                # Admin-specific components
-│       ├── admin-layout.tsx
-│       ├── admin-dashboard.tsx
-│       └── ...
-│
-├── lib/                       # Utilities
-│   └── utils.ts              # cn() helper, etc.
-│
-├── hooks/                     # Custom React hooks
-│   ├── use-toast.ts
-│   └── use-mobile.ts
-│
-├── public/                    # Static assets
-│   └── images/
-│
-├── styles/                    # Additional styles
-│   └── globals.css
-│
-├── .gitmessage               # Git commit template
-├── CONTRIBUTING.md           # Contributing guidelines
-├── components.json           # shadcn/ui config
-├── next.config.mjs           # Next.js configuration
-├── tsconfig.json             # TypeScript configuration
-├── tailwind.config.ts        # Tailwind CSS configuration
-├── package.json              # Dependencies & scripts
-└── pnpm-lock.yaml           # Lock file
-```
-
---- -->
 
 ## Cài đặt
 
@@ -302,16 +220,6 @@ import { cn } from '@/libs/utils'
 - How it works
 - Footer với links
 
-### Worker Portal (/worker)
-
-**Mobile-First Design**
-
-- Home: Job discovery feed với nearby jobs
-- Search: Advanced job search & filters
-- Jobs: Quản lý jobs đã ứng tuyển/đang làm
-- Wallet: Xem số dư, lịch sử giao dịch
-- Profile: Thông tin cá nhân, rating, history
-
 ### Farmer Portal (/farmer)
 
 **Desktop-Optimized Dashboard**
@@ -337,46 +245,6 @@ import { cn } from '@/libs/utils'
 - Settings: System configuration
 
 ---
-
-<!-- ## Roadmap
-
-### Phase 1: UI/UX Foundation ✅ (Current)
-
-- [x] Landing page
-- [x] Worker mobile interface
-- [x] Farmer dashboard
-- [x] Admin portal
-- [x] Component library (shadcn/ui)
-- [x] Routing structure
-
-### Phase 2: Backend Integration 🚧 (In Progress)
-
-- [ ] REST API integration
-- [ ] Authentication (JWT)
-- [ ] User management
-- [ ] Job CRUD operations
-- [ ] Real-time notifications
-- [ ] File upload (avatars, docs)
-
-### Phase 3: Core Features 📝 (Planned)
-
-- [ ] GPS-based job search
-- [ ] Payment gateway integration (VNPay/Momo)
-- [ ] Chat/messaging system
-- [ ] Rating & review system
-- [ ] Dispute management
-- [ ] Email notifications
-
-### Phase 4: Advanced Features 🎯 (Future)
-
-- [ ] AI job matching
-- [ ] Analytics dashboard
-- [ ] Mobile apps (React Native)
-- [ ] Multi-language support
-- [ ] Advanced filtering & search
-- [ ] Export reports (PDF/Excel)
-
---- -->
 
 ## 🤝 Contributing
 
@@ -410,35 +278,6 @@ git push origin feat/your-feature
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-<!-- --- -->
-
-<!-- ## 👨‍💻 Team
-
-**CAPSTONE_SP25** - FPT University
-
-- **Frontend Lead**: [Your Name]
-- **Backend Team**: [Names]
-- **UI/UX Designer**: [Name]
-- **Project Manager**: [Name]
-
----
-
-## 📞 Contact
-
-- **Repository**: [https://github.com/tylum123/CAPSTONE_SP25_FE](https://github.com/tylum123/CAPSTONE_SP25_FE)
-- **Issues**: [GitHub Issues](https://github.com/tylum123/CAPSTONE_SP25_FE/issues)
-- **Email**: [EMAIL_ADDRESS]
-
----
-
-## 🙏 Acknowledgments
-
-- [Next.js](https://nextjs.org/) - The React Framework
-- [shadcn/ui](https://ui.shadcn.com/) - UI Component System
-- [Radix UI](https://www.radix-ui.com/) - Headless UI Components
-- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS
-- [Vercel](https://vercel.com/) - Deployment Platform -->
 
 ---
 

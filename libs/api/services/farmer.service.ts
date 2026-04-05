@@ -12,12 +12,18 @@ import type {
   FarmerProfile,
   RespondApplicationRequest,
   UpdateFarmerRequest,
+  DashboardStats,
 } from '@/libs/types';
 
 export const farmerService = {
 
   getProfile: async (): Promise<ApiResponse<FarmerProfile>> => {
     const response = await axiosInstance.get(API_ENDPOINTS.FARMER.PROFILE);
+    return response.data;
+  },
+
+  getDashboardStats: async (): Promise<ApiResponse<DashboardStats>> => {
+    const response = await axiosInstance.get(API_ENDPOINTS.FARMER.DASHBOARD);
     return response.data;
   },
 

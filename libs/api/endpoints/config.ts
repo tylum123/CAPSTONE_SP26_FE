@@ -3,6 +3,8 @@ export const API_CONFIG = {
   BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5057/api/v1',
   TIMEOUT: Number(process.env.NEXT_PUBLIC_API_TIMEOUT) || 30000,
   GOOGLE_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '',
+  BANKLOOKUP_API_KEY: process.env.NEXT_PUBLIC_BANKLOOKUP_API_KEY || '',
+  BANKLOOKUP_API_SECRET: process.env.NEXT_PUBLIC_BANKLOOKUP_API_SECRET || '',
 } as const;
 
 // API Endpoints
@@ -26,7 +28,7 @@ export const API_ENDPOINTS = {
     PROFILE: '/farmer',
     UPDATEPROFILE: '/farmer',
     UPDATEAVATAR: '/farmer/upload-avatar',
-    DASHBOARD: '/farmer/dashboard',
+    DASHBOARD: '/dashboard/farmer',
   },
 
   JOBS: {
