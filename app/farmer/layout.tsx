@@ -54,8 +54,10 @@ export default function FarmerLayout({
   const fetchNotifications = useCallback(async () => {
     try {
       const res = await notificationService.getAll({ pageNumber: 1, pageSize: 99 });
-      // The actual array is likely nested under res.data.data
-      const data: NotificationDTO[] = res.data?.data ?? [];
+      // res is ApiResponse. res.data can be NotificationDTO[] or PaginatedResponse<NotificationDTO>
+      const payload = res.data;
+      const data = Array.isArray(payload) ? payload : (payload as any)?.data ?? [];
+
       setNotifications(Array.isArray(data) ? data : []);
     } catch {
       // silently ignore notification fetch errors
@@ -338,8 +340,8 @@ export default function FarmerLayout({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="gap-2 hidden md:flex">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} />
+                    <Avatar className="h-10 w-10 border-2 border-agro-white relative flex items-center justify-center">
+                      <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} className="object-cover" />
                       <AvatarFallback className="bg-agro-green text-white">
                         {profile?.contactName?.charAt(0).toUpperCase() || "NA"}
                       </AvatarFallback>
@@ -381,7 +383,7 @@ export default function FarmerLayout({
                   <div className="flex flex-col gap-4 mt-8">
                     <div className="flex items-center gap-3 pb-4 border-b">
                       <Avatar className="h-12 w-12">
-                        <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} />
+                        <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} className="object-cover" />
                         <AvatarFallback className="bg-agro-green text-white">
                           {profile?.contactName?.charAt(0).toUpperCase() || "NA"}
                         </AvatarFallback>

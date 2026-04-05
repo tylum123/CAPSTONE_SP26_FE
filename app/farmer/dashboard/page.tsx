@@ -19,6 +19,7 @@ import type { ApplicationDTO } from "@/libs/types"
 import { formatDistanceToNow } from "date-fns"
 import { vi } from "date-fns/locale"
 import { toast } from "sonner"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 
 const scheduledDates = [
@@ -86,7 +87,7 @@ export default function FarmerDashboard() {
 
     fetchProfile()
   }, [])
- 
+
   const fetchPendingApplications = async () => {
     try {
       setIsLoadingApplications(true)
@@ -236,13 +237,16 @@ export default function FarmerDashboard() {
                       pendingApplications.map((app) => (
                         <div key={app.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full overflow-hidden border bg-agro-green/10 flex items-center justify-center">
-                              {app.worker?.avatarUrl ? (
-                                <Image src={app.worker.avatarUrl} alt={app.worker.fullName} width={40} height={40} className="object-cover" />
-                              ) : (
-                                <span className="text-agro-green font-semibold">{app.worker?.fullName?.charAt(0) || "?"}</span>
-                              )}
-                            </div>
+                            <Avatar className="h-10 w-10 border shrink-0">
+                              <AvatarImage
+                                src={app.worker?.avatarUrl || "/placeholder.svg"}
+                                alt={app.worker?.fullName}
+                                className="object-cover"
+                              />
+                              <AvatarFallback className="bg-agro-green/10 text-agro-green font-semibold">
+                                <Image src="/placeholder.svg" alt="placeholder" width={40} height={40} className="object-cover" />
+                              </AvatarFallback>
+                            </Avatar>
                             <div>
                               <div className="flex items-center gap-2">
                                 <p className="font-medium">{app.worker?.fullName || "Ẩn danh"}</p>
