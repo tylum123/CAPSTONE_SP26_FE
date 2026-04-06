@@ -78,7 +78,7 @@ const JOB_TYPE_DAILY_ID = 2
 const DEFAULT_STATUS_ID = 2
 const DEFAULT_IS_URGENT = false
 
-const OSM_REVERSE_URL = process.env.NEXT_PUBLIC_OSM_REVERSE_URL || "https://nominatim.openstreetmap.org/reverse"
+const OSM_REVERSE_URL = process.env.NEXT_PUBLIC_OSM_REVERSE_URL
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("vi-VN", {
@@ -1306,7 +1306,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                 <div className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-20" />
                 <CheckCheck className="h-10 w-10 relative z-10" />
               </div>
-              
+
               <div className="space-y-2">
                 <h3 className="text-3xl font-bold tracking-tight text-foreground">
                   {isEditMode ? "Cập nhật thành công!" : "Đăng tin thành công!"}
@@ -1970,7 +1970,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                     </div>
                   </div>
                 </div>
-                
+
                 <CardContent className="p-8 md:p-12 space-y-12">
                   {/* Key Stats Grid */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-6 bg-muted/20 p-8 rounded-3xl border border-muted-foreground/10">
@@ -2006,7 +2006,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                     <div className="md:col-span-3 space-y-8">
                       <div className="space-y-4">
                         <h4 className="flex items-center text-xs font-black uppercase text-foreground bg-muted/50 w-fit px-3 py-1 rounded-full">
-                           Mô tả công việc
+                          Mô tả công việc
                         </h4>
                         <div className="text-lg leading-relaxed text-muted-foreground whitespace-pre-wrap">
                           {description}
@@ -2015,7 +2015,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
 
                       <div className="space-y-4">
                         <h4 className="flex items-center text-xs font-black uppercase text-foreground bg-muted/50 w-fit px-3 py-1 rounded-full">
-                           Kỹ năng kinh nghiệm
+                          Kỹ năng kinh nghiệm
                         </h4>
                         <div className="flex flex-wrap gap-2">
                           {selectedSkillIds.length > 0 ? (
@@ -2032,7 +2032,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                     <div className="md:col-span-2 space-y-8">
                       <div className="space-y-4">
                         <h4 className="flex items-center text-xs font-black uppercase text-foreground bg-muted/50 w-fit px-3 py-1 rounded-full">
-                           Thời gian cụ thể
+                          Thời gian cụ thể
                         </h4>
                         <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-6 border space-y-4">
                           {scheduleType === "contract" ? (
@@ -2051,7 +2051,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
 
                       <div className="space-y-4">
                         <h4 className="flex items-center text-xs font-black uppercase text-foreground bg-muted/50 w-fit px-3 py-1 rounded-full">
-                           Quyền lợi & Yêu cầu
+                          Quyền lợi & Yêu cầu
                         </h4>
                         <div className="grid gap-3">
                           {benefits.length > 0 ? benefits.map(b => (
@@ -2065,7 +2065,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                     </div>
                   </div>
                 </CardContent>
-                
+
                 <CardContent className="bg-muted/10 border-t p-8 md:p-12 flex flex-col sm:flex-row justify-between items-center gap-6">
                   {submitError && <p className="text-rose-600 font-bold flex items-center bg-rose-50 px-4 py-2 rounded-xl"><Info className="mr-2 h-4 w-4" /> {submitError}</p>}
                   <div className="flex gap-4 w-full sm:w-auto ml-auto">

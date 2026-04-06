@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { ArrowLeft, Banknote, CalendarDays, CheckCircle2, Clock, FileText, InfoIcon, MailIcon, MapPin, RotateCw, Star, Users, XCircle } from "lucide-react"
+import { ArrowLeft, Banknote, CalendarDays, CheckCircle2, Clock, FileText, InfoIcon, MailIcon, MapPin, Play, RotateCw, Star, Users, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
-import { formatDistanceToNow } from "date-fns"
+import { formatDistanceToNow, isToday, parseISO } from "date-fns"
 import { vi } from "date-fns/locale"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
@@ -21,7 +21,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { cn } from "@/libs/utils/utils"
-import { farmerService } from "@/libs/api/services/farmer.service"
 import { ApplicationStatusId } from "@/libs/types"
 import type { ApplicationDTO, Job, PaginatedResponse, RespondApplicationRequest } from "@/libs/types"
 import { jobService } from "@/libs/api/services/jobs.service"
@@ -34,8 +33,18 @@ const APP_STATUS = {
   cancelled: ApplicationStatusId.Cancelled,
 } as const
 
+const JOB_POST_STATUS = {
+  Draft: 1,
+  Published: 2,
+  Closed: 3,
+  InProgress: 4,
+  Completed: 5,
+  Cancelled: 6
+} as const
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import Image from "next/image"
+import { JobStatusChart } from "@/components/farmer/dashboard-charts"
 
 export default function FarmerJobDetailPage() {
   const params = useParams<{ id: string }>()
@@ -55,6 +64,10 @@ export default function FarmerJobDetailPage() {
   const [responseMessage, setResponseMessage] = useState("")
   const [isSubmittingResponse, setIsSubmittingResponse] = useState(false)
   const [responseStatus, setResponseStatus] = useState<ApplicationStatusId>(APP_STATUS.accepted)
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
+  const [isStartJobDialogOpen, setIsStartJobDialogOpen] = useState(false)
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("vi-VN", {
@@ -98,7 +111,7 @@ export default function FarmerJobDetailPage() {
     }
 
     if (statusId === APP_STATUS.accepted) {
-      return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Đã nhận</Badge>
+      return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Đã được ứng tuyển</Badge>
     }
 
     if (statusId === APP_STATUS.rejected) {
@@ -142,7 +155,7 @@ export default function FarmerJobDetailPage() {
     return "active"
   }
 
-  const status = useMemo(() => normalizeStatus(job?.status, job?.startDate), [job?.status, job?.startDate])
+  const status = useMemo(() => normalizeStatus(job?.statusId.toString(), job?.startDate), [job?.statusId, job?.startDate])
 
   const jobStatusBadge = useMemo(() => {
     switch (status) {
@@ -181,7 +194,6 @@ export default function FarmerJobDetailPage() {
         includeAll: true,
       })
 
-      console.log(response.data)
 
       const payload = response.data as
         | PaginatedResponse<ApplicationDTO>
@@ -224,7 +236,6 @@ export default function FarmerJobDetailPage() {
       }
 
       const response = await jobApplicationService.getApplicationDetail(applicationId)
-      console.log(response.data)
       setSelectedApplication(response.data)
       setResponseMessage(response.data.responseMessage ?? "")
       setResponseStatus(response.data.statusId === APP_STATUS.rejected ? APP_STATUS.rejected : APP_STATUS.accepted)
@@ -276,6 +287,56 @@ export default function FarmerJobDetailPage() {
     }
   }
 
+  const handleUpdateStatus = async (newStatus: number) => {
+    if (!jobId) return
+
+    try {
+      setIsUpdatingStatus(true)
+      await jobService.updateStatus(jobId, newStatus)
+
+      // Refresh job detail
+      const response = await jobService.getJobDetail(jobId)
+      setJob(response.data)
+    } catch (err) {
+      console.error(err)
+      setError("Không thể cập nhật trạng thái bài đăng.")
+    } finally {
+      setIsUpdatingStatus(false)
+    }
+  }
+
+  const handleCancelJob = async () => {
+    if (!jobId) return
+
+    try {
+      setIsCancelling(true)
+      await jobService.cancelJob(jobId)
+
+      // Refresh job detail
+      const response = await jobService.getJobDetail(jobId)
+      setJob(response.data)
+      setIsCancelDialogOpen(false)
+    } catch (err) {
+      console.error(err)
+      setError("Không thể hủy bài đăng.")
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
+  const handleStartJobButtonClick = () => {
+    if (!job) return
+
+    // Parse the start date
+    const startDate = parseISO(job.startDate)
+
+    if (!isToday(startDate)) {
+      setIsStartJobDialogOpen(true)
+    } else {
+      void handleUpdateStatus(JOB_POST_STATUS.InProgress)
+    }
+  }
+
   useEffect(() => {
     if (!jobId) {
       setError("Không tìm thấy bài đăng.")
@@ -324,11 +385,41 @@ export default function FarmerJobDetailPage() {
         </Button>
         <div className="flex gap-2">
           {job && (
-            <Button variant="outline" asChild className="border-agro-green/20 text-agro-green hover:bg-agro-green/10">
-              <Link href={`/farmer/jobs/${jobId}/edit`}>
-                Sửa bài đăng
-              </Link>
-            </Button>
+            <>
+              {/* Show "Bắt đầu công việc" if enough applicants and status is Closed */}
+              {job.workersAccepted >= job.workersNeeded && job.statusId === JOB_POST_STATUS.Closed && (
+                <Button
+                  onClick={handleStartJobButtonClick}
+                  disabled={isUpdatingStatus || isCancelling}
+                  className="bg-agro-green hover:bg-agro-green/90 text-white"
+                >
+                  {isUpdatingStatus ? <RotateCw className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+                  Bắt đầu công việc
+                </Button>
+              )}
+
+
+              {/* Only show "Hủy tin đăng" if not already cancelled or completed */}
+              {job.statusId !== JOB_POST_STATUS.Cancelled && job.statusId !== JOB_POST_STATUS.Completed && job.statusId !== JOB_POST_STATUS.Closed && job.statusId === JOB_POST_STATUS.InProgress && (
+                <Button
+                  variant="outline"
+                  onClick={() => setIsCancelDialogOpen(true)}
+                  disabled={isUpdatingStatus || isCancelling}
+                  className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                >
+                  <XCircle className="mr-2 h-4 w-4" />
+                  Hủy tin đăng
+                </Button>
+              )}
+
+              {job.statusId !== JOB_POST_STATUS.Cancelled && job.statusId !== JOB_POST_STATUS.Completed && job.statusId !== JOB_POST_STATUS.Closed && job.statusId === JOB_POST_STATUS.InProgress && (
+                <Button variant="outline" asChild className="border-agro-green/20 text-agro-green hover:bg-agro-green/10">
+                  <Link href={`/farmer/jobs/${jobId}/edit`}>
+                    Sửa bài đăng
+                  </Link>
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -394,7 +485,7 @@ export default function FarmerJobDetailPage() {
                     </div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Mức lương</p>
                     <p className="text-xl font-bold text-emerald-600">{formatCurrency(job.wageAmount)}</p>
-                    <p className="text-[10px] text-muted-foreground">Mỗi {job.jobTypeId === 1 ? "Khoán" : "Ngày"}</p>
+                    <p className="text-[10px] text-muted-foreground">Lương được trả ở cuối {job.jobTypeId === 1 ? "Khoán" : "Ngày"}</p>
                   </CardContent>
                 </Card>
 
@@ -520,15 +611,15 @@ export default function FarmerJobDetailPage() {
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-xl">Ứng viên ({applications.length})</CardTitle>
                     <div className="flex items-center gap-2">
-                       <Button 
-                         variant="ghost" 
-                         size="icon" 
-                         className="h-8 w-8 rounded-full text-muted-foreground hover:text-agro-green hover:bg-agro-green/10 transition-all" 
-                         onClick={() => jobId && loadApplications(jobId)}
-                         disabled={isLoadingApplications}
-                       >
-                         <RotateCw className={cn("h-4 w-4", isLoadingApplications && "animate-spin")} />
-                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full text-muted-foreground hover:text-agro-green hover:bg-agro-green/10 transition-all"
+                        onClick={() => jobId && loadApplications(jobId)}
+                        disabled={isLoadingApplications}
+                      >
+                        <RotateCw className={cn("h-4 w-4", isLoadingApplications && "animate-spin")} />
+                      </Button>
                       <div className="p-1.5 rounded-full bg-agro-green/10 text-agro-green">
                         <Users className="h-5 w-5" />
                       </div>
@@ -662,10 +753,20 @@ export default function FarmerJobDetailPage() {
             {!isLoadingApplicationDetail && !applicationDetailError && selectedApplication ? (
               <div className="space-y-4 text-sm">
                 <div className="rounded-lg border p-4">
-                  <p className="font-semibold text-base">{selectedApplication.worker?.fullName || "Ứng viên"}</p>
-                  <p className="text-muted-foreground">SĐT: {selectedApplication.worker?.phoneNumber || "Không có"}</p>
-                  <p className="text-muted-foreground">Email: {selectedApplication.worker?.email || "Không có"}</p>
-                  <p className="text-muted-foreground">Địa điểm: {selectedApplication.worker?.primaryLocation || "Không có"}</p>
+                  <div className="flex items-center gap-5">
+                    <Avatar className="h-18 w-18 border-2 border-background shadow-sm hover:scale-105 transition-transform">
+                      <AvatarImage src={selectedApplication.worker?.avatarUrl || "/placeholder.svg"} className="object-cover" />
+                      <AvatarFallback className="bg-agro-green/10 text-agro-green">
+                        <Image src="/placeholder.svg" alt="placeholder" width={48} height={48} className="object-cover" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-semibold text-base">{selectedApplication.worker?.fullName || "Ứng viên"}</p>
+                      <p className="text-muted-foreground">SĐT: {selectedApplication.worker?.phoneNumber || "Không có"}</p>
+                      <p className="text-muted-foreground">Email: {selectedApplication.worker?.email || "Không có"}</p>
+                      <p className="text-muted-foreground">Địa điểm: {selectedApplication.worker?.primaryLocation || "Không có"}</p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -814,6 +915,55 @@ export default function FarmerJobDetailPage() {
               )}
             </DialogFooter>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Hủy bài đăng?</DialogTitle>
+            <DialogDescription>
+              Bạn có chắc chắn muốn hủy bài đăng này không? Hành động này không thể hoàn tác.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-5 sm:gap-5">
+            <Button variant="outline" onClick={() => setIsCancelDialogOpen(false)} disabled={isCancelling}>
+              Không, quay lại
+            </Button>
+            <Button variant="destructive" onClick={() => void handleCancelJob()} disabled={isCancelling}>
+              {isCancelling ? <RotateCw className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Xác nhận hủy
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isStartJobDialogOpen} onOpenChange={setIsStartJobDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Bắt đầu công việc sớm?</DialogTitle>
+            <DialogDescription>
+              Ngày bắt đầu dự kiến là {formatDate(job?.startDate || "")}, nhưng hôm nay chưa tới.
+              <br />
+              Bạn có chắc chắn muốn bắt đầu công việc này ngay bây giờ không?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-5 sm:gap-5">
+            <Button variant="outline" onClick={() => setIsStartJobDialogOpen(false)} disabled={isUpdatingStatus}>
+              Hủy
+            </Button>
+            <Button
+              className="bg-agro-green hover:bg-agro-green/90"
+              onClick={async () => {
+                await handleUpdateStatus(JOB_POST_STATUS.InProgress)
+                setIsStartJobDialogOpen(false)
+              }}
+              disabled={isUpdatingStatus}
+            >
+              {isUpdatingStatus ? <RotateCw className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Xác nhận bắt đầu
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

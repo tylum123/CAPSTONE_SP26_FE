@@ -8,3 +8,4 @@ export { FarmService } from './farm.service';
 export { skillService } from './skill.service';
 export { jobCategoryService } from './job-category.service';
 export { notificationService } from './notifications.service';
+export { jobDetailsService } from './jobDetails.service';

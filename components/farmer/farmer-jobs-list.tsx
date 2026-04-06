@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Users, Clock, Banknote, MapPin, Copy, Calendar, Inbox, LayoutGrid, LayoutList, Loader2, Filter, ChevronLeft, ChevronRight, ArrowUpDown, ArrowDownUp } from "lucide-react"
+import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Users, Clock, Banknote, MapPin, Copy, Calendar, Inbox, LayoutGrid, LayoutList, Loader2, Filter, ChevronLeft, ChevronRight, ArrowUpDown, ArrowDownUp, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -69,8 +69,8 @@ export function FarmerJobsList() {
   const [applications, setApplications] = useState<Application[]>([])
   const [isLoadingApplications, setIsLoadingApplications] = useState(false)
   const [applicationsError, setApplicationsError] = useState<string | null>(null)
-  const [deletingJobId, setDeletingJobId] = useState<string | null>(null)
-  const [jobPendingDelete, setJobPendingDelete] = useState<Job | null>(null)
+  const [cancellingJobId, setCancellingJobId] = useState<string | null>(null)
+  const [jobPendingCancel, setJobPendingCancel] = useState<Job | null>(null)
   const [sortByDatesDescending, setSortByDatesDescending] = useState(true)
 
   // For combo boxes
@@ -355,17 +355,23 @@ export function FarmerJobsList() {
     }
   }
 
-  const handleDeleteJob = async (job: Job) => {
+  const handleCancelJob = async (job: Job) => {
     try {
-      setDeletingJobId(job.id)
-      await jobService.deleteJob(job.id)
-      setJobs((currentJobs) => currentJobs.filter((currentJob) => currentJob.id !== job.id))
-      setJobPendingDelete(null)
-    } catch (deleteError) {
-      console.error(deleteError)
-      setError("Không thể xóa bài đăng. Vui lòng thử lại.")
+      setCancellingJobId(job.id)
+      await jobService.cancelJob(job.id)
+      // Instead of removing from list, we can just update its status if the list logic handles it
+      // but for now, let's keep it consistent with the previous behavior and maybe just refresh
+      setJobs((currentJobs) =>
+        currentJobs.map((currentJob) =>
+          currentJob.id === job.id ? { ...currentJob, status: "Cancelled" } : currentJob
+        )
+      )
+      setJobPendingCancel(null)
+    } catch (cancelError) {
+      console.error(cancelError)
+      setError("Không thể hủy bài đăng. Vui lòng thử lại.")
     } finally {
-      setDeletingJobId(null)
+      setCancellingJobId(null)
     }
   }
 
@@ -652,11 +658,11 @@ export function FarmerJobsList() {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive cursor-pointer"
-                              onClick={() => setJobPendingDelete(job)}
-                              disabled={deletingJobId === job.id}
+                              onClick={() => setJobPendingCancel(job)}
+                              disabled={cancellingJobId === job.id}
                             >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              {deletingJobId === job.id ? "Đang xóa..." : "Xóa tin"}
+                              <XCircle className="mr-2 h-4 w-4" />
+                              {cancellingJobId === job.id ? "Đang hủy..." : "Hủy tin đăng"}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -732,11 +738,11 @@ export function FarmerJobsList() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive focus:text-destructive cursor-pointer"
-                          onClick={() => setJobPendingDelete(job)}
-                          disabled={deletingJobId === job.id}
+                          onClick={() => setJobPendingCancel(job)}
+                          disabled={cancellingJobId === job.id}
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          {deletingJobId === job.id ? "Đang xóa..." : "Xóa tin"}
+                          <XCircle className="mr-2 h-4 w-4" />
+                          {cancellingJobId === job.id ? "Đang hủy..." : "Hủy tin đăng"}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -759,34 +765,34 @@ export function FarmerJobsList() {
       </div>
 
       <AlertDialog
-        open={Boolean(jobPendingDelete)}
+        open={Boolean(jobPendingCancel)}
         onOpenChange={(open) => {
-          if (!open && !deletingJobId) {
-            setJobPendingDelete(null)
+          if (!open && !cancellingJobId) {
+            setJobPendingCancel(null)
           }
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xóa bài đăng?</AlertDialogTitle>
+            <AlertDialogTitle>Hủy bài đăng?</AlertDialogTitle>
             <AlertDialogDescription>
-              {jobPendingDelete
-                ? `Bạn có chắc muốn xóa bài đăng "${jobPendingDelete.title}"? Hành động này không thể hoàn tác.`
-                : "Bạn có chắc muốn xóa bài đăng này?"}
+              {jobPendingCancel
+                ? `Bạn có chắc muốn hủy bài đăng "${jobPendingCancel.title}"? Hành động này không thể hoàn tác.`
+                : "Bạn có chắc muốn hủy bài đăng này?"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={Boolean(deletingJobId)}>Hủy</AlertDialogCancel>
+            <AlertDialogCancel disabled={Boolean(cancellingJobId)}>Không</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (jobPendingDelete) {
-                  void handleDeleteJob(jobPendingDelete)
+                if (jobPendingCancel) {
+                  void handleCancelJob(jobPendingCancel)
                 }
               }}
-              disabled={Boolean(deletingJobId)}
+              disabled={Boolean(cancellingJobId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deletingJobId ? "Đang xóa..." : "Xóa"}
+              {cancellingJobId ? "Đang hủy..." : "Xác nhận hủy"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

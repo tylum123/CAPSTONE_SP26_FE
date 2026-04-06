@@ -81,6 +81,21 @@ export const jobService = {
         return response.data;
     },
 
+    cancelJob: async (id: string): Promise<ApiResponse<Job>> => {
+        const response = await axiosInstance.post(API_ENDPOINTS.JOBS.CANCEL(id));
+        return response.data;
+    },
+
+    updateStatus: async (id: string, status: number): Promise<ApiResponse<Job>> => {
+        const response = await axiosInstance.put(API_ENDPOINTS.JOBS.UPDATE_STATUS(id), { status });
+        return response.data;
+    },
+
+    updateUrgency: async (id: string, isUrgent: boolean): Promise<ApiResponse<Job>> => {
+        const response = await axiosInstance.put(API_ENDPOINTS.JOBS.UPDATE_URGENCY(id), { isUrgent });
+        return response.data;
+    },
+
     /**
      * Delete job
      */

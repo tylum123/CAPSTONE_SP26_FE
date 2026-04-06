@@ -31,7 +31,7 @@ export interface Job {
   createdAt: string;
   updatedAt: string;
   isUrgent: boolean;
-  status: string;
+  statusId: number;
 }
 
 export interface JobCategory {

@@ -40,13 +40,20 @@ export const API_ENDPOINTS = {
     FILTERED_JOBS_BY_FARMER: '/job/post/filter/farmer',
     CREATE: '/job/post',
     UPDATE: (id: string) => `/job/post/${id}`,
+    CANCEL: (id: string) => `/job/post/cancel/${id}`,
+    UPDATE_STATUS: (id: string) => `/job/post/update-status/${id}`,
+    UPDATE_URGENCY: (id: string) => `/job/post/update-urgency/${id}`,
     DELETE: (id: string) => `/job/post/${id}`,
     JOB_APPLICATIONS: '/job/application',
     JOB_APPLICATIONS_BY_POST: (jobPostId: string) => `/job/application/post/${jobPostId}`,
     APPLICATION_DETAIL: (id: string) => `/job/application/${id}`,
     RESPOND_APPLICANT: (id: string) => `/job/application/respond/${id}`,
     SAVE_DRAFT: '/job/post/draft',
-    GET_DRAFTS: '/job/post/drafts'
+    GET_DRAFTS: '/job/post/drafts',
+    JOB_DETAILS: '/job/details',
+    JOB_DETAIL: (id: string) => `/job/details/${id}`,
+    JOB_DETAILS_BY_POST: (id: string) => `/job/details/post/${id}`,
+    APPROVE_JOB_DETAILS: (id: string) => `/job/details/approve/${id}`,
   },
 
   // Farm
