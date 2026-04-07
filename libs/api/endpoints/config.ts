@@ -50,10 +50,10 @@ export const API_ENDPOINTS = {
     RESPOND_APPLICANT: (id: string) => `/job/application/respond/${id}`,
     SAVE_DRAFT: '/job/post/draft',
     GET_DRAFTS: '/job/post/drafts',
-    JOB_DETAILS: '/job/details',
-    JOB_DETAIL: (id: string) => `/job/details/${id}`,
-    JOB_DETAILS_BY_POST: (id: string) => `/job/details/post/${id}`,
-    APPROVE_JOB_DETAILS: (id: string) => `/job/details/approve/${id}`,
+    JOB_DETAILS: '/job/detail',
+    JOB_DETAIL: (id: string) => `/job/detail/${id}`,
+    JOB_DETAILS_BY_POST: (id: string) => `/job/detail/post/${id}`,
+    APPROVE_JOB_DETAILS: (id: string) => `/job/detail/approve/${id}`,
   },
 
   // Farm

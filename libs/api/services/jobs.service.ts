@@ -5,7 +5,10 @@ import type {
     Job,
     CreateJobRequest,
     UpdateJobRequest,
+    JobPostStatus,
 } from '@/libs/types';
+
+// Removed local JOB_POST_STATUS as it is now centrally managed in libs/types/job.types.ts
 
 export const jobService = {
 
@@ -86,8 +89,8 @@ export const jobService = {
         return response.data;
     },
 
-    updateStatus: async (id: string, status: number): Promise<ApiResponse<Job>> => {
-        const response = await axiosInstance.put(API_ENDPOINTS.JOBS.UPDATE_STATUS(id), { status });
+    updateStatus: async (id: string, status: JobPostStatus): Promise<ApiResponse<Job>> => {
+        const response = await axiosInstance.put(API_ENDPOINTS.JOBS.UPDATE_STATUS(id), null, { params: { status } });
         return response.data;
     },
 

@@ -5,6 +5,15 @@ export interface JobSkillRequirement {
   name: string;
 }
 
+export enum JobPostStatus {
+  Draft = 1,
+  Published = 2,
+  Closed = 3,
+  InProgress = 4,
+  Completed = 5,
+  Cancelled = 6
+}
+
 export interface Job {
   id: string;
   farmerProfileId: string;
@@ -31,7 +40,7 @@ export interface Job {
   createdAt: string;
   updatedAt: string;
   isUrgent: boolean;
-  statusId: number;
+  statusId: JobPostStatus;
 }
 
 export interface JobCategory {
@@ -73,7 +82,7 @@ export interface CreateJobRequest {
   createdAt?: string;
   updatedAt?: string;
   isUrgent: boolean;
-  statusId: number;
+  statusId: JobPostStatus;
 }
 
 export interface UpdateJobRequest extends Partial<CreateJobRequest> {

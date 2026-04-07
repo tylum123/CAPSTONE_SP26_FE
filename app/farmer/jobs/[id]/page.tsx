@@ -22,9 +22,11 @@ import {
 } from "@/components/ui/dialog"
 import { cn } from "@/libs/utils/utils"
 import { ApplicationStatusId } from "@/libs/types"
-import type { ApplicationDTO, Job, PaginatedResponse, RespondApplicationRequest } from "@/libs/types"
 import { jobService } from "@/libs/api/services/jobs.service"
 import { jobApplicationService } from "@/libs/api/services/jobApplication.service"
+import { jobDetailsService } from "@/libs/api/services/jobDetails.service"
+import type { ApplicationDTO, Job, JobDetail, PaginatedResponse, RespondApplicationRequest } from "@/libs/types"
+import { JobPostStatus, JobStatus } from "@/libs/types"
 
 const APP_STATUS = {
   pending: ApplicationStatusId.Pending,
@@ -33,14 +35,7 @@ const APP_STATUS = {
   cancelled: ApplicationStatusId.Cancelled,
 } as const
 
-const JOB_POST_STATUS = {
-  Draft: 1,
-  Published: 2,
-  Closed: 3,
-  InProgress: 4,
-  Completed: 5,
-  Cancelled: 6
-} as const
+const JOB_POST_STATUS = JobPostStatus;
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import Image from "next/image"
@@ -68,6 +63,14 @@ export default function FarmerJobDetailPage() {
   const [isCancelling, setIsCancelling] = useState(false)
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
   const [isStartJobDialogOpen, setIsStartJobDialogOpen] = useState(false)
+  const [jobDetails, setJobDetails] = useState<JobDetail[]>([])
+  const [isLoadingJobDetails, setIsLoadingJobDetails] = useState(false)
+  const [selectedJobDetail, setSelectedJobDetail] = useState<JobDetail | null>(null)
+  const [isJobDetailDialogOpen, setIsJobDetailDialogOpen] = useState(false)
+  const [isApprovingDetail, setIsApprovingDetail] = useState(false)
+  const [approvalFeedback, setApprovalFeedback] = useState("")
+  const [approvalPercent, setApprovalPercent] = useState(100)
+  const [isLoadingSingleJobDetail, setIsLoadingSingleJobDetail] = useState(false)
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("vi-VN", {
@@ -128,34 +131,40 @@ export default function FarmerJobDetailPage() {
     return "Đã hủy"
   }
 
-  const normalizeStatus = (status?: string, startDate?: string) => {
-    const normalized = (status ?? "").toLowerCase()
-
+  const normalizeStatus = (statusId?: JobPostStatus, startDate?: string) => {
     if (startDate) {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const jobStart = new Date(startDate)
-      if (jobStart <= today) {
+      if (jobStart <= today && statusId === JobPostStatus.Published) {
         return "passed"
       }
     }
 
-    if (["open", "active", "published", "recruiting"].includes(normalized)) {
+    if (statusId === JobPostStatus.Published) {
       return "active"
     }
 
-    if (["filled", "full"].includes(normalized)) {
+    if (statusId === JobPostStatus.Closed) {
       return "filled"
     }
 
-    if (["completed", "closed", "done"].includes(normalized)) {
+    if (statusId === JobPostStatus.InProgress) {
+      return "in-progress"
+    }
+
+    if (statusId === JobPostStatus.Completed) {
       return "completed"
+    }
+
+    if (statusId === JobPostStatus.Cancelled) {
+      return "cancelled"
     }
 
     return "active"
   }
 
-  const status = useMemo(() => normalizeStatus(job?.statusId.toString(), job?.startDate), [job?.statusId, job?.startDate])
+  const status = useMemo(() => normalizeStatus(job?.statusId, job?.startDate), [job?.statusId, job?.startDate])
 
   const jobStatusBadge = useMemo(() => {
     switch (status) {
@@ -165,14 +174,24 @@ export default function FarmerJobDetailPage() {
           Đang tuyển
         </Badge>
       case "filled":
-        return <Badge className="bg-amber-100 text-amber-800 border-amber-200 px-3 py-1 flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+        return <Badge className="bg-amber-100 text-red-800 border-red-200 px-3 py-1 flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
           <Clock className="h-3.5 w-3.5" />
           Đã đủ người
+        </Badge>
+      case "in-progress":
+        return <Badge className="bg-amber-100 text-amber-800 border-amber-200 px-3 py-1 flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+          <Clock className="h-3.5 w-3.5" />
+          Đang trong quá trình
         </Badge>
       case "completed":
         return <Badge variant="outline" className="px-3 py-1 flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
           <CheckCircle2 className="h-3.5 w-3.5" />
           Hoàn thành
+        </Badge>
+      case "cancelled":
+        return <Badge className="bg-rose-100 text-rose-800 border-rose-200 px-3 py-1 flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+          <XCircle className="h-3.5 w-3.5" />
+          Đã hủy
         </Badge>
       case "passed":
         return <Badge className="bg-rose-100 text-rose-800 border-rose-200 px-3 py-1 flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
@@ -183,6 +202,19 @@ export default function FarmerJobDetailPage() {
         return null
     }
   }, [status])
+
+  const jobDetailStatusBadge = (statusId: number) => {
+    switch (statusId) {
+      case JobStatus.InProgress:
+        return <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/20">Chưa báo cáo</Badge>
+      case JobStatus.Reported:
+        return <Badge className="bg-blue-100 text-blue-800 border-blue-200 ring-1 ring-blue-500/20 shadow-sm">Đã gửi báo cáo</Badge>
+      case JobStatus.Completed:
+        return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 shadow-sm">Đã được phê duyệt</Badge>
+      default:
+        return <Badge variant="outline" className="opacity-50">Không xác định</Badge>
+    }
+  }
 
   const loadApplications = async (currentJobId: string) => {
     try {
@@ -236,6 +268,7 @@ export default function FarmerJobDetailPage() {
       }
 
       const response = await jobApplicationService.getApplicationDetail(applicationId)
+      console.log(response);
       setSelectedApplication(response.data)
       setResponseMessage(response.data.responseMessage ?? "")
       setResponseStatus(response.data.statusId === APP_STATUS.rejected ? APP_STATUS.rejected : APP_STATUS.accepted)
@@ -287,7 +320,7 @@ export default function FarmerJobDetailPage() {
     }
   }
 
-  const handleUpdateStatus = async (newStatus: number) => {
+  const handleUpdateStatus = async (newStatus: JobPostStatus) => {
     if (!jobId) return
 
     try {
@@ -302,6 +335,47 @@ export default function FarmerJobDetailPage() {
       setError("Không thể cập nhật trạng thái bài đăng.")
     } finally {
       setIsUpdatingStatus(false)
+    }
+  }
+
+  const handleOpenJobDetail = async (detailId: string) => {
+    try {
+      setIsJobDetailDialogOpen(true)
+      setIsLoadingSingleJobDetail(true)
+      const response = await jobDetailsService.getJobDetail(detailId)
+      console.log(response);
+      setSelectedJobDetail(response.data)
+      setApprovalFeedback(response.data.farmerFeedback || "")
+      setApprovalPercent(response.data.farmerApprovedPercent || 100)
+    } catch (err) {
+      console.error("Failed to fetch job detail:", err)
+    } finally {
+      setIsLoadingSingleJobDetail(false)
+    }
+  }
+
+  const handleApproveJobDetail = async () => {
+    if (!selectedJobDetail) return
+
+    try {
+      setIsApprovingDetail(true)
+      await jobDetailsService.approveJobDetail(selectedJobDetail.id, {
+        farmerApprovedPercent: approvalPercent,
+        farmerFeedback: approvalFeedback,
+      })
+
+      // Refresh job detail in the list
+      if (jobId) {
+        const response = await jobDetailsService.getJobDetailsByPost(jobId)
+        setJobDetails(response.data)
+      }
+
+      // Close dialog or update current view
+      setIsJobDetailDialogOpen(false)
+    } catch (err) {
+      console.error("Failed to approve job detail:", err)
+    } finally {
+      setIsApprovingDetail(false)
     }
   }
 
@@ -371,6 +445,26 @@ export default function FarmerJobDetailPage() {
     void loadApplications(jobId)
   }, [jobId])
 
+  useEffect(() => {
+    if (job && jobId &&
+      job.statusId !== JOB_POST_STATUS.Draft &&
+      job.statusId !== JOB_POST_STATUS.Published &&
+      job.statusId !== JOB_POST_STATUS.Closed) {
+      const loadJobDetails = async () => {
+        try {
+          setIsLoadingJobDetails(true)
+          const response = await jobDetailsService.getJobDetailsByPost(jobId)
+          setJobDetails(response.data)
+        } catch (err) {
+          console.error("Failed to fetch job details:", err)
+        } finally {
+          setIsLoadingJobDetails(false)
+        }
+      }
+      void loadJobDetails()
+    }
+  }, [job, jobId])
+
   const jobTypeLabel = job?.jobTypeId === 1 ? "Khoán" : job?.jobTypeId === 2 ? "Ngày" : "-"
 
   return (
@@ -399,8 +493,8 @@ export default function FarmerJobDetailPage() {
               )}
 
 
-              {/* Only show "Hủy tin đăng" if not already cancelled or completed */}
-              {job.statusId !== JOB_POST_STATUS.Cancelled && job.statusId !== JOB_POST_STATUS.Completed && job.statusId !== JOB_POST_STATUS.Closed && job.statusId === JOB_POST_STATUS.InProgress && (
+              {/* Only show "Hủy tin đăng" if the job is not yet in progress or finished */}
+              {job.statusId <= JOB_POST_STATUS.Closed && (
                 <Button
                   variant="outline"
                   onClick={() => setIsCancelDialogOpen(true)}
@@ -412,7 +506,7 @@ export default function FarmerJobDetailPage() {
                 </Button>
               )}
 
-              {job.statusId !== JOB_POST_STATUS.Cancelled && job.statusId !== JOB_POST_STATUS.Completed && job.statusId !== JOB_POST_STATUS.Closed && job.statusId === JOB_POST_STATUS.InProgress && (
+              {job.statusId <= JOB_POST_STATUS.Closed && (
                 <Button variant="outline" asChild className="border-agro-green/20 text-agro-green hover:bg-agro-green/10">
                   <Link href={`/farmer/jobs/${jobId}/edit`}>
                     Sửa bài đăng
@@ -606,26 +700,27 @@ export default function FarmerJobDetailPage() {
 
             {/* Applications Sidebar */}
             <div className="lg:col-span-1">
-              <Card className="lg:sticky lg:top-8 border-0 shadow-xl bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md">
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-xl">Ứng viên ({applications.length})</CardTitle>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 rounded-full text-muted-foreground hover:text-agro-green hover:bg-agro-green/10 transition-all"
-                        onClick={() => jobId && loadApplications(jobId)}
-                        disabled={isLoadingApplications}
-                      >
-                        <RotateCw className={cn("h-4 w-4", isLoadingApplications && "animate-spin")} />
-                      </Button>
-                      <div className="p-1.5 rounded-full bg-agro-green/10 text-agro-green">
-                        <Users className="h-5 w-5" />
-                      </div>
+              <Card className="lg:sticky lg:top-8 border-0 shadow-sm overflow-hidden bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md">
+                <div className="h-1 bg-agro-green" />
+                <CardHeader className="pb-4 flex flex-row items-center justify-between gap-3 space-y-0">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-agro-green/10 text-agro-green">
+                      <Users className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl">Ứng viên ({applications.length})</CardTitle>
+                      <CardDescription>Danh sách hồ sơ ứng tuyển</CardDescription>
                     </div>
                   </div>
-                  <CardDescription>Danh sách hồ sơ ứng tuyển bài đăng này</CardDescription>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-agro-green hover:bg-agro-green/10 transition-all"
+                    onClick={() => jobId && loadApplications(jobId)}
+                    disabled={isLoadingApplications}
+                  >
+                    <RotateCw className={cn("h-4 w-4", isLoadingApplications && "animate-spin")} />
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">
@@ -654,7 +749,7 @@ export default function FarmerJobDetailPage() {
                     {applications.map((application) => (
                       <div
                         key={application.id}
-                        className="group relative flex flex-col gap-3 rounded-xl border border-muted bg-white/40 dark:bg-zinc-800/40 p-4 hover:border-agro-green/50 hover:bg-white/60 dark:hover:bg-zinc-800/60 transition-all duration-300"
+                        className="group relative flex flex-col gap-3 rounded-xl border border-muted bg-muted/30 p-4 hover:border-agro-green/30 hover:bg-muted/50 transition-all duration-300"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
@@ -679,7 +774,7 @@ export default function FarmerJobDetailPage() {
                           </div>
                         </div>
 
-                        <div className="mt-1 flex items-center justify-between gap-2 border-t border-muted pt-3">
+                        <div className="mt-1 flex items-center justify-between gap-2 border-t border-muted/50 pt-3">
                           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-tight">
                             <Clock className="h-3 w-3" />
                             {formatDistanceToNow(new Date(application.appliedAt), { addSuffix: true, locale: vi })}
@@ -712,6 +807,98 @@ export default function FarmerJobDetailPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Job Reports / Job Details Card */}
+              {job.statusId !== JOB_POST_STATUS.Draft &&
+                job.statusId !== JOB_POST_STATUS.Published &&
+                job.statusId !== JOB_POST_STATUS.Closed && (
+                  <Card className="border-0 mt-8 shadow-sm overflow-hidden bg-white/80 dark:bg-zinc-900/80">
+                    <div className="h-1 bg-blue-500" />
+                    <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
+                          <Clock className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-xl">Báo cáo công việc</CardTitle>
+                          <CardDescription>Chi tiết quá trình thực hiện của các phiên làm việc</CardDescription>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          if (jobId) {
+                            setIsLoadingJobDetails(true)
+                            jobDetailsService.getJobDetailsByPost(jobId)
+                              .then(res => setJobDetails(res.data))
+                              .finally(() => setIsLoadingJobDetails(false))
+                          }
+                        }}
+                        disabled={isLoadingJobDetails}
+                      >
+                        <RotateCw className={cn("h-4 w-4", isLoadingJobDetails && "animate-spin")} />
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      {isLoadingJobDetails ? (
+                        <div className="flex items-center justify-center py-12">
+                          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-r-transparent" />
+                        </div>
+                      ) : jobDetails.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                          <FileText className="h-12 w-12 mb-4 opacity-20" />
+                          <p className="text-sm">Chưa có báo cáo công việc nào được gửi.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {jobDetails.map((detail) => (
+                            <div key={detail.id} className="p-4 rounded-xl border bg-muted/30 hover:bg-muted/50 transition-colors">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-semibold">{formatDate(detail.workDate)}</p>
+                                    {jobDetailStatusBadge(detail.statusId)}
+                                  </div>
+                                  <p className="text-sm text-muted-foreground line-clamp-2">
+                                    {detail.workerDescription || "Không có mô tả từ người làm."}
+                                  </p>
+                                </div>
+                                <div className="flex flex-col items-end gap-2">
+                                  <div className="flex items-center gap-1 text-emerald-600 font-bold">
+                                    <Banknote className="h-4 w-4" />
+                                    {formatCurrency(detail.jobPrice)}
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    {detail.farmerApprovedPercent > 0 && (
+                                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                                        {detail.farmerApprovedPercent}% Duyệt
+                                      </Badge>
+                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                      onClick={() => handleOpenJobDetail(detail.id)}
+                                    >
+                                      Chi tiết
+                                      <InfoIcon className="ml-1.5 h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                              {detail.farmerFeedback && (
+                                <div className="mt-3 pt-3 border-t border-muted italic text-xs text-muted-foreground">
+                                  Phản hồi từ bạn: {detail.farmerFeedback}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
             </div>
           </div>
         </div>
@@ -765,9 +952,26 @@ export default function FarmerJobDetailPage() {
                       <p className="text-muted-foreground">SĐT: {selectedApplication.worker?.phoneNumber || "Không có"}</p>
                       <p className="text-muted-foreground">Email: {selectedApplication.worker?.email || "Không có"}</p>
                       <p className="text-muted-foreground">Địa điểm: {selectedApplication.worker?.primaryLocation || "Không có"}</p>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Badge variant="outline" className="bg-muted capitalize font-normal">{selectedApplication.worker?.gender || "Không rõ giới tính"}</Badge>
+                        <Badge variant="outline" className="bg-muted font-normal">{selectedApplication.worker?.date_of_birth ? `Ngày sinh: ${formatDate(selectedApplication.worker.date_of_birth)}` : "Không rõ NS"}</Badge>
+                      </div>
                     </div>
                   </div>
                 </div>
+
+                {selectedApplication.worker?.skills && selectedApplication.worker.skills.length > 0 && (
+                  <div className="rounded-lg border p-4">
+                    <p className="text-xs text-muted-foreground mb-2">Kỹ năng chuyên môn</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedApplication.worker.skills.map((skill) => (
+                        <Badge key={skill.id} variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-100 transition-colors">
+                          {skill.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-lg border p-4">
@@ -795,22 +999,24 @@ export default function FarmerJobDetailPage() {
                   </p>
                 </div>
 
-                <div className="rounded-lg border p-4">
-                  <p className="text-xs text-muted-foreground">Ngày làm việc đề xuất</p>
-                  {selectedApplication.workDates?.length ? (
-                    <ul className="mt-2 grid gap-1">
-                      {selectedApplication.workDates.map((workDate) => (
-                        <li key={workDate} className="text-muted-foreground">- {formatDate(workDate)}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="mt-2 text-muted-foreground">Không có ngày làm việc cụ thể.</p>
-                  )}
-                </div>
+                {job?.jobTypeId !== 1 && (
+                  <div className="rounded-lg border p-4">
+                    <p className="text-xs text-muted-foreground">Ngày làm việc đề xuất</p>
+                    {selectedApplication.workDates?.length ? (
+                      <ul className="mt-2 grid gap-1">
+                        {selectedApplication.workDates.map((workDate) => (
+                          <li key={workDate} className="text-muted-foreground">- {formatDate(workDate)}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-2 text-muted-foreground">Không có ngày làm việc cụ thể.</p>
+                    )}
+                  </div>
+                )}
 
                 {selectedApplication.responseMessage ? (
                   <div className="rounded-lg border p-4">
-                    <p className="text-xs text-muted-foreground">Phản hồi từ chủ trang trại</p>
+                    <p className="text-xs text-muted-foreground">Phản hồi từ nông dân</p>
                     <p className="mt-2 whitespace-pre-wrap text-muted-foreground">{selectedApplication.responseMessage}</p>
                   </div>
                 ) : null}
@@ -962,6 +1168,142 @@ export default function FarmerJobDetailPage() {
             >
               {isUpdatingStatus ? <RotateCw className="mr-2 h-4 w-4 animate-spin" /> : null}
               Xác nhận bắt đầu
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Báo cáo công việc  */}
+      <Dialog open={isJobDetailDialogOpen} onOpenChange={setIsJobDetailDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Chi tiết báo cáo công việc</DialogTitle>
+            <DialogDescription>
+              {selectedJobDetail ? `Báo cáo cho ngày ${formatDate(selectedJobDetail.workDate)}` : "Đang tải báo cáo..."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[70vh] space-y-6 overflow-y-auto pr-1 py-4">
+            {isLoadingSingleJobDetail ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-agro-green border-r-transparent" />
+              </div>
+            ) : selectedJobDetail ? (
+              <div className="space-y-6">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-xl border bg-muted/30 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Người làm</p>
+                    <div className="mt-2 flex items-center gap-3">
+                      <Avatar className="h-10 w-10 border shadow-sm">
+                        <AvatarImage src={selectedJobDetail.worker?.avatarUrl || "/placeholder.svg"} className="object-cover" />
+                        <AvatarFallback className="bg-agro-green/10 text-agro-green">
+                          <Users className="h-5 w-5" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-semibold text-sm leading-tight text-foreground">{selectedJobDetail.worker?.fullName || `ID: ${selectedJobDetail.workerId.slice(0, 8)}`}</p>
+                        <p className="text-[11px] text-muted-foreground">{selectedJobDetail.worker?.phoneNumber || "Không có SĐT"}</p>
+                      </div>
+                    </div>
+                    {selectedJobDetail.worker?.skills && selectedJobDetail.worker.skills.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-1">
+                        {selectedJobDetail.worker.skills.slice(0, 3).map(skill => (
+                          <span key={skill.id} className="inline-flex items-center rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                            {skill.name}
+                          </span>
+                        ))}
+                        {selectedJobDetail.worker.skills.length > 3 && (
+                          <span className="text-[10px] text-muted-foreground">+{selectedJobDetail.worker.skills.length - 3} nữa</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="rounded-xl border bg-muted/30 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Trạng thái</p>
+                    <div className="mt-2">
+                      {jobDetailStatusBadge(selectedJobDetail.statusId)}
+                    </div>
+                    {selectedJobDetail.completedAt && (
+                      <p className="mt-2 text-[11px] text-muted-foreground italic">Hoàn thành lúc: {formatDateTime(selectedJobDetail.completedAt)}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Mô tả công việc từ người làm</Label>
+                  <div className="rounded-xl border p-4 bg-white dark:bg-zinc-950/50">
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {selectedJobDetail.workerDescription || "Người làm không để lại mô tả."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/30 p-4 dark:border-emerald-900/20 dark:bg-emerald-950/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Số tiền lao động</p>
+                      <p className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-500">
+                        {formatCurrency(selectedJobDetail.jobPrice)}
+                      </p>
+                    </div>
+                    <Banknote className="h-10 w-10 text-emerald-500 opacity-20" />
+                  </div>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-dashed">
+                  <h4 className="font-bold text-base text-foreground">Phê duyệt báo cáo</h4>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="approval-range" className="text-sm font-medium">% Công việc thực tế hoàn thành</Label>
+                      <span className="text-lg font-bold text-agro-green">{approvalPercent}%</span>
+                    </div>
+                    <input
+                      id="approval-range"
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={approvalPercent}
+                      onChange={(e) => setApprovalPercent(parseInt(e.target.value))}
+                      className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-agro-green"
+                    />
+                    <p className="text-[10px] text-muted-foreground italic">
+                      Lưu ý: % duyệt sẽ tương ứng với % lương mà người làm nhận được cho phiên làm việc này.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="farmer-feedback" className="text-sm font-medium">Phản hồi / Ghi chú của bạn</Label>
+                    <Textarea
+                      id="farmer-feedback"
+                      placeholder="Nhập phản hồi cho người làm..."
+                      value={approvalFeedback}
+                      onChange={(e) => setApprovalFeedback(e.target.value)}
+                      className="min-h-[100px] bg-white dark:bg-zinc-950/50"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter className="gap-3 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsJobDetailDialogOpen(false)}
+              disabled={isApprovingDetail}
+              className="flex-1 sm:flex-none"
+            >
+              Hủy
+            </Button>
+            <Button
+              className="bg-agro-green hover:bg-agro-green/90 flex-1 sm:flex-none"
+              onClick={handleApproveJobDetail}
+              disabled={isApprovingDetail || !selectedJobDetail}
+            >
+              {isApprovingDetail ? <RotateCw className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+              Lưu & Phê duyệt
             </Button>
           </DialogFooter>
         </DialogContent>

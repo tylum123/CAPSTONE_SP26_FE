@@ -1,9 +1,12 @@
+import { ApplicationWorkerDTO } from "./application.types";
+
 export interface JobDetail {
     id: string;
     jobApplicationId: string;
     jobPostId: string;
     workerId: string;
-    statusId: number;
+    worker: ApplicationWorkerDTO;
+    statusId: JobStatus;
     workDate: string;
     workerDescription: string;
     farmerFeedback: string;
@@ -19,4 +22,10 @@ export interface JobDetail {
 export interface ApproveJobDetailRequest {
     farmerApprovedPercent: number;
     farmerFeedback: string;
+}
+
+export enum JobStatus {
+    InProgress = 1,
+    Reported = 2,
+    Completed = 3
 }
