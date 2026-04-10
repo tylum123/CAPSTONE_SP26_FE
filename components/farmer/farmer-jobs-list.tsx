@@ -272,12 +272,7 @@ export function FarmerJobsList() {
         .some((value) => value.toLowerCase().includes(searchQuery.toLowerCase()))
 
       const status = normalizeStatus(job.statusId, job.startDate)
-      const matchesTab =
-        activeTab === "all" ||
-        (activeTab === "active" && status === "active") ||
-        (activeTab === "filled" && status === "filled") ||
-        (activeTab === "completed" && status === "completed") ||
-        (activeTab === "passed" && status === "passed")
+      const matchesTab = activeTab === "all" || activeTab === status
 
       return matchesSearch && matchesTab
     })
@@ -296,6 +291,8 @@ export function FarmerJobsList() {
         return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 border-emerald-200">Đang tuyển</Badge>
       case "filled":
         return <Badge variant="secondary" className="bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-400 border-amber-200">Đã đủ người</Badge>
+      case "in-progress":
+        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-400 border-blue-200">Đang làm việc</Badge>
       case "completed":
         return (
           <Badge variant="outline" className="bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800/60 dark:text-slate-400 border-slate-200 dark:border-slate-700">
@@ -306,6 +303,12 @@ export function FarmerJobsList() {
         return (
           <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-400 border-rose-200">
             Quá hạn
+          </Badge>
+        )
+      case "cancelled":
+        return (
+          <Badge variant="destructive" className="bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-400 border-red-200">
+            Đã hủy
           </Badge>
         )
       default:
@@ -416,6 +419,7 @@ export function FarmerJobsList() {
                 <SelectItem value="all">Tất cả bài đăng</SelectItem>
                 <SelectItem value="active">Đang tuyển</SelectItem>
                 <SelectItem value="filled">Đã đủ / Full</SelectItem>
+                <SelectItem value="in-progress">Đang làm việc</SelectItem>
                 <SelectItem value="completed">Đã xong</SelectItem>
                 {/* <SelectItem value="passed">Quá hạn</SelectItem> */}
                 <SelectItem value="cancelled">Đã hủy</SelectItem>

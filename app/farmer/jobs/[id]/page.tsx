@@ -373,6 +373,19 @@ export default function FarmerJobDetailPage() {
         setJobDetailsTotalPages(response.data.pagination?.totalPages || 1)
       }
 
+      // If the approved details fall on the last day of the job, mark job as Completed
+      if (job && job.endDate && selectedJobDetail.workDate && job.statusId === JOB_POST_STATUS.InProgress) {
+        const endDateObj = new Date(job.endDate)
+        const workDateObj = new Date(selectedJobDetail.workDate)
+        const isSameDay = endDateObj.getFullYear() === workDateObj.getFullYear() &&
+                          endDateObj.getMonth() === workDateObj.getMonth() &&
+                          endDateObj.getDate() === workDateObj.getDate()
+        
+        if (isSameDay) {
+          await handleUpdateStatus(JOB_POST_STATUS.Completed)
+        }
+      }
+
       // Close dialog or update current view
       setIsJobDetailDialogOpen(false)
     } catch (err) {
@@ -496,6 +509,18 @@ export default function FarmerJobDetailPage() {
                 >
                   {isUpdatingStatus ? <RotateCw className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
                   Bắt đầu công việc
+                </Button>
+              )}
+
+              {/* Show "Hoàn thành công việc" if status is InProgress */}
+              {job.statusId === JOB_POST_STATUS.InProgress && (
+                <Button
+                  onClick={() => handleUpdateStatus(JOB_POST_STATUS.Completed)}
+                  disabled={isUpdatingStatus || isCancelling}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isUpdatingStatus ? <RotateCw className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                  Hoàn thành công việc
                 </Button>
               )}
 
@@ -870,6 +895,7 @@ export default function FarmerJobDetailPage() {
                               .finally(() => setIsLoadingJobDetails(false))
                           }
                         }}
+                        className="h-8 w-8 rounded-full text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-all"
                         disabled={isLoadingJobDetails}
                       >
                         <RotateCw className={cn("h-4 w-4", isLoadingJobDetails && "animate-spin")} />
@@ -1313,40 +1339,45 @@ export default function FarmerJobDetailPage() {
                   </div>
                 </div>
 
-                <div className="space-y-4 pt-4 border-t border-dashed">
-                  <h4 className="font-bold text-base text-foreground">Phê duyệt báo cáo</h4>
+                {
+                  true && (
+                    <div className="space-y-4 pt-4 border-t border-dashed">
+                      <h4 className="font-bold text-base text-foreground">Phê duyệt báo cáo</h4>
 
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="approval-range" className="text-sm font-medium">% Công việc thực tế hoàn thành</Label>
-                      <span className="text-lg font-bold text-agro-green">{approvalPercent}%</span>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="approval-range" className="text-sm font-medium">% Công việc thực tế hoàn thành</Label>
+                          <span className="text-lg font-bold text-agro-green">{approvalPercent}%</span>
+                        </div>
+                        <input
+                          id="approval-range"
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="5"
+                          value={approvalPercent}
+                          onChange={(e) => setApprovalPercent(parseInt(e.target.value))}
+                          disabled={selectedJobDetail.statusId === JobStatus.Completed}
+                          className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-agro-green disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                        <p className="text-[10px] text-muted-foreground italic">
+                          Lưu ý: % duyệt sẽ tương ứng với % lương mà người làm nhận được cho phiên làm việc này.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="farmer-feedback" className="text-sm font-medium">Phản hồi / Ghi chú của bạn</Label>
+                        <Textarea
+                          id="farmer-feedback"
+                          placeholder="Nhập phản hồi cho người làm..."
+                          value={approvalFeedback}
+                          onChange={(e) => setApprovalFeedback(e.target.value)}
+                          disabled={selectedJobDetail.statusId === JobStatus.Completed}
+                          className="min-h-[100px] bg-white dark:bg-zinc-950/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                      </div>
                     </div>
-                    <input
-                      id="approval-range"
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="5"
-                      value={approvalPercent}
-                      onChange={(e) => setApprovalPercent(parseInt(e.target.value))}
-                      className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-agro-green"
-                    />
-                    <p className="text-[10px] text-muted-foreground italic">
-                      Lưu ý: % duyệt sẽ tương ứng với % lương mà người làm nhận được cho phiên làm việc này.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="farmer-feedback" className="text-sm font-medium">Phản hồi / Ghi chú của bạn</Label>
-                    <Textarea
-                      id="farmer-feedback"
-                      placeholder="Nhập phản hồi cho người làm..."
-                      value={approvalFeedback}
-                      onChange={(e) => setApprovalFeedback(e.target.value)}
-                      className="min-h-[100px] bg-white dark:bg-zinc-950/50"
-                    />
-                  </div>
-                </div>
+                  )}
               </div>
             ) : null}
           </div>
@@ -1363,10 +1394,10 @@ export default function FarmerJobDetailPage() {
             <Button
               className="bg-agro-green hover:bg-agro-green/90 flex-1 sm:flex-none"
               onClick={handleApproveJobDetail}
-              disabled={isApprovingDetail || !selectedJobDetail}
+              disabled={isApprovingDetail || !selectedJobDetail || selectedJobDetail.statusId === JobStatus.Completed}
             >
               {isApprovingDetail ? <RotateCw className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-              Lưu & Phê duyệt
+              {selectedJobDetail?.statusId === JobStatus.Completed ? "Đã phê duyệt" : "Lưu & Phê duyệt"}
             </Button>
           </DialogFooter>
         </DialogContent>

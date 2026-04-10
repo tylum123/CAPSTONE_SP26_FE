@@ -1,18 +1,6 @@
 import type { JobSkillRequirement } from "./job.types";
 import { Skill } from "./skill.types";
 
-export interface Application {
-  id: string;
-  jobId: string;
-  workerId: string;
-  workerName: string;
-  workerPhone: string;
-  workerAvatar?: string;
-  status: 'pending' | 'approved' | 'rejected';
-  appliedAt: string;
-  reviewedAt?: string;
-}
-
 export enum ApplicationStatusId {
   Pending = 1,
   Accepted = 2,

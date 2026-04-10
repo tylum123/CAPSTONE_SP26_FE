@@ -1998,7 +1998,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                       <p className="text-2xl font-black">{formatCurrency(scheduleType === "contract" ? incomeNumber : incomeNumber * workersNeededNumber * selectedDailyDaysCount)}</p>
                     </div>
                     <div className="bg-white/20 p-3 rounded-xl">
-                      <DollarSign className="h-8 w-8 text-white" />
+                      <div className="h-8 w-8 text-white font-bold flex items-center">VNĐ</div>
                     </div>
                   </div>
 
