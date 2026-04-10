@@ -1,10 +1,5 @@
-import { AdminLayout } from "@/components/admin/admin-layout"
-import { AdminUsers } from "@/components/admin/admin-users"
+import { AdminShell } from "@/components/admin/admin-shell";
 
 export default function AdminUsersPage() {
-  return (
-    <AdminLayout>
-      <AdminUsers />
-    </AdminLayout>
-  )
+  return <AdminShell initialPage="users" />;
 }
