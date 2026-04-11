@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Users,
   Briefcase,
@@ -20,88 +21,139 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import { adminService } from "@/libs/api/services";
+
+interface DashboardStats {
+  totalUsers: number;
+  activeJobs: number;
+  totalRevenue: number;
+  completionRate: number;
+}
+
+interface TrendItem {
+  month: string;
+  newUsers: number;
+  newJobs: number;
+  revenue: number;
+}
+
+interface JobStatusBreakdown {
+  completed: number;
+  inProgress: number;
+  pending: number;
+  cancelled: number;
+}
+
+interface RecentActivity {
+  id: string;
+  type: string;
+  description: string;
+  actorName: string;
+  amount?: number;
+  createdAt: string;
+}
+
+interface DashboardData {
+  stats: DashboardStats;
+  trends: TrendItem[];
+  jobStatusBreakdown: JobStatusBreakdown;
+  recentActivities: RecentActivity[];
+}
+
+function formatTimeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 60) return `${minutes} phút trước`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} giờ trước`;
+  const days = Math.floor(hours / 24);
+  return `${days} ngày trước`;
+}
 
 export function AdminDashboard() {
-  const stats = [
-    {
-      label: "Tổng người dùng",
-      value: "2,547",
-      icon: Users,
-      change: "+12%",
-      color: "bg-primary",
-    },
-    {
-      label: "Công việc đang hoạt động",
-      value: "342",
-      icon: Briefcase,
-      change: "+8%",
-      color: "bg-[#D28228]",
-    },
-    {
-      label: "Tổng doanh thu",
-      value: "$48,250",
-      icon: DollarSign,
-      change: "+24%",
-      color: "bg-[#10B981]",
-    },
-    {
-      label: "Tỷ lệ hoàn thành",
-      value: "94.2%",
-      icon: TrendingUp,
-      change: "+3%",
-      color: "bg-primary",
-    },
-  ];
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const chartData = [
-    { month: "Jan", users: 400, jobs: 240, revenue: 2400 },
-    { month: "Feb", users: 520, jobs: 290, revenue: 2810 },
-    { month: "Mar", users: 680, jobs: 350, revenue: 3200 },
-    { month: "Apr", users: 750, jobs: 420, revenue: 3890 },
-    { month: "May", users: 920, jobs: 510, revenue: 4500 },
-    { month: "Jun", users: 1100, jobs: 620, revenue: 5200 },
-  ];
+  useEffect(() => {
+    adminService
+      .getDashboard()
+      .then((res) => {
+        setData(res.data ?? res);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
-  const jobStatusData = [
-    { name: "Hoàn thành", value: 680, color: "#3A8250" },
-    { name: "Đang tiến hành", value: 342, color: "#10B981" },
-    { name: "Chờ xử lý", value: 156, color: "#D28228" },
-    { name: "Hủy bỏ", value: 42, color: "#EF4444" },
-  ];
+  const stats = data
+    ? [
+        {
+          label: "Tổng người dùng",
+          value: data.stats.totalUsers.toLocaleString(),
+          icon: Users,
+          color: "bg-primary",
+        },
+        {
+          label: "Công việc đang hoạt động",
+          value: data.stats.activeJobs.toLocaleString(),
+          icon: Briefcase,
+          color: "bg-[#D28228]",
+        },
+        {
+          label: "Tổng doanh thu",
+          value: data.stats.totalRevenue.toLocaleString("vi-VN") + " ₫",
+          icon: DollarSign,
+          color: "bg-[#10B981]",
+        },
+        {
+          label: "Tỷ lệ hoàn thành",
+          value: data.stats.completionRate.toFixed(1) + "%",
+          icon: TrendingUp,
+          color: "bg-primary",
+        },
+      ]
+    : [];
 
-  const recentActivity = [
-    {
-      id: 1,
-      action: "Người dùng mới đăng ký",
-      user: "Nguyễn Văn A",
-      time: "2 phút trước",
-    },
-    {
-      id: 2,
-      action: "Công việc hoàn thành",
-      job: "Trồng cà chua",
-      time: "15 phút trước",
-    },
-    {
-      id: 3,
-      action: "Tranh chấp được giải quyết",
-      amount: "$150",
-      time: "1 giờ trước",
-    },
-    {
-      id: 4,
-      action: "Nạp tiền vào ví",
-      user: "Trần Thị B",
-      amount: "$500",
-      time: "2 giờ trước",
-    },
-    {
-      id: 5,
-      action: "Tài khoản bị khóa",
-      user: "Lê Văn C",
-      time: "3 giờ trước",
-    },
-  ];
+  const chartData = (data?.trends ?? []).map((t) => ({
+    month: t.month,
+    users: t.newUsers,
+    jobs: t.newJobs,
+    revenue: t.revenue,
+  }));
+
+  const jobStatusData = data
+    ? [
+        {
+          name: "Hoàn thành",
+          value: data.jobStatusBreakdown.completed,
+          color: "#3A8250",
+        },
+        {
+          name: "Đang tiến hành",
+          value: data.jobStatusBreakdown.inProgress,
+          color: "#10B981",
+        },
+        {
+          name: "Chờ xử lý",
+          value: data.jobStatusBreakdown.pending,
+          color: "#D28228",
+        },
+        {
+          name: "Hủy bỏ",
+          value: data.jobStatusBreakdown.cancelled,
+          color: "#EF4444",
+        },
+      ]
+    : [];
+
+  const recentActivities = data?.recentActivities ?? [];
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <p className="text-muted-foreground">Đang tải dữ liệu...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 space-y-8">
@@ -124,9 +176,6 @@ export function AdminDashboard() {
                 <div className={`${stat.color} rounded-lg p-3`}>
                   <Icon size={24} className="text-white" />
                 </div>
-                <span className="text-sm font-semibold text-green-600">
-                  {stat.change}
-                </span>
               </div>
               <h3 className="text-sm font-medium text-muted-foreground">
                 {stat.label}
@@ -231,7 +280,7 @@ export function AdminDashboard() {
           </h2>
         </div>
         <div className="space-y-4">
-          {recentActivity.map((activity) => (
+          {recentActivities.map((activity) => (
             <div
               key={activity.id}
               className="flex items-start gap-4 border-b border-border pb-4 last:border-0"
@@ -241,17 +290,19 @@ export function AdminDashboard() {
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-foreground">
-                  {activity.action}
+                  {activity.description}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {("user" in activity && activity.user) ||
-                    ("job" in activity && activity.job) ||
-                    ("amount" in activity && activity.amount) ||
-                    ""}
+                  {activity.actorName}
+                  {activity.amount !== undefined && (
+                    <span className="ml-2 font-medium text-primary">
+                      {activity.amount.toLocaleString("vi-VN")} ₫
+                    </span>
+                  )}
                 </p>
               </div>
               <span className="whitespace-nowrap text-xs text-muted-foreground">
-                {activity.time}
+                {formatTimeAgo(activity.createdAt)}
               </span>
             </div>
           ))}
