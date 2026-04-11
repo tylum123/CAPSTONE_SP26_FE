@@ -1,32 +1,38 @@
 "use client";
 
 import { useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ChatInterface } from "@/components/chat/chat-interface";
 
 export default function FarmerMessageConversationPage() {
   const router = useRouter();
   const params = useParams<{ receiverId: string }>();
+  const searchParams = useSearchParams();
   const receiverId = params?.receiverId || "";
+
+  const nameParam = searchParams?.get("name");
+  const avatarParam = searchParams?.get("avatarUrl");
 
   // Ideally, fetch the user's details by receiverId here.
   // Using a fallback for now.
   const displayId = receiverId.length > 8 ? receiverId.substring(0, 8).toUpperCase() : receiverId;
+  const userName = nameParam || `Người dùng ${displayId}`;
+  const userAvatar = avatarParam || "/placeholder.svg";
 
   const conversations = useMemo(
     () => [
       {
         id: receiverId,
         userId: receiverId,
-        userName: `Người dùng ${displayId}`,
-        userAvatar: "/placeholder.svg",
+        userName,
+        userAvatar,
         lastMessage: "Bấm vào để xem tin nhắn",
         lastMessageTime: "vừa xong",
         unreadCount: 0,
         online: true,
       },
     ],
-    [receiverId, displayId]
+    [receiverId, userName, userAvatar]
   );
 
   return (

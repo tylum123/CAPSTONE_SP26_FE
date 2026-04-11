@@ -866,7 +866,12 @@ export default function FarmerJobDetailPage() {
                                 type="button"
                                 size="sm"
                                 className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm hover:shadow-md transition-all"
-                                onClick={() => router.push(`/farmer/messages/${application.worker?.userId}`)}
+                                onClick={() => {
+                                  const query = new URLSearchParams();
+                                  if (application.worker?.fullName) query.set("name", application.worker.fullName);
+                                  if (application.worker?.avatarUrl) query.set("avatarUrl", application.worker.avatarUrl);
+                                  router.push(`/farmer/messages/${application.worker?.userId}?${query.toString()}`);
+                                }}
                               >
                                 <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
                                 Nhắn tin

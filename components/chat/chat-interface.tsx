@@ -48,12 +48,11 @@ export function ChatInterface({
   const [searchQuery, setSearchQuery] = useState("");
   const [messageInput, setMessageInput] = useState("");
 
-  const currentConversation = conversations.find((c) => c.id === currentConversationId);
-
   const { user } = useAuth();
   const myUserId = user?.userId;
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const [localConversations, setLocalConversations] = useState<Conversation[]>(conversations);
 
   const connectionRef = useRef<HubConnection | null>(null);
   const otherUserIdRef = useRef<string | null>(null);
@@ -62,6 +61,55 @@ export function ChatInterface({
   useEffect(() => {
     myUserIdRef.current = myUserId ?? null;
   }, [myUserId]);
+
+  const formatCreatedAt = (value: string) => {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  useEffect(() => {
+    setLocalConversations((prev) => {
+      const merged = new Map(prev.map((c) => [c.id, c]));
+      conversations.forEach((c) => {
+        if (!merged.has(c.id)) {
+          merged.set(c.id, c);
+        }
+      });
+      return Array.from(merged.values());
+    });
+  }, [conversations]);
+
+  useEffect(() => {
+    const fetchLastConversations = async () => {
+      try {
+        const res = await commonService.getLastConversations();
+        if (res.data) {
+          const apiConvs: Conversation[] = res.data.map((dto) => ({
+            id: dto.contact.id,
+            userId: dto.contact.id,
+            userName: dto.contact.name || `Người dùng ${dto.contact.id.substring(0, 8)}`,
+            userAvatar: dto.contact.avatarUrl || "/placeholder.svg",
+            lastMessage: dto.lastMessage?.content || "Không có tin nhắn",
+            lastMessageTime: dto.lastMessage?.createdAt ? formatCreatedAt(dto.lastMessage.createdAt) : "",
+            unreadCount: dto.unreadCount || 0,
+            online: false,
+          }));
+
+          setLocalConversations((prev) => {
+            const apiConvsMap = new Map(apiConvs.map((c) => [c.id, c]));
+            const uniquePrev = prev.filter((c) => !apiConvsMap.has(c.id));
+            return [...apiConvs, ...uniquePrev];
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load last conversations:", err);
+      }
+    };
+    fetchLastConversations();
+  }, []);
+
+  const currentConversation = localConversations.find((c) => c.id === currentConversationId);
 
   const hubBaseUrl = useMemo(() => {
     return API_CONFIG.BASE_URL.replace(/\/api\/v1\/?$/, "");
@@ -72,15 +120,9 @@ export function ChatInterface({
     setMessages([]); // reset view when switching conversations
   }, [currentConversationId, currentConversation?.userId]);
 
-  const filteredConversations = conversations.filter((conv) =>
+  const filteredConversations = localConversations.filter((conv) =>
     conv.userName.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const formatCreatedAt = (value: string) => {
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return value;
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
 
   const ensureConnectionStarted = async () => {
     if (connectionRef.current) return connectionRef.current;
@@ -171,7 +213,7 @@ export function ChatInterface({
             content: m.content,
             read: m.read,
             createdAt: m.createdAt,
-          }))
+          })).reverse()
         );
       } catch (e) {
         console.error("Failed to load messages:", e);
@@ -325,18 +367,18 @@ export function ChatInterface({
               </Avatar>
               <div>
                 <h3 className="font-semibold">{currentConversation.userName}</h3>
-                <p className="text-sm text-muted-foreground">
+                {/* <p className="text-sm text-muted-foreground">
                   {currentConversation.online ? "Đang hoạt động" : "Không hoạt động"}
-                </p>
+                </p> */}
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon">
+              {/* <Button variant="ghost" size="icon">
                 <Phone className="h-5 w-5" />
               </Button>
               <Button variant="ghost" size="icon">
                 <Video className="h-5 w-5" />
-              </Button>
+              </Button> */}
               <Button variant="ghost" size="icon">
                 <MoreVertical className="h-5 w-5" />
               </Button>
@@ -352,7 +394,7 @@ export function ChatInterface({
                   <div
                     key={message.id}
                     className={cn(
-                      "flex block",
+                      "flex",
                       isMine ? "justify-end" : "justify-start"
                     )}
                   >

@@ -157,7 +157,8 @@ export const API_ENDPOINTS = {
   MESSAGES: {
     GET: '/messages',
     SEND: '/messages',
-    READ: '/messages/read'
+    READ: '/messages/read',
+    CONVERSATIONS: '/messages/conversations'
   },
 
   UPLOAD: '/upload',

@@ -1,6 +1,6 @@
 import axiosInstance from '../axios-instance';
 import { API_ENDPOINTS } from '../endpoints/config';
-import type { ApiResponse, PaginatedResponse, Message } from '@/libs/types';
+import type { ApiResponse, PaginatedResponse, Message, LastConversationsDTO } from '@/libs/types';
 
 export const commonService = {
   /**
@@ -33,6 +33,14 @@ export const commonService = {
     const response = await axiosInstance.patch(`${API_ENDPOINTS.MESSAGES.READ}`, {
       senderId,
     });
+    return response.data;
+  },
+
+  /**
+   * Fetch last conversations
+   */
+  getLastConversations: async (): Promise<ApiResponse<LastConversationsDTO[]>> => {
+    const response = await axiosInstance.get(API_ENDPOINTS.MESSAGES.CONVERSATIONS);
     return response.data;
   },
 
