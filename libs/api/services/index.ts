@@ -13,3 +13,4 @@ export { jobService } from './jobs.service';
 export { jobApplicationService } from './jobApplication.service';
 export { PaymentService } from './payment.service';
 export { WalletService } from './wallet.service';
+export { ratingService } from './rating.service';

@@ -27,6 +27,7 @@ import { jobApplicationService } from "@/libs/api/services/jobApplication.servic
 import { jobDetailsService } from "@/libs/api/services/jobDetails.service"
 import type { ApplicationDTO, Job, JobDetail, PaginatedResponse, RespondApplicationRequest } from "@/libs/types"
 import { JobPostStatus, JobStatus } from "@/libs/types"
+import { ratingService } from "@/libs/api/services"
 
 const APP_STATUS = {
   pending: ApplicationStatusId.Pending,
@@ -40,6 +41,86 @@ const JOB_POST_STATUS = JobPostStatus;
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import Image from "next/image"
 import { JobStatusChart } from "@/components/farmer/dashboard-charts"
+import { useAuth } from "@/libs/stores/auth.store"
+import type { RatingDTO } from "@/libs/types/rating.types"
+
+function JobReviews({ jobId }: { jobId: string }) {
+  const { user } = useAuth();
+  const [reviews, setReviews] = useState<RatingDTO[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user?.userId) {
+      setLoading(false);
+      return;
+    }
+
+    ratingService.getAllByUser(user.userId)
+      .then(res => {
+        if (res.data) {
+          const filtered = res.data.filter(r => r.jobPostId === jobId && r.typeId === 2);
+          setReviews(filtered);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [user?.userId, jobId]);
+
+  if (loading) return null;
+  if (reviews.length === 0) return null;
+
+  return (
+    <Card className="border-0 shadow-sm bg-white/70 dark:bg-zinc-900/70">
+      <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-3">
+        <div className="p-2 rounded-lg bg-amber-100 text-amber-600">
+          <Star className="h-5 w-5 fill-amber-600" />
+        </div>
+        <CardTitle className="text-lg">Đánh giá từ người làm</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {reviews.map(review => (
+          <div key={review.id} className="p-4 rounded-lg bg-muted/30 border border-muted/50 flex flex-col gap-2">
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-0.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star key={i} className={cn("h-4 w-4", i < review.ratingScore ? "text-amber-500 fill-amber-500" : "text-muted stroke-muted-foreground/30")} />
+                ))}
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {new Intl.DateTimeFormat("vi-VN", { dateStyle: "short" }).format(new Date(review.createdAt))}
+              </span>
+            </div>
+            <p className="text-sm text-foreground leading-relaxed">{review.reviewText || "Không có nội dung đánh giá."}</p>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+function WorkerAverageRating({ userId, fallback }: { userId?: string, fallback?: number }) {
+  const [rating, setRating] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    ratingService.getAverage(userId)
+      .then(res => {
+        if (res.data !== undefined) {
+          setRating(res.data);
+        }
+      })
+      .catch(() => {});
+  }, [userId]);
+
+  const displayRating = rating !== null ? rating : fallback;
+
+  return (
+    <>
+      <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
+      <span>{displayRating !== undefined && displayRating !== null ? displayRating.toFixed(1) : "5.0"}</span>
+    </>
+  );
+}
 
 export default function FarmerJobDetailPage() {
   const params = useParams<{ id: string }>()
@@ -729,6 +810,9 @@ export default function FarmerJobDetailPage() {
                     </CardContent>
                   </Card>
                 </div>
+                
+                {/* Job Reviews Section */}
+                {jobId && <JobReviews jobId={jobId} />}
               </div>
             </div>
 
@@ -823,8 +907,7 @@ export default function FarmerJobDetailPage() {
                             <div className="min-w-0">
                               <p className="font-bold text-foreground truncate">{application.worker?.fullName || "Ứng viên"}</p>
                               <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-                                <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
-                                <span>{application.worker?.averageRating?.toFixed(1) || "5.0"}</span>
+                                <WorkerAverageRating userId={application.worker?.userId} fallback={application.worker?.averageRating} />
                                 <span className="opacity-40">•</span>
                                 <span>{application.worker?.primaryLocation || "TP.HCM"}</span>
                               </div>
@@ -1089,6 +1172,7 @@ export default function FarmerJobDetailPage() {
                       <div className="flex flex-wrap gap-2 mt-2">
                         <Badge variant="outline" className="bg-muted capitalize font-normal">{selectedApplication.worker?.gender || "Không rõ giới tính"}</Badge>
                         <Badge variant="outline" className="bg-muted font-normal">{selectedApplication.worker?.date_of_birth ? `Ngày sinh: ${formatDate(selectedApplication.worker.date_of_birth)}` : "Không rõ NS"}</Badge>
+                        <Badge variant="outline" className="bg-muted font-normal flex items-center gap-1.5"><WorkerAverageRating userId={selectedApplication.worker?.userId} fallback={selectedApplication.worker?.averageRating} /></Badge>
                       </div>
                     </div>
                   </div>

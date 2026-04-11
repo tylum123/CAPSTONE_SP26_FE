@@ -161,6 +161,13 @@ export const API_ENDPOINTS = {
     CONVERSATIONS: '/messages/conversations'
   },
 
+  RATINGS: {
+    SPECIFIC: (userId: string) => `/ratings/${userId}`,
+    BY_USER: (userId: string) => `/ratings/user/${userId}/all`,
+    GIVEN: `/ratings/user/given`,
+    AVERAGE: (userId: string) => `/ratings/user/${userId}/average`
+  },
+
   UPLOAD: '/upload',
 } as const;
 
