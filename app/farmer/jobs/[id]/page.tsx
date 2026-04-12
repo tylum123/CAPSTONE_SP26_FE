@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Banknote, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText, InfoIcon, MailIcon, MapPin, MessageSquare, Play, RotateCw, Star, Users, XCircle } from "lucide-react"
+import { ArrowLeft, Banknote, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText, InfoIcon, MailIcon, MapPin, MessageSquare, Play, RotateCw, Star, Users, XCircle, Paperclip } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -1052,6 +1052,12 @@ export default function FarmerJobDetailPage() {
                                   <p className="text-sm text-muted-foreground line-clamp-2">
                                     {detail.workerDescription || "Không có mô tả từ người làm."}
                                   </p>
+                                  {detail.attachments && detail.attachments.length > 0 && (
+                                    <div className="flex items-center gap-1.5 pt-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                                      <Paperclip className="h-3 w-3" />
+                                      {detail.attachments.length} tệp đính kèm
+                                    </div>
+                                  )}
                                 </div>
                                 <div className="flex flex-col items-end gap-2">
                                   <div className="flex items-center gap-1 text-emerald-600 font-bold">
@@ -1455,6 +1461,43 @@ export default function FarmerJobDetailPage() {
                     </p>
                   </div>
                 </div>
+
+                {selectedJobDetail.attachments && selectedJobDetail.attachments.length > 0 && (
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold">Đính kèm từ người làm</Label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {selectedJobDetail.attachments.map(att => (
+                        <a 
+                          key={att.id} 
+                          href={att.fileUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="relative aspect-square border rounded-xl overflow-hidden block group"
+                        >
+                          {att.format && (att.format.toLowerCase() === 'mp4' || att.format.toLowerCase() === 'video' || att.format.includes('video')) ? (
+                             <video 
+                               src={att.fileUrl} 
+                               className="object-cover w-full h-full" 
+                             />
+                          ) : (
+                             <Image 
+                               src={att.fileUrl} 
+                               alt="Đính kèm" 
+                               fill 
+                               sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw"
+                               className="object-cover group-hover:scale-105 transition-transform duration-300" 
+                             />
+                          )}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">
+                            <span className="opacity-0 group-hover:opacity-100 bg-black/60 text-white text-[10px] px-2 py-1 rounded-md backdrop-blur-sm transition-opacity duration-300">
+                              Xem chi tiết
+                            </span>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50/30 p-4 dark:border-emerald-900/20 dark:bg-emerald-950/20">
                   <div className="flex items-center justify-between">

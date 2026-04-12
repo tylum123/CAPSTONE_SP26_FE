@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ChatInterface } from "@/components/chat/chat-interface";
+import { ChatSidebar } from "@/components/chat/chat-sidebar";
+import { MessageSquare } from "lucide-react";
 
 export default function FarmerMessagesPage() {
   const router = useRouter();
@@ -15,11 +16,31 @@ export default function FarmerMessagesPage() {
         </p>
       </div>
 
-      <div className="flex-1 min-h-0 bg-white dark:bg-zinc-900 border rounded-2xl shadow-sm overflow-hidden">
-        <ChatInterface
-          conversations={[]}
-          onConversationSelect={(id) => router.push(`/farmer/messages/${id}`)}
-        />
+      <div className="flex-1 min-h-0 flex gap-4">
+        {/* Sidebar Card */}
+        <div className="w-80 shrink-0 bg-white border rounded-2xl shadow-sm overflow-hidden flex flex-col">
+          <ChatSidebar
+            onConversationSelect={(conv) => {
+              const query = new URLSearchParams();
+              if (conv.userName) query.set("name", conv.userName);
+              if (conv.userAvatar) query.set("avatarUrl", conv.userAvatar);
+              router.push(`/farmer/messages/${conv.id}?${query.toString()}`);
+            }}
+          />
+        </div>
+
+        {/* Empty state card */}
+        <div className="hidden sm:flex flex-1 bg-white border rounded-2xl shadow-sm items-center justify-center text-center p-8">
+          <div>
+            <div className="w-16 h-16 rounded-full bg-agro-cream flex items-center justify-center mx-auto mb-4">
+              <MessageSquare className="h-8 w-8 text-agro-green" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Chọn một cuộc trò chuyện</h3>
+            <p className="text-muted-foreground text-sm">
+              Chọn một cuộc trò chuyện từ danh sách bên trái để bắt đầu nhắn tin
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

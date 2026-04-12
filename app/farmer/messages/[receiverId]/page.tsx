@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ChatInterface } from "@/components/chat/chat-interface";
+import { ChatSidebar } from "@/components/chat/chat-sidebar";
 
 export default function FarmerMessageConversationPage() {
   const router = useRouter();
@@ -13,13 +14,11 @@ export default function FarmerMessageConversationPage() {
   const nameParam = searchParams?.get("name");
   const avatarParam = searchParams?.get("avatarUrl");
 
-  // Ideally, fetch the user's details by receiverId here.
-  // Using a fallback for now.
   const displayId = receiverId.length > 8 ? receiverId.substring(0, 8).toUpperCase() : receiverId;
   const userName = nameParam || `Người dùng ${displayId}`;
   const userAvatar = avatarParam || "/placeholder.svg";
 
-  const conversations = useMemo(
+  const initialConversations = useMemo(
     () => [
       {
         id: receiverId,
@@ -42,12 +41,27 @@ export default function FarmerMessageConversationPage() {
         <p className="text-sm text-muted-foreground">Trao đổi trực tiếp với người dùng và quản lý cập nhật công việc</p>
       </div>
 
-      <div className="flex-1 min-h-0 bg-white dark:bg-zinc-900 border rounded-2xl shadow-sm overflow-hidden">
-        <ChatInterface
-          conversations={conversations}
-          currentConversationId={receiverId}
-          onConversationSelect={(id) => router.push(`/farmer/messages/${id}`)}
-        />
+      <div className="flex-1 min-h-0 flex gap-4">
+        {/* Sidebar Card */}
+        <div className="hidden sm:flex w-80 shrink-0 bg-white border rounded-2xl shadow-sm overflow-hidden flex-col">
+          <ChatSidebar
+            initialConversations={initialConversations}
+            currentConversationId={receiverId}
+            onConversationSelect={(conv) => {
+              const query = new URLSearchParams();
+              if (conv.userName) query.set("name", conv.userName);
+              if (conv.userAvatar) query.set("avatarUrl", conv.userAvatar);
+              router.push(`/farmer/messages/${conv.id}?${query.toString()}`);
+            }}
+          />
+        </div>
+
+        {/* Chat Card */}
+        <div className="flex-1 bg-white border rounded-2xl shadow-sm overflow-hidden flex flex-col">
+          <ChatInterface
+            receiver={{ id: receiverId, name: userName, avatarUrl: userAvatar }}
+          />
+        </div>
       </div>
     </div>
   );

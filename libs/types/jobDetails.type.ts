@@ -1,5 +1,15 @@
 import { ApplicationWorkerDTO } from "./application.types";
 
+export interface JobAttachment {
+    id: string;
+    jobDetailId: string;
+    cloudinaryPublicId: string;
+    fileUrl: string;
+    format: string;
+    fileSize: number;
+    createdAt: string;
+}
+
 export interface JobDetail {
     id: string;
     jobApplicationId: string;
@@ -17,6 +27,7 @@ export interface JobDetail {
     completedAt: string;
     createdAt: string;
     updatedAt: string;
+    attachments: JobAttachment[];
 }
 
 export interface ApproveJobDetailRequest {
