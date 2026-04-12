@@ -31,7 +31,7 @@ import { farmerService } from "@/libs/api/services/farmer.service"
 import { FarmService } from "@/libs/api/services/farm.service"
 import { jobCategoryService } from "@/libs/api/services/job-category.service"
 import { skillService } from "@/libs/api/services/skill.service"
-import type { CreateJobRequest, GetFarmResponse, Job, JobCategory, Skill, UpdateJobRequest } from "@/libs/types"
+import { JobPostStatus, JobStatus, type CreateJobRequest, type GetFarmResponse, type Job, type JobCategory, type Skill, type UpdateJobRequest } from "@/libs/types"
 import { cn } from "@/libs/utils/utils"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@radix-ui/react-collapsible"
 import { jobService } from "@/libs/api/services/jobs.service"
@@ -75,7 +75,7 @@ const DEFAULT_FARM_ID = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
 const DEFAULT_JOB_CATEGORY_ID = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
 const JOB_TYPE_CONTRACT_ID = 1
 const JOB_TYPE_DAILY_ID = 2
-const DEFAULT_STATUS_ID = 2
+const DEFAULT_STATUS_ID = JobPostStatus.Published
 const DEFAULT_IS_URGENT = false
 
 const OSM_REVERSE_URL = process.env.NEXT_PUBLIC_OSM_REVERSE_URL
