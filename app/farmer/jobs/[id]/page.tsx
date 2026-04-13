@@ -158,6 +158,7 @@ export default function FarmerJobDetailPage() {
   const [applicationsTotalPages, setApplicationsTotalPages] = useState(1)
   const [jobDetailsPage, setJobDetailsPage] = useState(1)
   const [jobDetailsTotalPages, setJobDetailsTotalPages] = useState(1)
+  const [autoAcceptingId, setAutoAcceptingId] = useState<string | null>(null)
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("vi-VN", {
@@ -494,6 +495,20 @@ export default function FarmerJobDetailPage() {
       setError("Không thể hủy bài đăng.")
     } finally {
       setIsCancelling(false)
+    }
+  }
+
+  const handleAutoAccept = async (applicationId: string) => {
+    if (!jobId) return
+    try {
+      setAutoAcceptingId(applicationId)
+      await jobApplicationService.autoAccept(applicationId)
+      await loadApplications(jobId, applicationsPage)
+    } catch (err) {
+      console.error(err)
+      setError("Không thể nhận ứng viên. Vui lòng thử lại.")
+    } finally {
+      setAutoAcceptingId(null)
     }
   }
 
@@ -934,15 +949,32 @@ export default function FarmerJobDetailPage() {
                                 <InfoIcon className="h-4 w-4" />
                               </Button>
                               {application.statusId === APP_STATUS.pending && (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  className="h-8 px-3 rounded-lg bg-agro-green hover:bg-agro-green-dark text-white text-xs font-semibold shadow-sm hover:shadow-md transition-all"
-                                  onClick={() => void openApplicationRespond(application.id)}
-                                >
-                                  <MailIcon className="mr-1.5 h-3.5 w-3.5" />
-                                  Phản hồi
-                                </Button>
+                                <>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 px-3 rounded-lg border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-xs font-semibold transition-all"
+                                    disabled={autoAcceptingId === application.id}
+                                    onClick={() => void handleAutoAccept(application.id)}
+                                  >
+                                    {autoAcceptingId === application.id ? (
+                                      <RotateCw className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                                    )}
+                                    Nhận ngay
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="h-8 px-3 rounded-lg bg-agro-green hover:bg-agro-green-dark text-white text-xs font-semibold shadow-sm hover:shadow-md transition-all"
+                                    onClick={() => void openApplicationRespond(application.id)}
+                                  >
+                                    <MailIcon className="mr-1.5 h-3.5 w-3.5" />
+                                    Phản hồi
+                                  </Button>
+                                </>
                               )}
                               {application.statusId === APP_STATUS.accepted && (
                                 <Button
