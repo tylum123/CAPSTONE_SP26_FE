@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -8,6 +8,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/libs/utils/utils";
 import { commonService } from "@/libs/api/services";
+import { useAuth } from "@/libs/stores/auth.store";
+import { useSignalR, type IncomingMessage } from "@/contexts/signalr-context";
 
 export interface Conversation {
   id: string;
@@ -26,36 +28,50 @@ interface ChatSidebarProps {
   onConversationSelect: (conversation: Conversation) => void;
 }
 
-export function ChatSidebar({ initialConversations = [], currentConversationId, onConversationSelect }: ChatSidebarProps) {
+export function ChatSidebar({
+  initialConversations = [],
+  currentConversationId,
+  onConversationSelect,
+}: ChatSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
+  const [conversations, setConversations] =
+    useState<Conversation[]>(initialConversations);
 
+  const { user } = useAuth();
+  const myUserId = user?.userId;
+  const { onMessage } = useSignalR();
+
+  const formatTime = (value: string) => {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  /* ─── Initial fetch ────────────────────────────────────────── */
   useEffect(() => {
     const fetchLastConversations = async () => {
       try {
         const res = await commonService.getLastConversations();
         if (res.data) {
-          const formatCreatedAt = (value: string) => {
-            const d = new Date(value);
-            if (Number.isNaN(d.getTime())) return value;
-            return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-          };
-
           const apiConvs: Conversation[] = res.data.map((dto) => ({
             id: dto.contact.id,
             userId: dto.contact.id,
-            userName: dto.contact.name || `Người dùng ${dto.contact.id.substring(0, 8)}`,
+            userName:
+              dto.contact.name ||
+              `Người dùng ${dto.contact.id.substring(0, 8)}`,
             userAvatar: dto.contact.avatarUrl || "/placeholder.svg",
             lastMessage: dto.lastMessage?.content || "Không có tin nhắn",
-            lastMessageTime: dto.lastMessage?.createdAt ? formatCreatedAt(dto.lastMessage.createdAt) : "",
+            lastMessageTime: dto.lastMessage?.createdAt
+              ? formatTime(dto.lastMessage.createdAt)
+              : "",
             unreadCount: dto.unreadCount || 0,
             online: false,
           }));
 
           setConversations((prev) => {
-            const apiConvsMap = new Map(apiConvs.map((c) => [c.id, c]));
-            const uniquePrev = prev.filter((c) => !apiConvsMap.has(c.id));
-            return [...apiConvsMap.values(), ...uniquePrev]; // overwrite stub with API actual
+            const apiMap = new Map(apiConvs.map((c) => [c.id, c]));
+            const uniquePrev = prev.filter((c) => !apiMap.has(c.id));
+            return [...apiMap.values(), ...uniquePrev];
           });
         }
       } catch (err) {
@@ -63,7 +79,76 @@ export function ChatSidebar({ initialConversations = [], currentConversationId, 
       }
     };
     fetchLastConversations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* ─── Realtime: update sidebar preview on new message ──────── */
+  const handleIncomingMessage = useCallback(
+    (msg: IncomingMessage) => {
+      if (!myUserId) return;
+
+      // The "other" participant is whoever isn't us
+      const otherUserId =
+        msg.senderId.toLowerCase() === myUserId.toLowerCase()
+          ? msg.receiverId
+          : msg.senderId;
+
+      // Is this message for the currently-open conversation?
+      const isActiveConversation =
+        currentConversationId?.toLowerCase() === otherUserId.toLowerCase();
+
+      setConversations((prev) => {
+        const existing = prev.find(
+          (c) => c.id.toLowerCase() === otherUserId.toLowerCase()
+        );
+
+        const updated: Conversation = existing
+          ? {
+              ...existing,
+              lastMessage: msg.content,
+              lastMessageTime: formatTime(msg.createdAt),
+              // Only bump unread count if conversation is not currently open
+              unreadCount: isActiveConversation
+                ? 0
+                : existing.unreadCount + (msg.senderId !== myUserId ? 1 : 0),
+            }
+          : {
+              id: otherUserId,
+              userId: otherUserId,
+              userName: `Người dùng ${otherUserId.substring(0, 8).toUpperCase()}`,
+              userAvatar: "/placeholder.svg",
+              lastMessage: msg.content,
+              lastMessageTime: formatTime(msg.createdAt),
+              unreadCount: isActiveConversation ? 0 : 1,
+              online: false,
+            };
+
+        // Bring the updated conversation to the top, remove old entry
+        const rest = prev.filter(
+          (c) => c.id.toLowerCase() !== otherUserId.toLowerCase()
+        );
+        return [updated, ...rest];
+      });
+    },
+    [myUserId, currentConversationId]
+  );
+
+  useEffect(() => {
+    const unsubscribe = onMessage(handleIncomingMessage);
+    return unsubscribe;
+  }, [onMessage, handleIncomingMessage]);
+
+  /* ─── Reset unread when opening a conversation ──────────────── */
+  useEffect(() => {
+    if (!currentConversationId) return;
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id.toLowerCase() === currentConversationId.toLowerCase()
+          ? { ...c, unreadCount: 0 }
+          : c
+      )
+    );
+  }, [currentConversationId]);
 
   const filteredConversations = conversations.filter((conv) =>
     conv.userName.toLowerCase().includes(searchQuery.toLowerCase())

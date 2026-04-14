@@ -1,22 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, MoreVertical, Paperclip, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/libs/utils/utils";
-import {
-  HubConnection,
-  HubConnectionBuilder,
-  HubConnectionState,
-  LogLevel,
-} from "@microsoft/signalr";
 import { commonService } from "@/libs/api/services";
-import { API_CONFIG } from "@/libs/api/endpoints/config";
-import { STORAGE_KEYS } from "@/constants";
 import { useAuth } from "@/libs/stores/auth.store";
+import { useSignalR, type IncomingMessage } from "@/contexts/signalr-context";
 
 interface Message {
   id: string;
@@ -39,12 +32,12 @@ export function ChatInterface({ receiver }: ChatInterfaceProps) {
   const [messageInput, setMessageInput] = useState("");
   const { user } = useAuth();
   const myUserId = user?.userId;
+  const { onMessage } = useSignalR();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const shouldScrollRef = useRef(false);
 
-  const connectionRef = useRef<HubConnection | null>(null);
-  // Keep refs in sync so SignalR callbacks always read latest values
+  // Keep refs in sync so the SignalR callback always reads the latest values
   const otherUserIdRef = useRef<string>(receiver.id);
   const myUserIdRef = useRef<string | null>(myUserId ?? null);
 
@@ -85,166 +78,43 @@ export function ChatInterface({ receiver }: ChatInterfaceProps) {
     return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
   };
 
-  const hubBaseUrl = useMemo(() => {
-    return API_CONFIG.BASE_URL.replace(/\/api\/v1\/?$/, "");
-  }, []);
+  /* ─── Subscribe to the shared SignalR connection ───────────── */
+  const handleIncomingMessage = useCallback(
+    (msg: IncomingMessage) => {
+      const myIdNow = myUserIdRef.current;
+      const otherIdNow = otherUserIdRef.current;
+      if (!myIdNow || !otherIdNow) return;
 
-  /* ─── incoming message handler (stable ref so we can re-attach after reconnect) ─── */
-  const handleIncomingMessage = useCallback((incoming: any) => {
-    const myIdNow = myUserIdRef.current;
-    const otherIdNow = otherUserIdRef.current;
-    if (!myIdNow || !otherIdNow) return;
+      const sId = msg.senderId.toLowerCase();
+      const rId = msg.receiverId.toLowerCase();
+      const myId = myIdNow.toLowerCase();
+      const otherId = otherIdNow.toLowerCase();
 
-    // Support both camelCase and PascalCase from the backend
-    const sId: string = incoming.senderId || incoming.SenderId || "";
-    const rId: string = incoming.receiverId || incoming.ReceiverId || "";
-    const id: string = incoming.id || incoming.Id || "";
-    const content: string = incoming.content || incoming.Content || "";
-    const read: boolean = incoming.read !== undefined ? !!incoming.read : !!incoming.Read;
-    const createdAt: string =
-      incoming.createdAt || incoming.CreatedAt || new Date().toISOString();
+      // Only update messages that belong to the currently-open conversation
+      const isBetweenCurrentUsers =
+        (sId === myId && rId === otherId) ||
+        (sId === otherId && rId === myId);
 
-    if (!sId || !rId || !id) return;
+      if (!isBetweenCurrentUsers) return;
 
-    const isBetweenCurrentUsers =
-      (sId.toLowerCase() === myIdNow.toLowerCase() &&
-        rId.toLowerCase() === otherIdNow.toLowerCase()) ||
-      (sId.toLowerCase() === otherIdNow.toLowerCase() &&
-        rId.toLowerCase() === myIdNow.toLowerCase());
-
-    if (!isBetweenCurrentUsers) return;
-
-    setMessages((prev) => {
-      if (prev.some((m) => m.id === id)) return prev;
-      shouldScrollRef.current = true;
-      const next: Message = { id, senderId: sId, receiverId: rId, content, read, createdAt };
-      return [...prev, next].sort(
-        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      );
-    });
-  }, []); // stable — reads latest values via refs
-
-  /* ─── attach event listeners (called on start AND after reconnect) ─── */
-  const attachListeners = useCallback(
-    (conn: HubConnection) => {
-      conn.off("NewMessage");
-      conn.off("ReceiveMessage");
-      conn.on("NewMessage", handleIncomingMessage);
-      conn.on("ReceiveMessage", handleIncomingMessage);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev; // deduplicate
+        shouldScrollRef.current = true;
+        return [...prev, msg].sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+      });
     },
-    [handleIncomingMessage]
+    [] // stable — reads values via refs
   );
 
-  /* ─── SignalR connection lifecycle ─────────────────────────── */
   useEffect(() => {
-    // Do not connect until we know who the current user is
-    if (!myUserId) return;
+    const unsubscribe = onMessage(handleIncomingMessage);
+    return unsubscribe;
+  }, [onMessage, handleIncomingMessage]);
 
-    let cancelled = false;
-
-    const startConnection = async () => {
-      // Reuse an existing healthy connection
-      if (
-        connectionRef.current &&
-        connectionRef.current.state === HubConnectionState.Connected
-      ) {
-        attachListeners(connectionRef.current);
-        return;
-      }
-
-      // Stop any stale connection first
-      if (connectionRef.current) {
-        try {
-          await connectionRef.current.stop();
-        } catch {
-          /* ignore */
-        }
-        connectionRef.current = null;
-      }
-
-      // React Strict Mode unmounts before async work finishes — bail out
-      if (cancelled) return;
-
-      const hubUrl = `${hubBaseUrl}/hubs/chat`;
-
-      const conn = new HubConnectionBuilder()
-        .withUrl(hubUrl, {
-          accessTokenFactory: () =>
-            localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN) ?? "",
-          // Allow SignalR to negotiate the best transport:
-          // WebSockets → Server-Sent Events → Long Polling
-          // This ensures real-time works even through ngrok or restrictive networks
-        })
-        .withAutomaticReconnect()
-        .configureLogging({
-          log: (logLevel, message) => {
-            if (
-              logLevel === LogLevel.Error &&
-              (message.includes("stopped during negotiation") ||
-                message.includes("before stop() was called"))
-            )
-              return;
-            if (logLevel >= LogLevel.Information) {
-              if (logLevel === LogLevel.Error || logLevel === LogLevel.Critical)
-                console.error("[SignalR]", message);
-              else if (logLevel === LogLevel.Warning)
-                console.warn("[SignalR]", message);
-              else console.log("[SignalR]", message);
-            }
-          },
-        })
-        .build();
-
-      // Re-attach listeners after automatic reconnect
-      conn.onreconnected(() => {
-        console.log("[SignalR] Reconnected");
-        attachListeners(conn);
-      });
-
-      conn.onclose((err) => {
-        if (err) console.error("[SignalR] Connection closed with error:", err);
-      });
-
-      attachListeners(conn);
-
-      // Store ref NOW so cleanup can call stop() if Strict Mode fires again
-      connectionRef.current = conn;
-
-      try {
-        await conn.start();
-        // If cleanup ran while we were connecting, stop immediately
-        if (cancelled) {
-          conn.stop().catch(() => { });
-          connectionRef.current = null;
-          return;
-        }
-        console.log("[SignalR] Connected");
-      } catch (e: any) {
-        // These errors are expected when React Strict Mode tears down the effect
-        // before start() finishes — suppress them so they don't pollute the console
-        if (
-          e?.name === "AbortError" ||
-          e?.message?.includes("stopped during negotiation") ||
-          e?.message?.includes("before stop() was called")
-        )
-          return;
-        console.error("[SignalR] Connect failed:", e);
-      }
-    };
-
-    startConnection();
-
-    return () => {
-      cancelled = true;
-      if (connectionRef.current) {
-        connectionRef.current.stop().catch(() => { });
-        connectionRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hubBaseUrl, myUserId]);
-
-  /* ─── load history when receiver changes ──────────────────── */
+  /* ─── Load history when receiver changes ──────────────────── */
   useEffect(() => {
     if (!receiver.id) return;
 
@@ -285,7 +155,7 @@ export function ChatInterface({ receiver }: ChatInterfaceProps) {
     loadMessages();
   }, [receiver.id]);
 
-  /* ─── auto-scroll ─────────────────────────────────────────── */
+  /* ─── Auto-scroll ─────────────────────────────────────────── */
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -295,7 +165,7 @@ export function ChatInterface({ receiver }: ChatInterfaceProps) {
     }
   }, [messages]);
 
-  /* ─── send message ────────────────────────────────────────── */
+  /* ─── Send message ────────────────────────────────────────── */
   const handleSendMessage = async () => {
     const content = messageInput.trim();
     if (!content || !receiver.id) return;

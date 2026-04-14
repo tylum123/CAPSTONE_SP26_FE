@@ -37,6 +37,7 @@ import type { NotificationDTO } from "@/libs/types/notifications.types";
 import { useAuth } from "@/libs/stores/auth.store";
 import { AnimatedBubbles } from "@/components/farmer/animated-bubbles";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SignalRProvider } from "@/contexts/signalr-context";
 
 export default function FarmerLayout({
   children,
@@ -470,7 +471,9 @@ export default function FarmerLayout({
       </header>
 
       {/* Main Content */}
-      <main className="relative z-10 container mx-auto px-4 lg:px-8 py-6">{children}</main>
+      <main className="relative z-10 container mx-auto px-4 lg:px-8 py-6">
+        <SignalRProvider>{children}</SignalRProvider>
+      </main>
     </div>
   );
 }
