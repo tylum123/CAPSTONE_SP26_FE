@@ -162,6 +162,7 @@ export const API_ENDPOINTS = {
   },
 
   RATINGS: {
+    CREATE: `/ratings`,
     SPECIFIC: (userId: string) => `/ratings/${userId}`,
     BY_USER: (userId: string) => `/ratings/user/${userId}/all`,
     GIVEN: `/ratings/user/given`,

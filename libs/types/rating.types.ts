@@ -15,7 +15,6 @@ export enum RatingType {
 }
 
 export interface RatingCreateDTO {
-    raterId: string;
     rateeId: string;
     jobPostId: string;
     ratingScore: number;

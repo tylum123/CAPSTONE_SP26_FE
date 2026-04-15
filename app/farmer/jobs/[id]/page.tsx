@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Banknote, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText, InfoIcon, MailIcon, MapPin, MessageSquare, Play, RotateCw, Star, Users, XCircle, Paperclip } from "lucide-react"
+import { ArrowLeft, Banknote, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText, InfoIcon, MailIcon, MapPin, MessageSquare, Play, RotateCw, Star, Users, XCircle, Paperclip, MessageCircleIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -42,7 +42,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import Image from "next/image"
 import { JobStatusChart } from "@/components/farmer/dashboard-charts"
 import { useAuth } from "@/libs/stores/auth.store"
-import type { RatingDTO } from "@/libs/types/rating.types"
+import { RatingType, type RatingCreateDTO, type RatingDTO } from "@/libs/types/rating.types"
 
 function JobReviews({ jobId }: { jobId: string }) {
   const { user } = useAuth();
@@ -123,6 +123,7 @@ function WorkerAverageRating({ userId, fallback }: { userId?: string, fallback?:
 }
 
 export default function FarmerJobDetailPage() {
+  const { user } = useAuth()
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const jobId = Array.isArray(params?.id) ? params.id[0] : params?.id
@@ -159,6 +160,13 @@ export default function FarmerJobDetailPage() {
   const [jobDetailsPage, setJobDetailsPage] = useState(1)
   const [jobDetailsTotalPages, setJobDetailsTotalPages] = useState(1)
   const [autoAcceptingId, setAutoAcceptingId] = useState<string | null>(null)
+  const [isRatingDialogOpen, setIsRatingDialogOpen] = useState(false)
+  const [ratingApplication, setRatingApplication] = useState<ApplicationDTO | null>(null)
+  const [ratingScore, setRatingScore] = useState(5)
+  const [ratingReviewText, setRatingReviewText] = useState("")
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false)
+  const [ratingError, setRatingError] = useState<string | null>(null)
+  const [ratedByWorkerId, setRatedByWorkerId] = useState<Record<string, RatingDTO>>({})
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("vi-VN", {
@@ -525,6 +533,55 @@ export default function FarmerJobDetailPage() {
     }
   }
 
+  const openRatingDialog = (application: ApplicationDTO) => {
+    const workerId = application.worker?.userId
+    const existingRating = workerId ? ratedByWorkerId[workerId] : undefined
+
+    setRatingApplication(application)
+    setRatingScore(existingRating?.ratingScore ?? 5)
+    setRatingReviewText(existingRating?.reviewText ?? "")
+    setRatingError(null)
+    setIsRatingDialogOpen(true)
+  }
+
+  const handleSubmitRating = async () => {
+    if (!jobId || !ratingApplication?.worker?.userId) {
+      setRatingError("Không đủ thông tin để gửi đánh giá.")
+      return
+    }
+
+    try {
+      setIsSubmittingRating(true)
+      setRatingError(null)
+
+      const payload: RatingCreateDTO = {
+        rateeId: ratingApplication.worker.userId,
+        jobPostId: jobId,
+        ratingScore,
+        reviewText: ratingReviewText.trim(),
+        typeId: RatingType.FarmerToWorker,
+        createdAt: new Date().toISOString(),
+      }
+
+      const response = await ratingService.create(payload)
+
+      setRatedByWorkerId((prev) => ({
+        ...prev,
+        [payload.rateeId]: response.data,
+      }))
+
+      setIsRatingDialogOpen(false)
+      setRatingApplication(null)
+      setRatingScore(5)
+      setRatingReviewText("")
+    } catch (submitRatingError) {
+      console.error(submitRatingError)
+      setRatingError("Không thể gửi đánh giá. Vui lòng thử lại.")
+    } finally {
+      setIsSubmittingRating(false)
+    }
+  }
+
   useEffect(() => {
     if (!jobId) {
       setError("Không tìm thấy bài đăng.")
@@ -582,6 +639,31 @@ export default function FarmerJobDetailPage() {
       void loadJobDetails()
     }
   }, [job, jobId, jobDetailsPage])
+
+  useEffect(() => {
+    if (!jobId || job?.statusId !== JOB_POST_STATUS.Completed) {
+      setRatedByWorkerId({})
+      return
+    }
+
+    ratingService.getGiven()
+      .then((res) => {
+        const ratings = res.data ?? []
+        const ratingMap: Record<string, RatingDTO> = {}
+
+        ratings
+          .filter((rating) => rating.jobPostId === jobId && rating.typeId === RatingType.FarmerToWorker)
+          .forEach((rating) => {
+            ratingMap[rating.rateeId] = rating
+          })
+
+        setRatedByWorkerId(ratingMap)
+      })
+      .catch((givenRatingsError) => {
+        console.error(givenRatingsError)
+        setRatedByWorkerId({})
+      })
+  }, [job?.statusId, jobId])
 
   const jobTypeLabel = job?.jobTypeId === 1 ? "Khoán" : job?.jobTypeId === 2 ? "Ngày" : "-"
 
@@ -954,7 +1036,7 @@ export default function FarmerJobDetailPage() {
                                     type="button"
                                     size="sm"
                                     variant="outline"
-                                    className="h-8 px-3 rounded-lg border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-xs font-semibold transition-all"
+                                    className="h-8 w-8 p-0 rounded-lg hover:bg-agro-green/10 text-agro-green"
                                     disabled={autoAcceptingId === application.id}
                                     onClick={() => void handleAutoAccept(application.id)}
                                   >
@@ -968,29 +1050,47 @@ export default function FarmerJobDetailPage() {
                                   <Button
                                     type="button"
                                     size="sm"
-                                    className="h-8 px-3 rounded-lg bg-agro-green hover:bg-agro-green-dark text-white text-xs font-semibold shadow-sm hover:shadow-md transition-all"
+                                    className="h-8 w-8 p-0 rounded-lg hover:bg-agro-green/10 text-agro-green"
                                     onClick={() => void openApplicationRespond(application.id)}
                                   >
-                                    <MailIcon className="mr-1.5 h-3.5 w-3.5" />
-                                    Phản hồi
+                                    <MailIcon className="h-3.5 w-3.5" />
                                   </Button>
                                 </>
                               )}
                               {application.statusId === APP_STATUS.accepted && (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm hover:shadow-md transition-all"
-                                  onClick={() => {
-                                    const query = new URLSearchParams();
-                                    if (application.worker?.fullName) query.set("name", application.worker.fullName);
-                                    if (application.worker?.avatarUrl) query.set("avatarUrl", application.worker.avatarUrl);
-                                    router.push(`/farmer/messages/${application.worker?.userId}?${query.toString()}`);
-                                  }}
-                                >
-                                  <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
-                                  Nhắn tin
-                                </Button>
+                                <>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="h-8 w-8"
+                                    onClick={() => {
+                                      const query = new URLSearchParams();
+                                      if (application.worker?.fullName) query.set("name", application.worker.fullName);
+                                      if (application.worker?.avatarUrl) query.set("avatarUrl", application.worker.avatarUrl);
+                                      router.push(`/farmer/messages/${application.worker?.userId}?${query.toString()}`);
+                                    }}
+                                  >
+                                    <MessageSquare className="h-3.5 w-3.5" />
+                                  </Button>
+                                  {job.statusId === JOB_POST_STATUS.Completed && application.worker?.userId ? (
+                                    ratedByWorkerId[application.worker.userId] ? (
+                                      <Badge className="h-8 border-amber-200 bg-amber-50 px-2 text-normal text-amber-700 hover:bg-amber-50">
+                                        Đã đánh giá
+                                      </Badge>
+                                    ) : (
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 gap-1.5 border-amber-200 bg-amber-700 text-white hover:bg-amber-600 hover:text-white"
+                                        onClick={() => openRatingDialog(application)}
+                                      >
+                                        <Star className="h-3.5 w-3.5" />
+                                        Đánh giá
+                                      </Button>
+                                    )
+                                  ) : null}
+                                </>
                               )}
                             </div>
                           </div>
@@ -1105,11 +1205,10 @@ export default function FarmerJobDetailPage() {
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                      className="h-8 w-8 p-0 rounded-lg hover:bg-agro-green/10 text-agro-green"
                                       onClick={() => handleOpenJobDetail(detail.id)}
                                     >
-                                      Chi tiết
-                                      <InfoIcon className="ml-1.5 h-3.5 w-3.5" />
+                                      <InfoIcon className="h-3.5 w-3.5" />
                                     </Button>
                                   </div>
                                 </div>
@@ -1208,9 +1307,9 @@ export default function FarmerJobDetailPage() {
                       <p className="text-muted-foreground">Email: {selectedApplication.worker?.email || "Không có"}</p>
                       <p className="text-muted-foreground">Địa điểm: {selectedApplication.worker?.primaryLocation || "Không có"}</p>
                       <div className="flex flex-wrap gap-2 mt-2">
-                        <Badge variant="outline" className="bg-muted capitalize font-normal">{selectedApplication.worker?.gender || "Không rõ giới tính"}</Badge>
-                        <Badge variant="outline" className="bg-muted font-normal">{selectedApplication.worker?.date_of_birth ? `Ngày sinh: ${formatDate(selectedApplication.worker.date_of_birth)}` : "Không rõ NS"}</Badge>
-                        <Badge variant="outline" className="bg-muted font-normal flex items-center gap-1.5"><WorkerAverageRating userId={selectedApplication.worker?.userId} fallback={selectedApplication.worker?.averageRating} /></Badge>
+                        <Badge variant="outline" className="bg-muted capitalize font-lg">{selectedApplication.worker?.gender === "Male" ? "Nam" : "Nữ"}</Badge>
+                        <Badge variant="outline" className="bg-muted font-lg">{selectedApplication.worker?.date_of_birth ? `${formatDate(selectedApplication.worker.date_of_birth)}` : "Không rõ NS"}</Badge>
+                        <Badge variant="outline" className="bg-muted font-lg flex items-center gap-1.5"><WorkerAverageRating userId={selectedApplication.worker?.userId} fallback={selectedApplication.worker?.averageRating} /></Badge>
                       </div>
                     </div>
                   </div>
@@ -1261,7 +1360,9 @@ export default function FarmerJobDetailPage() {
                     {selectedApplication.workDates?.length ? (
                       <ul className="mt-2 grid gap-1">
                         {selectedApplication.workDates.map((workDate) => (
-                          <li key={workDate} className="text-muted-foreground">- {formatDate(workDate)}</li>
+                          <Badge className="bg-agro-green">
+                            <li key={workDate} className="text-normal font-normal">{formatDate(workDate)}</li>
+                          </Badge>
                         ))}
                       </ul>
                     ) : (
@@ -1377,6 +1478,87 @@ export default function FarmerJobDetailPage() {
               )}
             </DialogFooter>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isRatingDialogOpen}
+        onOpenChange={(open) => {
+          setIsRatingDialogOpen(open)
+          if (!open) {
+            setRatingError(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Đánh giá người làm</DialogTitle>
+            <DialogDescription>
+              {ratingApplication?.worker?.fullName
+                ? `Gửi đánh giá cho ${ratingApplication.worker.fullName}`
+                : "Gửi đánh giá cho người làm"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-lg border p-4">
+              <p className="mb-2 text-xs text-muted-foreground">Mức đánh giá</p>
+              <div className="flex items-center gap-1.5">
+                {Array.from({ length: 5 }).map((_, index) => {
+                  const score = index + 1
+                  return (
+                    <Button
+                      key={score}
+                      type="button"
+                      variant="ghost"
+                      className="h-9 w-9 p-0"
+                      onClick={() => setRatingScore(score)}
+                    >
+                      <Star
+                        className={cn(
+                          "h-5 w-5",
+                          score <= ratingScore ? "fill-amber-500 text-amber-500" : "text-muted-foreground/40"
+                        )}
+                      />
+                    </Button>
+                  )
+                })}
+                <span className="ml-1 text-sm font-medium">{ratingScore}/5</span>
+              </div>
+            </div>
+
+            <div className="rounded-lg border p-4">
+              <p className="mb-2 text-xs text-muted-foreground">Nội dung đánh giá</p>
+              <Textarea
+                value={ratingReviewText}
+                onChange={(event) => setRatingReviewText(event.target.value)}
+                placeholder="Chia sẻ trải nghiệm của bạn về người làm..."
+                rows={4}
+              />
+            </div>
+
+            {ratingError ? (
+              <p className="text-sm text-destructive">{ratingError}</p>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsRatingDialogOpen(false)}
+              disabled={isSubmittingRating}
+            >
+              Hủy
+            </Button>
+            <Button
+              className="bg-amber-500 text-white hover:bg-amber-600"
+              onClick={() => void handleSubmitRating()}
+              disabled={isSubmittingRating || !ratingApplication || !user?.userId}
+            >
+              {isSubmittingRating ? <RotateCw className="mr-2 h-4 w-4 animate-spin" /> : <Star className="mr-2 h-4 w-4" />}
+              {isSubmittingRating ? "Đang gửi..." : "Gửi đánh giá"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
