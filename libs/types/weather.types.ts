@@ -15,6 +15,20 @@ export interface BeWeatherData {
   sunrise: string;
   sunset: string;
   fetchedAt: string;
+  hourlyForecast?: WeatherForecastItem[];
+}
+
+export interface WeatherForecastItem {
+  forecastTime: string;
+  temperature: number;
+  feelsLike: number;
+  tempMin: number;
+  tempMax: number;
+  humidity: number;
+  windSpeed: number;
+  description: string;
+  icon: string;
+  iconUrl: string;
 }
 
 export interface WeatherData {
@@ -109,6 +123,7 @@ export interface DailyWeather {
   tempMax: number;
   description: string;
   icon: string;
+  iconUrl: string;
   humidity: number;
   windSpeed: number;
 }

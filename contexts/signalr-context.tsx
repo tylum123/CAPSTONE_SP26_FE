@@ -38,6 +38,12 @@ interface SignalRContextValue {
   connectionStatus: "disconnected" | "connecting" | "connected" | "reconnecting";
 }
 
+interface HubConnectionStats {
+  totalConnections: number;
+  uniqueUsers: number;
+  myConnections: number;
+}
+
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 const SignalRContext = createContext<SignalRContextValue | null>(null);
@@ -45,14 +51,56 @@ const SignalRContext = createContext<SignalRContextValue | null>(null);
 // ─── Normalise helper (pure — no closures over component state) ───────────────
 
 function normalise(raw: any): IncomingMessage | null {
-  const id: string = String(raw.id ?? raw.Id ?? "");
-  const senderId: string = String(raw.senderId ?? raw.SenderId ?? "");
-  const receiverId: string = String(raw.receiverId ?? raw.ReceiverId ?? "");
-  const content: string = String(raw.content ?? raw.Content ?? "");
+  // Support multiple backend payload shapes/casing (web + mobile integrations).
+  const payload = raw?.data ?? raw?.message ?? raw;
+
+  const id: string = String(
+    payload?.id ?? payload?.Id ?? payload?.messageId ?? payload?.MessageId ?? ""
+  );
+
+  const senderId: string = String(
+    payload?.senderId ??
+      payload?.SenderId ??
+      payload?.senderID ??
+      payload?.SenderID ??
+      payload?.fromUserId ??
+      payload?.FromUserId ??
+      payload?.sender?.id ??
+      payload?.Sender?.Id ??
+      ""
+  );
+
+  const receiverId: string = String(
+    payload?.receiverId ??
+      payload?.ReceiverId ??
+      payload?.receiverID ??
+      payload?.ReceiverID ??
+      payload?.recipientId ??
+      payload?.RecipientId ??
+      payload?.toUserId ??
+      payload?.ToUserId ??
+      payload?.receiver?.id ??
+      payload?.Receiver?.Id ??
+      payload?.recipient?.id ??
+      payload?.Recipient?.Id ??
+      ""
+  );
+
+  const content: string = String(
+    payload?.content ?? payload?.Content ?? payload?.messageContent ?? payload?.MessageContent ?? ""
+  );
   const read: boolean =
-    raw.read !== undefined ? !!raw.read : !!raw.Read;
+    payload?.read !== undefined
+      ? !!payload.read
+      : payload?.Read !== undefined
+      ? !!payload.Read
+      : false;
   const createdAt: string =
-    raw.createdAt ?? raw.CreatedAt ?? new Date().toISOString();
+    payload?.createdAt ??
+    payload?.CreatedAt ??
+    payload?.sentAt ??
+    payload?.SentAt ??
+    new Date().toISOString();
 
   if (!id || !senderId || !receiverId) {
     console.warn("[SignalR] Dropped message – missing id/senderId/receiverId:", raw);
@@ -73,6 +121,14 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
   const [connectionStatus, setConnectionStatus] = useState<
     "disconnected" | "connecting" | "connected" | "reconnecting"
   >("disconnected");
+
+  const chatEventNames = [
+    "NewMessage",
+    "ReceiveMessage",
+    "newMessage",
+    "receiveMessage",
+    "MessageReceived",
+  ] as const;
 
   const hubBaseUrl = API_CONFIG.BASE_URL.replace(/\/api\/v1\/?$/, "");
 
@@ -98,10 +154,10 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
         connectionRef.current.state === HubConnectionState.Connected
       ) {
         console.log("[SignalR] Reusing existing connected instance");
-        connectionRef.current.off("NewMessage");
-        connectionRef.current.off("ReceiveMessage");
-        connectionRef.current.on("NewMessage", dispatch);
-        connectionRef.current.on("ReceiveMessage", dispatch);
+        for (const eventName of chatEventNames) {
+          connectionRef.current.off(eventName);
+          connectionRef.current.on(eventName, dispatch);
+        }
         return;
       }
 
@@ -144,8 +200,9 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
         })
         .build();
 
-      conn.on("NewMessage", dispatch);
-      conn.on("ReceiveMessage", dispatch);
+      for (const eventName of chatEventNames) {
+        conn.on(eventName, dispatch);
+      }
 
       conn.onreconnecting(() => {
         console.log("[SignalR] Reconnecting...");
@@ -155,10 +212,10 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
       conn.onreconnected(() => {
         console.log("[SignalR] Reconnected — re-attaching listeners");
         setConnectionStatus("connected");
-        conn.off("NewMessage");
-        conn.off("ReceiveMessage");
-        conn.on("NewMessage", dispatch);
-        conn.on("ReceiveMessage", dispatch);
+        for (const eventName of chatEventNames) {
+          conn.off(eventName);
+          conn.on(eventName, dispatch);
+        }
       });
 
       conn.onclose((err) => {
@@ -177,6 +234,14 @@ export function SignalRProvider({ children }: { children: React.ReactNode }) {
         }
         setConnectionStatus("connected");
         console.log("[SignalR] Connected (shared provider) for user:", myUserId);
+
+        // Diagnostic check: helps verify whether multiple devices are connected.
+        try {
+          const stats = await conn.invoke<HubConnectionStats>("GetConnectionStats");
+          console.log("[SignalR] Hub connection stats:", stats);
+        } catch (statsErr) {
+          console.warn("[SignalR] Could not fetch hub connection stats:", statsErr);
+        }
       } catch (e: any) {
         if (
           e?.name === "AbortError" ||

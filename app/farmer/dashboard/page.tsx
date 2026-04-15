@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
 import { Briefcase, Users, DollarSign, Clock, ChevronRight, ChevronLeft, Star, Cloud, Droplets, Wind, X, RefreshCw, ChevronDown, Plus, Sparkles, Loader2 } from "lucide-react"
 import Link from "next/link"
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { farmerService } from "@/libs/api/services/farmer.service"
 import type { FarmerProfile, DashboardStats } from "@/libs/types"
 import { useWeather } from "@/hooks/use-weather"
@@ -34,9 +34,29 @@ export default function FarmerDashboard() {
   const [isLoadingApplications, setIsLoadingApplications] = useState(false)
   const [applicationsPage, setApplicationsPage] = useState(1)
   const [applicationsTotalPages, setApplicationsTotalPages] = useState(1)
-  const { currentWeather, loading: weatherLoading, refetch } = useWeather({
+  const { currentWeather, dailyForecast, loading: weatherLoading, error: weatherError, refetch } = useWeather({
     useCurrentUserAddress: true,
   })
+
+  const getDateKey = (d: Date) => {
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, "0")
+    const day = String(d.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+  }
+
+  const popupForecast = useMemo(() => {
+    if (!weatherPopup) return null
+    return dailyForecast.get(getDateKey(weatherPopup.date)) || null
+  }, [weatherPopup, dailyForecast])
+
+  const weatherForecastDates = useMemo(() => {
+    return Array.from(dailyForecast.values()).map((f) => f.date)
+  }, [dailyForecast])
+
+  const hasForecastForDate = useCallback((d: Date) => {
+    return dailyForecast.has(getDateKey(d))
+  }, [dailyForecast])
 
   useEffect(() => {
     setDate(new Date())
@@ -455,13 +475,20 @@ export default function FarmerDashboard() {
                   </div>
                 )}
 
+                {!weatherLoading && !currentWeather && weatherError && (
+                  <div className="mb-4 p-3 rounded-lg border border-destructive/20 bg-destructive/5 text-destructive text-sm">
+                    Không thể tải dữ liệu thời tiết. Vui lòng thử lại sau.
+                  </div>
+                )}
+
                 <Calendar
                   mode="single"
                   selected={date}
                   onSelect={setDate}
                   className="rounded-md w-full"
                   modifiers={{
-                    scheduled: scheduledDates
+                    scheduled: scheduledDates,
+                    weatherAvailable: weatherForecastDates,
                   }}
                   modifiersStyles={{
                     scheduled: {
@@ -470,15 +497,19 @@ export default function FarmerDashboard() {
                       fontWeight: "bold",
                       borderRadius: "0.375rem",
                     },
+                    weatherAvailable: {
+                      boxShadow: "inset 0 0 0 1px oklch(0.62 0.13 238 / 0.55)",
+                      borderRadius: "0.375rem",
+                    },
                   }}
                   components={{
                     DayButton: ({ day, ...props }) => (
                       <button
                         {...props}
-                        className={`${props.className} ${currentWeather ? 'cursor-pointer' : ''} mt-3`}
+                        className={`${props.className} ${hasForecastForDate(day.date) ? 'cursor-pointer' : 'cursor-default'} mt-3`}
                         onClick={(e) => {
                           setDate(day.date);
-                          if (currentWeather) {
+                          if (currentWeather && hasForecastForDate(day.date)) {
                             const rect = e.currentTarget.getBoundingClientRect();
                             const popupWidth = 320;
                             const popupHeight = 400;
@@ -494,6 +525,9 @@ export default function FarmerDashboard() {
                             }
 
                             setWeatherPopup({ date: day.date, position: { x, y } });
+                          } else {
+                            setWeatherPopup(null)
+                            toast.info("Chỉ có dữ liệu dự báo cho những ngày được viền xanh")
                           }
                         }}
                       >
@@ -511,7 +545,7 @@ export default function FarmerDashboard() {
                     {currentWeather && (
                       <div className="flex items-center gap-1.5">
                         <Cloud className="h-3 w-3 text-blue-500" />
-                        <span>Click ngày bất kỳ để xem thời tiết</span>
+                        <span>Click ngày có viền xanh để xem dự báo</span>
                       </div>
                     )}
                   </div>
@@ -523,7 +557,7 @@ export default function FarmerDashboard() {
       </div>
 
       {/* Weather Popup */}
-      {weatherPopup && currentWeather && (
+      {weatherPopup && currentWeather && popupForecast && (
         <>
           <div
             className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 animate-in fade-in duration-200"
@@ -552,12 +586,12 @@ export default function FarmerDashboard() {
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">{currentWeather.city}, {currentWeather.country}</p>
                   <p className="text-sm text-muted-foreground capitalize mt-0.5">
-                    {currentWeather.description}
+                    {popupForecast.description}
                   </p>
                 </div>
                 <Image
-                  src={currentWeather.iconUrl}
-                  alt={currentWeather.description}
+                  src={popupForecast.iconUrl}
+                  alt={popupForecast.description}
                   width={72}
                   height={72}
                   className="animate-bounce-slow"
@@ -573,9 +607,11 @@ export default function FarmerDashboard() {
                   <div className="flex-1">
                     <p className="text-xs text-muted-foreground font-medium">Nhiệt độ</p>
                     <p className="text-lg font-bold">
-                      {Math.round(currentWeather.tempMin)}° - {Math.round(currentWeather.tempMax)}°C
+                      {Math.round(popupForecast.tempMin)}° - {Math.round(popupForecast.tempMax)}°C
                     </p>
-                    <p className="text-xs text-muted-foreground">Cảm giác như {Math.round(currentWeather.feelsLike)}°C</p>
+                    <p className="text-xs text-muted-foreground">
+                      Nhiệt độ trung bình {Math.round(popupForecast.temp)}°C
+                    </p>
                   </div>
                 </div>
 
@@ -586,7 +622,7 @@ export default function FarmerDashboard() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground font-medium">Độ ẩm</p>
-                      <p className="text-base font-bold">{currentWeather.humidity}%</p>
+                      <p className="text-base font-bold">{popupForecast.humidity}%</p>
                     </div>
                   </div>
 
@@ -596,7 +632,7 @@ export default function FarmerDashboard() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground font-medium">Gió</p>
-                      <p className="text-base font-bold">{currentWeather.windSpeed} m/s</p>
+                      <p className="text-base font-bold">{popupForecast.windSpeed} m/s</p>
                     </div>
                   </div>
                 </div>
