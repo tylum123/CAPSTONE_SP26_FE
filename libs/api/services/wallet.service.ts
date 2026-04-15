@@ -27,9 +27,9 @@ export const WalletService = {
   },
 
   // Transactions
-  getTransactionsByWallet: async (walletId: string, page = 1, limit = 10): Promise<PaginatedResponse<WalletTransactionDTO>> => {
+  getTransactionsByWallet: async (walletId: string, params?: { page?: number; limit?: number }): Promise<ApiResponse<PaginatedResponse<WalletTransactionDTO>>> => {
     const response = await axiosInstance.get(API_ENDPOINTS.WALLET_TRANSACTION.GET_BY_WALLET(walletId), {
-      params: { page, limit }
+      params: { ...params }
     });
     return response.data;
   },
