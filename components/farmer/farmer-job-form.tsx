@@ -2090,7 +2090,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                   <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                     <div className="space-y-2">
                       <Badge className="bg-agro-green/10 text-agro-green border-agro-green/20 hover:bg-agro-green/20 mb-2">XÁC NHẬN BÀI ĐĂNG</Badge>
-                      <CardTitle className="text-3xl md:text-4xl font-extrabold tracking-tight">{title}</CardTitle>
+                      <CardTitle className="text-3xl md:text-4xl font-bold tracking-tight">{title}</CardTitle>
                       <CardDescription className="text-lg">Kiểm tra kỹ thông tin trước khi xuất bản tin tuyển dụng</CardDescription>
                     </div>
                     <div className="flex flex-col items-end gap-2">
@@ -2145,7 +2145,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
 
                       <div className="space-y-4">
                         <h4 className="flex items-center text-xs font-black uppercase text-foreground bg-muted/50 w-fit px-3 py-1 rounded-full">
-                          Kỹ năng kinh nghiệm
+                          Kỹ năng
                         </h4>
                         <div className="flex flex-wrap gap-2">
                           {selectedSkillIds.length > 0 ? (

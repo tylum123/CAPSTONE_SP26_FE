@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Users, Clock, Banknote, MapPin, Copy, Calendar, Inbox, LayoutGrid, LayoutList, Loader2, Filter, ChevronLeft, ChevronRight, ArrowUpDown, ArrowDownUp, XCircle, RefreshCw, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -55,6 +56,7 @@ import { jobApplicationService } from "@/libs/api/services/jobApplication.servic
 type JobFilterTab = "all" | "draft" | "active" | "filled" | "in-progress" | "completed" | "passed" | "cancelled"
 
 export function FarmerJobsList() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState<JobFilterTab>("active")
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid")
@@ -396,6 +398,19 @@ export function FarmerJobsList() {
     setActiveTab(value as JobFilterTab)
   }
 
+  const handleCardClick = (event: MouseEvent<HTMLDivElement>, jobId: string) => {
+    const target = event.target as HTMLElement
+    const clickedInteractiveElement = target.closest(
+      "a, button, input, textarea, select, [role='menuitem'], [data-radix-collection-item]"
+    )
+
+    if (clickedInteractiveElement) {
+      return
+    }
+
+    router.push(`/farmer/jobs/${jobId}`)
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Page Header */}
@@ -435,7 +450,6 @@ export function FarmerJobsList() {
             <Select value={activeTab} onValueChange={handleActiveTabChange}>
               <SelectTrigger className="h-10 font-medium bg-white dark:bg-slate-900 border-slate-200">
                 <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
                   <SelectValue placeholder="Trạng thái" />
                 </div>
               </SelectTrigger>
@@ -443,7 +457,7 @@ export function FarmerJobsList() {
                 <SelectItem value="all">Tất cả bài đăng</SelectItem>
                 {/* <SelectItem value="draft">Bản nháp</SelectItem> */}
                 <SelectItem value="active">Đang tuyển</SelectItem>
-                <SelectItem value="filled">Đã đủ / Full</SelectItem>
+                <SelectItem value="filled">Đã tuyển đủ</SelectItem>
                 <SelectItem value="in-progress">Đang làm việc</SelectItem>
                 <SelectItem value="completed">Đã xong</SelectItem>
                 {/* <SelectItem value="passed">Quá hạn</SelectItem> */}
@@ -655,7 +669,7 @@ export function FarmerJobsList() {
         ) : null}
 
         {filteredJobs.map((job) => (
-          <Card key={job.id} className="overflow-hidden hover:shadow-md transition-all duration-200 border-slate-200 dark:border-slate-800 flex flex-col h-full">
+          <Card key={job.id} className="overflow-hidden hover:shadow-md transition-all duration-200 border-slate-200 dark:border-slate-800 flex flex-col h-full cursor-pointer" onClick={(event) => handleCardClick(event, job.id)}>
             <CardContent className="p-0 flex flex-col h-full">
               <div className={`flex flex-col gap-5 p-6 flex-1 ${viewMode === "grid" ? "" : "lg:flex-row lg:items-start lg:justify-between"}`}>
                 <div className="flex-1 space-y-4">
@@ -685,12 +699,14 @@ export function FarmerJobsList() {
                                 Xem chi tiết
                               </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem asChild className="cursor-pointer">
-                              <Link href={`/farmer/jobs/${job.id}/edit`}>
-                                <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
-                                Chỉnh sửa
-                              </Link>
-                            </DropdownMenuItem>
+                            {Number(job.statusId) === JobPostStatus.Published && (
+                              <DropdownMenuItem asChild className="cursor-pointer">
+                                <Link href={`/farmer/jobs/${job.id}/edit`}>
+                                  <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
+                                  Chỉnh sửa
+                                </Link>
+                              </DropdownMenuItem>
+                            )}
                             {Number(job.statusId) === JobPostStatus.Published && (
                               <DropdownMenuItem
                                 className="cursor-pointer"
@@ -705,15 +721,19 @@ export function FarmerJobsList() {
                                     : "Đánh dấu khẩn cấp"}
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive cursor-pointer"
-                              onClick={() => setJobPendingCancel(job)}
-                              disabled={cancellingJobId === job.id}
-                            >
-                              <XCircle className="mr-2 h-4 w-4" />
-                              {cancellingJobId === job.id ? "Đang hủy..." : "Hủy tin đăng"}
-                            </DropdownMenuItem>
+                            {Number(job.statusId) === JobPostStatus.Published && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive cursor-pointer"
+                                  onClick={() => setJobPendingCancel(job)}
+                                  disabled={cancellingJobId === job.id}
+                                >
+                                  <XCircle className="mr-2 h-4 w-4" />
+                                  {cancellingJobId === job.id ? "Đang hủy..." : "Hủy tin đăng"}
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -775,12 +795,14 @@ export function FarmerJobsList() {
                             Xem chi tiết
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild className="cursor-pointer">
-                          <Link href={`/farmer/jobs/${job.id}/edit`}>
-                            <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
-                            Chỉnh sửa
-                          </Link>
-                        </DropdownMenuItem>
+                        {Number(job.statusId) === JobPostStatus.Published && (
+                          <DropdownMenuItem asChild className="cursor-pointer">
+                            <Link href={`/farmer/jobs/${job.id}/edit`}>
+                              <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
+                              Chỉnh sửa
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem className="cursor-pointer">
                           <Copy className="mr-2 h-4 w-4 text-muted-foreground" />
                           Đăng lại
@@ -799,15 +821,19 @@ export function FarmerJobsList() {
                                 : "Đánh dấu khẩn cấp"}
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive cursor-pointer"
-                          onClick={() => setJobPendingCancel(job)}
-                          disabled={cancellingJobId === job.id}
-                        >
-                          <XCircle className="mr-2 h-4 w-4" />
-                          {cancellingJobId === job.id ? "Đang hủy..." : "Hủy tin đăng"}
-                        </DropdownMenuItem>
+                        {Number(job.statusId) === JobPostStatus.Published && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive cursor-pointer"
+                              onClick={() => setJobPendingCancel(job)}
+                              disabled={cancellingJobId === job.id}
+                            >
+                              <XCircle className="mr-2 h-4 w-4" />
+                              {cancellingJobId === job.id ? "Đang hủy..." : "Hủy tin đăng"}
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

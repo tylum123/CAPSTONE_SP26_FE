@@ -55,7 +55,7 @@ function JobReviews({ jobId }: { jobId: string }) {
       return;
     }
 
-    ratingService.getAllByUser(user.userId)
+    ratingService.getReceivedByPost(jobId)
       .then(res => {
         if (res.data) {
           const filtered = res.data.filter(r => r.jobPostId === jobId && r.typeId === 2);
@@ -88,6 +88,22 @@ function JobReviews({ jobId }: { jobId: string }) {
         ) : (
           reviews.map(review => (
             <div key={review.id} className="p-4 rounded-lg bg-muted/30 border border-muted/50 flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-9 w-9 border shadow-xs">
+                  <AvatarImage src={review.raterProfile?.workerProfile?.avatarUrl || "/placeholder.svg"} className="object-cover" />
+                  <AvatarFallback className="bg-agro-green/10 text-agro-green text-xs font-semibold">
+                    {(review.raterProfile?.workerProfile?.fullName || "W").charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    {review.raterProfile?.workerProfile?.fullName || "Người làm"}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {review.raterProfile?.workerProfile?.primaryLocation || "Không có địa điểm"}
+                  </p>
+                </div>
+              </div>
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-0.5">
                   {Array.from({ length: 5 }).map((_, i) => (
@@ -156,6 +172,7 @@ export default function FarmerJobDetailPage() {
   const [isCancelling, setIsCancelling] = useState(false)
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
   const [isStartJobDialogOpen, setIsStartJobDialogOpen] = useState(false)
+  const [isCompleteJobDialogOpen, setIsCompleteJobDialogOpen] = useState(false)
   const [jobDetails, setJobDetails] = useState<JobDetail[]>([])
   const [isLoadingJobDetails, setIsLoadingJobDetails] = useState(false)
   const [selectedJobDetail, setSelectedJobDetail] = useState<JobDetail | null>(null)
@@ -697,6 +714,14 @@ export default function FarmerJobDetailPage() {
   }, [job?.statusId, jobId])
 
   const jobTypeLabel = job?.jobTypeId === 1 ? "Khoán" : job?.jobTypeId === 2 ? "Ngày" : "-"
+  const isPerPlotLastDay = Boolean(
+    job?.jobTypeId === 1 &&
+    job?.endDate &&
+    isToday(parseISO(job.endDate))
+  )
+  const isApprovalSectionDisabled = Boolean(
+    job?.statusId === JOB_POST_STATUS.Completed || isPerPlotLastDay
+  )
 
   return (
     <div className="flex flex-col gap-8">
@@ -726,7 +751,7 @@ export default function FarmerJobDetailPage() {
               {/* Show "Hoàn thành công việc" if status is InProgress */}
               {job.statusId === JOB_POST_STATUS.InProgress && (
                 <Button
-                  onClick={() => handleUpdateStatus(JOB_POST_STATUS.Completed)}
+                  onClick={() => setIsCompleteJobDialogOpen(true)}
                   disabled={isUpdatingStatus || isCancelling}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
@@ -737,7 +762,7 @@ export default function FarmerJobDetailPage() {
 
 
               {/* Only show "Hủy tin đăng" if the job is not yet in progress or finished */}
-              {job.statusId <= JOB_POST_STATUS.Closed && (
+              {job.statusId === JOB_POST_STATUS.Published && (
                 <Button
                   variant="outline"
                   onClick={() => setIsCancelDialogOpen(true)}
@@ -749,7 +774,7 @@ export default function FarmerJobDetailPage() {
                 </Button>
               )}
 
-              {job.statusId <= JOB_POST_STATUS.Closed && (
+              {job.statusId === JOB_POST_STATUS.Published && (
                 <Button variant="outline" asChild className="border-agro-green/20 text-agro-green hover:bg-agro-green/10">
                   <Link href={`/farmer/jobs/${jobId}/edit`}>
                     Sửa bài đăng
@@ -945,7 +970,7 @@ export default function FarmerJobDetailPage() {
             </div>
 
             {/* Applications Sidebar */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 lg:sticky lg:top-8">
               <Card className="lg:top-8 border-0 shadow-sm overflow-hidden bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md">
                 <div className="h-1 bg-agro-green" />
                 <CardHeader className="pb-4 flex flex-row items-center justify-between gap-3 space-y-0">
@@ -990,7 +1015,7 @@ export default function FarmerJobDetailPage() {
                     </button>
                   </div>
 
-                  <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">
+                  <div className="space-y-4 max-h-150 overflow-y-auto pr-1 custom-scrollbar">
                     {isLoadingApplications ? (
                       <div className="flex flex-col items-center justify-center py-12 gap-3">
                         <div className="h-8 w-8 animate-spin rounded-full border-2 border-agro-green border-r-transparent" />
@@ -1037,7 +1062,7 @@ export default function FarmerJobDetailPage() {
                                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
                                   <WorkerAverageRating userId={application.worker?.userId} fallback={application.worker?.averageRating} />
                                   <span className="opacity-40">•</span>
-                                  <span>{application.worker?.primaryLocation || "TP.HCM"}</span>
+                                  <span>{application.worker?.primaryLocation || "Không có địa chỉ"}</span>
                                 </div>
                               </div>
                             </div>
@@ -1055,7 +1080,7 @@ export default function FarmerJobDetailPage() {
                               <Button
                                 type="button"
                                 size="sm"
-                                variant="ghost"
+                                variant="outline"
                                 className="h-8 w-8 p-0 rounded-lg hover:bg-agro-green/10 text-agro-green"
                                 onClick={() => void openApplicationDetail(application.id)}
                               >
@@ -1074,13 +1099,13 @@ export default function FarmerJobDetailPage() {
                                     {autoAcceptingId === application.id ? (
                                       <RotateCw className="h-3.5 w-3.5 animate-spin" />
                                     ) : (
-                                      <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
                                     )}
-                                    Nhận ngay
                                   </Button>
                                   <Button
                                     type="button"
                                     size="sm"
+                                    variant="outline"
                                     className="h-8 w-8 p-0 rounded-lg hover:bg-agro-green/10 text-agro-green"
                                     onClick={() => void openApplicationRespond(application.id)}
                                   >
@@ -1093,7 +1118,8 @@ export default function FarmerJobDetailPage() {
                                   <Button
                                     type="button"
                                     size="sm"
-                                    className="h-8 w-8"
+                                    variant="outline"
+                                    className="h-8 w-8 p-0 rounded-lg hover:bg-agro-green/10 text-agro-green"
                                     onClick={() => {
                                       const query = new URLSearchParams();
                                       if (application.worker?.fullName) query.set("name", application.worker.fullName);
@@ -1113,11 +1139,10 @@ export default function FarmerJobDetailPage() {
                                         type="button"
                                         size="sm"
                                         variant="outline"
-                                        className="h-8 gap-1.5 border-amber-200 bg-amber-700 text-white hover:bg-amber-600 hover:text-white"
+                                        className="h-8 w-8 p-0 rounded-lg border-muted text-amber-700 hover:bg-amber-700/10 hover:text-amber-700/100"
                                         onClick={() => openRatingDialog(application)}
                                       >
                                         <Star className="h-3.5 w-3.5" />
-                                        Đánh giá
                                       </Button>
                                     )
                                   ) : null}
@@ -1161,131 +1186,131 @@ export default function FarmerJobDetailPage() {
 
               {/* Job Reports / Job Details Card */}
               <Card className="border-0 mt-8 shadow-sm overflow-hidden bg-white/80 dark:bg-zinc-900/80">
-                    <div className="h-1 bg-blue-500" />
-                    <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
-                          <Clock className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-xl">Báo cáo công việc</CardTitle>
-                          <CardDescription>Chi tiết quá trình thực hiện của các phiên làm việc</CardDescription>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          if (jobId) {
-                            setIsLoadingJobDetails(true)
-                            jobDetailsService.getJobDetailsByPost(jobId, { page: 1, limit: 100 })
-                              .then(res => setJobDetails(res.data.data))
-                              .finally(() => setIsLoadingJobDetails(false))
-                          }
-                        }}
-                        className="h-8 w-8 rounded-full text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-all"
-                        disabled={isLoadingJobDetails || !canDisplayJobReports}
-                      >
-                        <RotateCw className={cn("h-4 w-4", isLoadingJobDetails && "animate-spin")} />
-                      </Button>
-                    </CardHeader>
-                    <CardContent>
-                      {isLoadingJobDetails ? (
-                        <div className="flex items-center justify-center py-12">
-                          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-r-transparent" />
-                        </div>
-                      ) : !canDisplayJobReports ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                          <Clock className="h-12 w-12 mb-4 opacity-20" />
-                          <p className="text-sm">Chưa có báo cáo công việc.</p>
-                          <p className="text-xs">Báo cáo sẽ hiển thị khi công việc bắt đầu.</p>
-                        </div>
-                      ) : jobDetails.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                          <FileText className="h-12 w-12 mb-4 opacity-20" />
-                          <p className="text-sm">Chưa có báo cáo công việc nào được gửi.</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {jobDetails.map((detail) => (
-                            <div key={detail.id} className="p-4 rounded-xl border bg-muted/30 hover:bg-muted/50 transition-colors">
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <p className="font-semibold">{formatDate(detail.workDate)}</p>
-                                    {jobDetailStatusBadge(detail.statusId)}
-                                  </div>
-                                  <p className="text-sm text-muted-foreground line-clamp-2">
-                                    {detail.workerDescription || "Không có mô tả từ người làm."}
-                                  </p>
-                                  {detail.attachments && detail.attachments.length > 0 && (
-                                    <div className="flex items-center gap-1.5 pt-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                                      <Paperclip className="h-3 w-3" />
-                                      {detail.attachments.length} tệp đính kèm
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="flex flex-col items-end gap-2">
-                                  <div className="flex items-center gap-1 text-emerald-600 font-bold">
-                                    <Banknote className="h-4 w-4" />
-                                    {formatCurrency(detail.jobPrice)}
-                                  </div>
-                                  <div className="flex items-center gap-1.5">
-                                    {detail.farmerApprovedPercent > 0 && (
-                                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
-                                        {detail.farmerApprovedPercent}% Duyệt
-                                      </Badge>
-                                    )}
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-8 w-8 p-0 rounded-lg hover:bg-agro-green/10 text-agro-green"
-                                      onClick={() => handleOpenJobDetail(detail.id)}
-                                    >
-                                      <InfoIcon className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
-                                </div>
+                <div className="h-1 bg-blue-500" />
+                <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
+                      <Clock className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl">Báo cáo công việc</CardTitle>
+                      <CardDescription>Chi tiết quá trình thực hiện của các phiên làm việc</CardDescription>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      if (jobId) {
+                        setIsLoadingJobDetails(true)
+                        jobDetailsService.getJobDetailsByPost(jobId, { page: 1, limit: 100 })
+                          .then(res => setJobDetails(res.data.data))
+                          .finally(() => setIsLoadingJobDetails(false))
+                      }
+                    }}
+                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-all"
+                    disabled={isLoadingJobDetails || !canDisplayJobReports}
+                  >
+                    <RotateCw className={cn("h-4 w-4", isLoadingJobDetails && "animate-spin")} />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingJobDetails ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-r-transparent" />
+                    </div>
+                  ) : !canDisplayJobReports ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                      <Clock className="h-12 w-12 mb-4 opacity-20" />
+                      <p className="text-sm">Chưa có báo cáo công việc.</p>
+                      <p className="text-xs">Báo cáo sẽ hiển thị khi công việc bắt đầu.</p>
+                    </div>
+                  ) : jobDetails.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                      <FileText className="h-12 w-12 mb-4 opacity-20" />
+                      <p className="text-sm">Chưa có báo cáo công việc nào được gửi.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {jobDetails.map((detail) => (
+                        <div key={detail.id} className="p-4 rounded-xl border bg-muted/30 hover:bg-muted/50 transition-colors">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold">{formatDate(detail.workDate)}</p>
+                                {jobDetailStatusBadge(detail.statusId)}
                               </div>
-                              {detail.farmerFeedback && (
-                                <div className="mt-3 pt-3 border-t border-muted italic text-xs text-muted-foreground">
-                                  Phản hồi từ bạn: {detail.farmerFeedback}
+                              <p className="text-sm text-muted-foreground line-clamp-2">
+                                {detail.workerDescription || "Không có mô tả từ người làm."}
+                              </p>
+                              {detail.attachments && detail.attachments.length > 0 && (
+                                <div className="flex items-center gap-1.5 pt-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                                  <Paperclip className="h-3 w-3" />
+                                  {detail.attachments.length} tệp đính kèm
                                 </div>
                               )}
                             </div>
-                          ))}
-
-                          {jobDetailsTotalPages > 1 && (
-                            <div className="flex items-center justify-center gap-4 pt-6 border-t mt-4">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setJobDetailsPage(prev => Math.max(1, prev - 1))}
-                                disabled={jobDetailsPage === 1 || isLoadingJobDetails}
-                                className="h-8"
-                              >
-                                <ChevronLeft className="h-4 w-4 mr-1" />
-                                Trang trước
-                              </Button>
-                              <span className="text-sm font-medium">
-                                Trang {jobDetailsPage} / {jobDetailsTotalPages}
-                              </span>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setJobDetailsPage(prev => Math.min(jobDetailsTotalPages, prev + 1))}
-                                disabled={jobDetailsPage === jobDetailsTotalPages || isLoadingJobDetails}
-                                className="h-8"
-                              >
-                                Trang sau
-                                <ChevronRight className="h-4 w-4 ml-1" />
-                              </Button>
+                            <div className="flex flex-col items-end gap-2">
+                              <div className="flex items-center gap-1 text-emerald-600 font-bold">
+                                <Banknote className="h-4 w-4" />
+                                {formatCurrency(detail.jobPrice)}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                {detail.farmerApprovedPercent > 0 && (
+                                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                                    {detail.farmerApprovedPercent}% Duyệt
+                                  </Badge>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 rounded-lg hover:bg-agro-green/10 text-agro-green"
+                                  onClick={() => handleOpenJobDetail(detail.id)}
+                                >
+                                  <InfoIcon className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                          {detail.farmerFeedback && (
+                            <div className="mt-3 pt-3 border-t border-muted italic text-xs text-muted-foreground">
+                              Phản hồi từ bạn: {detail.farmerFeedback}
                             </div>
                           )}
                         </div>
+                      ))}
+
+                      {jobDetailsTotalPages > 1 && (
+                        <div className="flex items-center justify-center gap-4 pt-6 border-t mt-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setJobDetailsPage(prev => Math.max(1, prev - 1))}
+                            disabled={jobDetailsPage === 1 || isLoadingJobDetails}
+                            className="h-8"
+                          >
+                            <ChevronLeft className="h-4 w-4 mr-1" />
+                            Trang trước
+                          </Button>
+                          <span className="text-sm font-medium">
+                            Trang {jobDetailsPage} / {jobDetailsTotalPages}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setJobDetailsPage(prev => Math.min(jobDetailsTotalPages, prev + 1))}
+                            disabled={jobDetailsPage === jobDetailsTotalPages || isLoadingJobDetails}
+                            className="h-8"
+                          >
+                            Trang sau
+                            <ChevronRight className="h-4 w-4 ml-1" />
+                          </Button>
+                        </div>
                       )}
-                    </CardContent>
-                  </Card>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
@@ -1644,6 +1669,33 @@ export default function FarmerJobDetailPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={isCompleteJobDialogOpen} onOpenChange={setIsCompleteJobDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Hoàn thành công việc?</DialogTitle>
+            <DialogDescription>
+              Bạn có chắc chắn muốn đánh dấu công việc này là đã hoàn thành không?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-5 sm:gap-5">
+            <Button variant="outline" onClick={() => setIsCompleteJobDialogOpen(false)} disabled={isUpdatingStatus}>
+              Hủy
+            </Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={async () => {
+                await handleUpdateStatus(JOB_POST_STATUS.Completed)
+                setIsCompleteJobDialogOpen(false)
+              }}
+              disabled={isUpdatingStatus}
+            >
+              {isUpdatingStatus ? <RotateCw className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+              Xác nhận hoàn thành
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Báo cáo công việc  */}
       <Dialog open={isJobDetailDialogOpen} onOpenChange={setIsJobDetailDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
@@ -1759,7 +1811,7 @@ export default function FarmerJobDetailPage() {
                 </div>
 
                 {
-                  true && (
+                  !isApprovalSectionDisabled && selectedJobDetail.statusId !== JobStatus.Completed && (
                     <div className="space-y-4 pt-4 border-t border-dashed">
                       <h4 className="font-bold text-base text-foreground">Phê duyệt báo cáo</h4>
 
@@ -1776,7 +1828,7 @@ export default function FarmerJobDetailPage() {
                           step="5"
                           value={approvalPercent}
                           onChange={(e) => setApprovalPercent(parseInt(e.target.value))}
-                          disabled={selectedJobDetail.statusId === JobStatus.Completed}
+                          disabled={false}
                           className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-agro-green disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                         <p className="text-[10px] text-muted-foreground italic">
@@ -1791,7 +1843,7 @@ export default function FarmerJobDetailPage() {
                           placeholder="Nhập phản hồi cho người làm..."
                           value={approvalFeedback}
                           onChange={(e) => setApprovalFeedback(e.target.value)}
-                          disabled={selectedJobDetail.statusId === JobStatus.Completed}
+                          disabled={false}
                           className="min-h-[100px] bg-white dark:bg-zinc-950/50 disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       </div>
@@ -1808,16 +1860,18 @@ export default function FarmerJobDetailPage() {
               disabled={isApprovingDetail}
               className="flex-1 sm:flex-none"
             >
-              Hủy
+              Thoát
             </Button>
-            <Button
-              className="bg-agro-green hover:bg-agro-green/90 flex-1 sm:flex-none"
-              onClick={handleApproveJobDetail}
-              disabled={isApprovingDetail || !selectedJobDetail || selectedJobDetail.statusId === JobStatus.Completed}
-            >
-              {isApprovingDetail ? <RotateCw className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-              {selectedJobDetail?.statusId === JobStatus.Completed ? "Đã phê duyệt" : "Lưu & Phê duyệt"}
-            </Button>
+            {!isApprovalSectionDisabled && selectedJobDetail?.statusId !== JobStatus.Completed && (
+              <Button
+                className="bg-agro-green hover:bg-agro-green/90 flex-1 sm:flex-none"
+                onClick={handleApproveJobDetail}
+                disabled={isApprovingDetail || !selectedJobDetail}
+              >
+                {isApprovingDetail ? <RotateCw className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                Lưu & Phê duyệt
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

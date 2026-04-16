@@ -24,6 +24,11 @@ export const ratingService = {
         return response.data;
     },
 
+    getReceivedByPost: async (postId: string): Promise<ApiResponse<RatingDTO[]>> => {
+        const response = await axiosInstance.get(API_ENDPOINTS.RATINGS.RECEIVED_BY_POST(postId));
+        return response.data;
+    },
+
     getAverage: async (userId: string): Promise<ApiResponse<number>> => {
         const response = await axiosInstance.get(API_ENDPOINTS.RATINGS.AVERAGE(userId));
         return response.data;

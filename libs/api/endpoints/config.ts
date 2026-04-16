@@ -166,6 +166,7 @@ export const API_ENDPOINTS = {
     SPECIFIC: (userId: string) => `/ratings/${userId}`,
     BY_USER: (userId: string) => `/ratings/user/${userId}/all`,
     GIVEN: `/ratings/user/given`,
+    RECEIVED_BY_POST: (postId: string) => `/ratings/user/received/post/${postId}`,
     AVERAGE: (userId: string) => `/ratings/user/${userId}/average`
   },
 
