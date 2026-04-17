@@ -78,6 +78,7 @@ export default function FarmerLayout({
 
   const handleMarkRead = async (id: string) => {
     try {
+      
       await notificationService.markRead(id);
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, isRead: true, readAt: new Date().toISOString() } : n))

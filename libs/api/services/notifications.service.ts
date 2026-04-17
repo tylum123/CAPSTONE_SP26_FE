@@ -8,8 +8,8 @@ export const notificationService = {
         const response = await axiosInstance.get(API_ENDPOINTS.NOTIFICATIONS.GET_ALL, { params });
         return response.data;
     },
-    markRead: async (id: string): Promise<ApiResponse<NotificationDTO>> => {
-        const response = await axiosInstance.patch(API_ENDPOINTS.NOTIFICATIONS.MARK_READ, { id });
+    markRead: async (notificationId: string): Promise<ApiResponse<NotificationDTO>> => {
+        const response = await axiosInstance.patch(API_ENDPOINTS.NOTIFICATIONS.MARK_READ, { notificationId });
         return response.data;
     },
     markAllRead: async (): Promise<ApiResponse<NotificationDTO>> => {
@@ -24,4 +24,4 @@ export const notificationService = {
         const response = await axiosInstance.delete(API_ENDPOINTS.NOTIFICATIONS.DELETE(id));
         return response.data;
     }
-}
+}

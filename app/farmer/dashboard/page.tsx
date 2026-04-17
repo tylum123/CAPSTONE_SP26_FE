@@ -503,6 +503,10 @@ export default function FarmerDashboard() {
                     weatherAvailable: {
                       boxShadow: "inset 0 0 0 1px oklch(0.62 0.13 238 / 0.55)",
                       borderRadius: "0.375rem",
+                      borderColor: "transparent",
+                      backgroundColor: "oklch(0.7 0.1 239)",
+                      fontWeight: "bold",
+                      color: "oklch(1 0 239)",
                     },
                   }}
                   components={{
@@ -548,7 +552,7 @@ export default function FarmerDashboard() {
                     {currentWeather && (
                       <div className="flex items-center gap-1.5">
                         <Cloud className="h-3 w-3 text-blue-500" />
-                        <span>Click ngày có viền xanh để xem dự báo</span>
+                        <span>Click ngày màu xanh để xem dự báo</span>
                       </div>
                     )}
                   </div>
@@ -619,7 +623,7 @@ export default function FarmerDashboard() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5">
-                  <div className="flex flex-col gap-2 p-3 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/50 dark:to-cyan-950/50 rounded-lg hover:scale-[1.02] transition-transform border border-blue-200 dark:border-blue-800">
+                  <div className="flex flex-col gap-2 p-3 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/50 dark:to-cyan-950/50 rounded-lg hover:scale-[1.02] transition-transform border bg-blue-200 dark:bg-blue-800">
                     <div className="p-2 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg w-fit shadow-lg">
                       <Droplets className="h-5 w-5 text-white" />
                     </div>
