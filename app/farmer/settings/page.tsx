@@ -9,18 +9,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Upload, Save, Loader2, RotateCcw, CalendarIcon } from "lucide-react"
+import { Upload, Save, Loader2, RotateCcw } from "lucide-react"
 import { handleApiError } from "@/libs/utils/error-handler"
 import { FarmerProfile, UpdateFarmerRequest } from "@/libs/types"
 import { farmerService } from "@/libs/api/services/farmer.service"
 import { cloudinaryService } from "@/libs/api/services/cloudinary.service"
 import { useToast } from "@/hooks/use-toast"
 import { AddressForm } from "@/components/address-form"
-import { format } from "date-fns"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/libs/utils/utils";
-import { vi } from "date-fns/locale"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export default function SettingsPage() {
   const [profile, setProfile] = useState<FarmerProfile | null>(null)
@@ -43,6 +45,7 @@ export default function SettingsPage() {
     dateOfBirth: "",
     avatarUrl: "",
   })
+  const [dobParts, setDobParts] = useState({ day: "", month: "", year: "" })
 
   const [notifications, setNotifications] = useState({
     newApplications: true,
@@ -52,6 +55,42 @@ export default function SettingsPage() {
   })
 
   const { toast } = useToast()
+
+  const getDaysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate()
+
+  const parseDobParts = (value?: string) => {
+    if (!value) {
+      return { day: "", month: "", year: "" }
+    }
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) {
+      return { day: "", month: "", year: "" }
+    }
+    return {
+      day: String(parsed.getDate()),
+      month: String(parsed.getMonth() + 1),
+      year: String(parsed.getFullYear()),
+    }
+  }
+
+  const updateDob = (next: { day?: string; month?: string; year?: string }) => {
+    setDobParts((prev) => {
+      const updated = { ...prev, ...next }
+      if (updated.month && updated.year) {
+        const daysInMonth = getDaysInMonth(Number(updated.year), Number(updated.month))
+        if (updated.day && Number(updated.day) > daysInMonth) {
+          updated.day = String(daysInMonth)
+        }
+      }
+      if (updated.day && updated.month && updated.year) {
+        const day = updated.day.padStart(2, "0")
+        const month = updated.month.padStart(2, "0")
+        const value = `${updated.year}-${month}-${day}`
+        handleInputChange("dateOfBirth", value)
+      }
+      return updated
+    })
+  }
 
   // Fetch profile on mount
   useEffect(() => {
@@ -70,6 +109,7 @@ export default function SettingsPage() {
             dateOfBirth: response.data.dateOfBirth || "",
             avatarUrl: initialAvatar,
           })
+          setDobParts(parseDobParts(response.data.dateOfBirth))
 
           if (response.data.address) {
             const parts = response.data.address.split(",").map(p => p.trim())
@@ -247,7 +287,7 @@ export default function SettingsPage() {
                 />
                 <Button
                   variant="outline"
-                  className="gap-2 bg-transparent w-full max-w-[200px]"
+                  className="gap-2 bg-transparent w-full max-w-50"
                   onClick={() => avatarInputRef.current?.click()}
                   disabled={uploadingAvatar}
                 >
@@ -287,41 +327,67 @@ export default function SettingsPage() {
                   <Label htmlFor="dateOfBirth" className="font-medium text-gray-700">
                     Ngày sinh
                   </Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal bg-gray-50/50 border-gray-200 focus:bg-white focus:border-agro-green focus:ring-agro-green/20 h-9",
-                          !formData.dateOfBirth && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-5 w-5 opacity-50" />
-                        {formData.dateOfBirth ? (
-                          format(new Date(formData.dateOfBirth), "dd/MM/yyyy")
-                        ) : (
-                          <span>Chọn ngày sinh (dd/mm/yyyy)</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={formData.dateOfBirth ? new Date(formData.dateOfBirth) : undefined}
-                        onSelect={(date) =>
-                          handleInputChange("dateOfBirth", date ? format(date, "yyyy-MM-dd") : "")
-                        }
-                        disabled={(date) =>
-                          date > new Date() || date < new Date("1900-01-01")
-                        }
-                        initialFocus
-                        locale={vi}
-                        captionLayout="dropdown-buttons"
-                        fromYear={1900}
-                        toYear={new Date().getFullYear()}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Select
+                      value={dobParts.day}
+                      onValueChange={(value) => updateDob({ day: value })}
+                    >
+                      <SelectTrigger className="w-full bg-gray-50/50 border-gray-200 h-9">
+                        <SelectValue placeholder="Ngày" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({
+                          length: getDaysInMonth(
+                            Number(dobParts.year || new Date().getFullYear()),
+                            Number(dobParts.month || 1)
+                          ),
+                        }).map((_, index) => {
+                          const value = String(index + 1)
+                          return (
+                            <SelectItem key={value} value={value}>
+                              {value}
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={dobParts.month}
+                      onValueChange={(value) => updateDob({ month: value })}
+                    >
+                      <SelectTrigger className="w-full bg-gray-50/50 border-gray-200 h-9">
+                        <SelectValue placeholder="Tháng" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 12 }).map((_, index) => {
+                          const value = String(index + 1)
+                          return (
+                            <SelectItem key={value} value={value}>
+                              {value}
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={dobParts.year}
+                      onValueChange={(value) => updateDob({ year: value })}
+                    >
+                      <SelectTrigger className="w-full bg-gray-50/50 border-gray-200 h-9">
+                        <SelectValue placeholder="Năm" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: new Date().getFullYear() - 1899 }).map((_, index) => {
+                          const value = String(1900 + index)
+                          return (
+                            <SelectItem key={value} value={value}>
+                              {value}
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
 
@@ -351,7 +417,7 @@ export default function SettingsPage() {
                 <Label>Địa chỉ</Label>
                 {!editingAddress ? (
                   <div className="flex items-center gap-4 bg-gray-50/50 rounded-xl p-4 border border-gray-100">
-                    <div className="flex-1 text-base text-gray-700 text-sm">
+                    <div className="flex-1 text-gray-700 text-sm">
                       {profile?.address ? profile.address : <span className="text-muted-foreground">Chưa có địa chỉ</span>}
                     </div>
                     <Button

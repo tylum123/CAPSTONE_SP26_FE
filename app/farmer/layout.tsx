@@ -29,6 +29,7 @@ import {
   PersonStandingIcon,
   ChevronLeft,
   ChevronRight,
+  UserCircle,
 } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { farmerService, authService, notificationService } from "@/libs/api/services"
@@ -383,11 +384,18 @@ export default function FarmerLayout({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem asChild>
+                    <Link href="/farmer/profile" className="cursor-pointer">
+                      <UserCircle className="h-4 w-4 mr-2" />
+                      Hồ sơ
+                    </Link>
+                  </DropdownMenuItem>
+                  {/* <DropdownMenuItem asChild>
                     <Link href="/farmer/settings" className="cursor-pointer">
                       <Settings className="h-4 w-4 mr-2" />
                       Cài đặt
                     </Link>
-                  </DropdownMenuItem>
+                  </DropdownMenuItem> */}
+                  
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link href="/" className="cursor-pointer">
@@ -443,6 +451,18 @@ export default function FarmerLayout({
                       })}
                     </nav>
                     <div className="mt-auto pt-4 border-t">
+                      <Link href="/farmer/settings">
+                        <Button variant="ghost" className="w-full justify-start gap-3">
+                          <Settings className="h-5 w-5" />
+                          Cài đặt
+                        </Button>
+                      </Link>
+                      <Link href="/farmer/profile">
+                        <Button variant="ghost" className="w-full justify-start gap-3">
+                          <UserCircle className="h-5 w-5" />
+                          Hồ sơ
+                        </Button>
+                      </Link>
                       <Link href="/">
                         <Button variant="ghost" className="w-full justify-start gap-3">
                           <Leaf className="h-5 w-5" />

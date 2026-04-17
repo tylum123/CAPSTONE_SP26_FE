@@ -1,8 +1,8 @@
 export interface UpdateFarmerRequest {
-  contactName?: string;
-  address?: string;
-  dateOfBirth?: string;
-  avatarUrl?: string;
+  contactName: string;
+  address: string;
+  dateOfBirth: string;
+  avatarUrl: string;
 }
 
 export interface FarmerProfile {
