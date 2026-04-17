@@ -388,7 +388,7 @@ export function FarmerJobsList() {
 
     } catch (urgencyError) {
       console.error(urgencyError)
-      setError("Không thể cập nhật độ khẩn cấp. Vui lòng thử lại.")
+      setError("Không thể đánh dấu bài đăng là cần gấp. Vui lòng thử lại.")
     } finally {
       setUpdatingUrgencyJobId(null)
     }
@@ -680,7 +680,7 @@ export function FarmerJobsList() {
                       {job.isUrgent && (
                         <Badge className="bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/40 dark:text-orange-400 gap-1">
                           <Zap className="h-3 w-3" />
-                          Khẩn cấp
+                          Gấp
                         </Badge>
                       )}
                     </div>
@@ -717,8 +717,8 @@ export function FarmerJobsList() {
                                 {updatingUrgencyJobId === job.id
                                   ? "Đang cập nhật..."
                                   : job.isUrgent
-                                    ? "Bỏ khẩn cấp"
-                                    : "Đánh dấu khẩn cấp"}
+                                    ? "Bỏ đánh dấu gấp"
+                                    : "Đánh dấu gấp"}
                               </DropdownMenuItem>
                             )}
                             {Number(job.statusId) === JobPostStatus.Published && (
@@ -817,8 +817,8 @@ export function FarmerJobsList() {
                             {updatingUrgencyJobId === job.id
                               ? "Đang cập nhật..."
                               : job.isUrgent
-                                ? "Bỏ khẩn cấp"
-                                : "Đánh dấu khẩn cấp"}
+                                ? "Bỏ đánh dấu gấp"
+                                : "Đánh dấu gấp"}
                           </DropdownMenuItem>
                         )}
                         {Number(job.statusId) === JobPostStatus.Published && (

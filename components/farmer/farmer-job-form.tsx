@@ -423,12 +423,31 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
     )
   }
 
+  const toggleAllVisibleSkills = () => {
+    const visibleSkillIds = availableSkills.map((skill) => skill.id).filter(Boolean)
+
+    if (!visibleSkillIds.length) {
+      return
+    }
+
+    setSelectedSkillIds((currentSkills) => {
+      const hasAllVisibleSkills = visibleSkillIds.every((skillId) => currentSkills.includes(skillId))
+
+      if (hasAllVisibleSkills) {
+        return currentSkills.filter((skillId) => !visibleSkillIds.includes(skillId))
+      }
+
+      return Array.from(new Set([...currentSkills, ...visibleSkillIds]))
+    })
+  }
+
   const handleCreateSkill = async () => {
-    if (
-      !newSkillName.trim() ||
-      !selectedJobCategoryId ||
-      selectedJobCategoryId === DEFAULT_JOB_CATEGORY_ID
-    ) {
+    const skillCategoryId =
+      selectedJobCategoryId && selectedJobCategoryId !== DEFAULT_JOB_CATEGORY_ID
+        ? selectedJobCategoryId
+        : jobCategories[0]?.id
+
+    if (!newSkillName.trim() || !skillCategoryId) {
       return
     }
 
@@ -437,7 +456,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       const response = await skillService.createSkill({
         name: newSkillName.trim(),
         description: newSkillDesc.trim() || newSkillName.trim(),
-        categoryId: selectedJobCategoryId,
+        categoryId: skillCategoryId,
         isActive: true,
       })
 
@@ -840,18 +859,6 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       return "Vui lòng chọn danh mục công việc."
     }
 
-    if (!requirements.length) {
-      return "Vui lòng thêm ít nhất 1 yêu cầu."
-    }
-
-    if (!selectedSkillIds.length) {
-      return "Vui lòng chọn ít nhất 1 kỹ năng kinh nghiệm."
-    }
-
-    if (!benefits.length) {
-      return "Vui lòng thêm ít nhất 1 quyền lợi."
-    }
-
     if (scheduleType === "contract") {
       if (!contractStartDate || !contractEndDate) {
         return "Vui lòng chọn ngày bắt đầu và kết thúc cho công việc khoán."
@@ -964,6 +971,12 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
 
     const jobTypeId = scheduleType === "daily" ? JOB_TYPE_DAILY_ID : JOB_TYPE_CONTRACT_ID
 
+    const selectedDaysForPayload =
+      scheduleType === "daily"
+        ? normalizedSelectedDailyDates.map((date) => toDateOnlyFromDate(date))
+        : []
+    const workersNeededForPayload = scheduleType === "daily" ? workersNeededNumber : 0
+
     const payload: UpdateJobRequest = {
       skillIds: selectedSkillIds,
       farmId: selectedFarmId || DEFAULT_FARM_ID,
@@ -976,11 +989,11 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       endDate,
       startTime,
       endTime,
-      selectedDays: normalizedSelectedDailyDates.map(date => toDateOnlyFromDate(date)),
+      selectedDays: selectedDaysForPayload,
       requirements,
       privileges: benefits,
       wageAmount: incomeNumber,
-      workersNeeded: workersNeededNumber,
+      workersNeeded: workersNeededForPayload,
       workersAccepted: 0,
       updatedAt: nowISO,
       isUrgent,
@@ -999,11 +1012,25 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
         })
       const savedJob = response.data
 
+      const savedJobUnitIncome = savedJob.wageAmount ?? incomeNumber
+      const savedJobWorkersNeeded =
+        scheduleType === "daily"
+          ? (savedJob.workersNeeded && savedJob.workersNeeded > 0 ? savedJob.workersNeeded : workersNeededNumber)
+          : 1
+      const savedJobDailyDaysCount =
+        scheduleType === "daily"
+          ? ((savedJob.selectedDays?.length ?? 0) > 0 ? savedJob.selectedDays.length : selectedDailyDaysCount)
+          : 1
+      const postedIncome =
+        scheduleType === "daily"
+          ? savedJobUnitIncome * savedJobWorkersNeeded * savedJobDailyDaysCount
+          : savedJobUnitIncome
+
       const postedPayload: PostedJobPreview = {
         id: savedJob.id,
         createdAt: savedJob.createdAt ?? nowISO,
         title: savedJob.title ?? title.trim(),
-        income: savedJob.wageAmount ?? incomeNumber,
+        income: postedIncome,
         workersNeeded:
           savedJob.workersNeeded ?? (scheduleType === "daily" ? workersNeededNumber : 1),
         location: savedJob.address ?? location.trim(),
@@ -1111,11 +1138,14 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       endDate,
       startTime,
       endTime,
-      selectedDays: normalizedSelectedDailyDates.map((d) => toDateOnlyFromDate(d)),
+      selectedDays:
+        scheduleType === "daily"
+          ? normalizedSelectedDailyDates.map((d) => toDateOnlyFromDate(d))
+          : [],
       requirements,
       privileges: benefits,
       wageAmount: incomeNumber,
-      workersNeeded: workersNeededNumber || 1,
+      workersNeeded: scheduleType === "daily" ? workersNeededNumber || 1 : 0,
       workersAccepted: 0,
       isUrgent,
       statusId: 1, // Draft status
@@ -1658,73 +1688,92 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                           <Input value={contractEndDate} placeholder="dd/mm/yyyy" readOnly className="bg-muted/30" />
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                      <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
-                        <div className="rounded-lg border bg-card p-3 shadow-inner">
-                          <div className="mb-3 flex items-center justify-between">
-                            <Label className="text-xs font-bold">CHỌN NGÀY</Label>
-                            <div className="flex gap-1">
-                              <Button type="button" size="sm" variant={isRangePicking ? "default" : "outline"} className="h-7 text-[15px] px-2" onClick={toggleRangeSelectionMode}>
-                                {isRangePicking ? "Chọn đích" : "Khoảng"}
-                              </Button>
-                              <Button type="button" size="sm" variant="ghost" className="h-7 text-[15px] px-2 text-destructive" onClick={clearAllSelectedDailyDates} disabled={selectedDailyDaysCount === 0}>
-                                Xóa
-                              </Button>
-                            </div>
+                        <div className="space-y-2 border-t pt-4">
+                          <div className="flex justify-between text-sm">
+                            <span>Tiền công</span>
                           </div>
-                          <div className="flex justify-center bg-background rounded-md p-1">
-                            <Calendar
-                              key={calendarSelectionSignature}
-                              mode="multiple"
-                              selected={calendarSelectedDates}
-                              onDayClick={handleDailyCalendarDayClick}
-                              disabled={(d) => d < tomorrow}
-                              className="rounded-md scale-100 w-full"
+                          <div className="relative">
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              value={income}
+                              onChange={(e) => setIncome(formatThousandsWithDots(e.target.value))}
+                              className="pr-12 text-lg font-medium text-teal-700 dark:text-teal-400"
+                              placeholder="300.000"
                             />
-                          </div>
-                          <div className="mt-2 text-center">
-                            <Badge variant="secondary" className="font-normal">
-                              {selectedDailyDaysCount > 0 ? `Đã chọn ${selectedDailyDaysCount} ngày` : "Chưa chọn ngày"}
-                            </Badge>
+                            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">VNĐ</span>
                           </div>
                         </div>
+                    </div>
+                  ) : (
+                    <div className="grid gap-4 animate-in fade-in zoom-in-95 duration-300 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:items-start">
+                      <div className="rounded-lg border bg-card p-3 shadow-inner">
+                        <div className="mb-3 flex items-center justify-between">
+                          <Label className="text-xs font-bold">CHỌN NGÀY</Label>
+                          <div className="flex gap-1">
+                            <Button type="button" size="sm" variant={isRangePicking ? "default" : "outline"} className="h-7 text-[15px] px-2" onClick={toggleRangeSelectionMode}>
+                              {isRangePicking ? "Chọn đích" : "Khoảng"}
+                            </Button>
+                            <Button type="button" size="sm" variant="ghost" className="h-7 text-[15px] px-2 text-destructive" onClick={clearAllSelectedDailyDates} disabled={selectedDailyDaysCount === 0}>
+                              Xóa
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex justify-center rounded-md bg-background p-1">
+                          <Calendar
+                            key={calendarSelectionSignature}
+                            mode="multiple"
+                            selected={calendarSelectedDates}
+                            onDayClick={handleDailyCalendarDayClick}
+                            disabled={(d) => d < tomorrow}
+                          />
+                        </div>
+                        <div className="mt-2 text-center">
+                          <Badge variant="secondary" className="font-normal">
+                            {selectedDailyDaysCount > 0 ? `Đã chọn ${selectedDailyDaysCount} ngày` : "Chưa chọn ngày"}
+                          </Badge>
+                        </div>
+                      </div>
 
+                      <div className="space-y-4 rounded-lg border bg-muted/20 p-3">
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
-                            <Label className="text-[10px] uppercase text-muted-foreground font-bold">Giờ bắt đầu</Label>
+                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">Giờ bắt đầu</Label>
                             <TimePicker value={dailyStartTime} onChange={setDailyStartTime} />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[10px] uppercase text-muted-foreground font-bold">Giờ kết thúc</Label>
+                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">Giờ kết thúc</Label>
                             <TimePicker value={dailyEndTime} onChange={setDailyEndTime} />
                           </div>
                         </div>
 
-                        <div className="space-y-2 pt-5 border-t">
+                        <div className="space-y-2 border-t pt-4">
                           <Label className="flex justify-between">
                             <span>Số lượng nhân công</span>
-                            <span className="font-bold text-primary">{workersNeeded}</span>
                           </Label>
                           <Input type="number" min="1" value={workersNeeded} onChange={(e) => setWorkersNeeded(e.target.value)} />
                         </div>
 
-
+                        <div className="space-y-2 border-t pt-4">
+                          <div className="flex justify-between text-sm">
+                            <span>Đơn giá</span>
+                          </div>
+                          <div className="relative">
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              value={income}
+                              onChange={(e) => setIncome(formatThousandsWithDots(e.target.value))}
+                              className="pr-12 text-lg font-medium text-teal-700 dark:text-teal-400"
+                              placeholder="300.000"
+                            />
+                            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">VNĐ</span>
+                          </div>
+                        </div>
                       </div>
+                    </div>
                   )}
-
-                      <div className="relative">
-                        <div className="absolute left-3 top-2.5 text-muted-foreground text-xs pr-3">VNĐ</div>
-                        <Input
-                          type="text"
-                          inputMode="numeric"
-                          value={income}
-                          onChange={(e) => setIncome(formatThousandsWithDots(e.target.value))}
-                          className="pl-12 text-lg font-medium text-teal-700 dark:text-teal-400"
-                          placeholder="300.000"
-                        />
-                      </div>
-                    </CardContent>
+                </CardContent>
               </Card>
 
               <Card className="shadow-md overflow-hidden border-t-4 border-t-teal-500">
@@ -1873,17 +1922,30 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                         <Label className="text-sm font-semibold text-muted-foreground uppercase">Kỹ năng</Label>
                         <p className="text-sm text-muted-foreground">Chọn các kỹ năng ứng viên cần có:</p>
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setIsAddSkillDialogOpen(true)
-                        }}
-                        disabled={selectedJobCategoryId === DEFAULT_JOB_CATEGORY_ID}
-                      >
-                        <Plus className="mr-2 h-4 w-4" /> Thêm kỹ năng
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={toggleAllVisibleSkills}
+                          disabled={isLoadingSkills || availableSkills.length === 0}
+                        >
+                          <CheckSquare className="mr-2 h-4 w-4" />
+                          {availableSkills.length > 0 && availableSkills.every((skill) => selectedSkillIds.includes(skill.id))
+                            ? "Bỏ chọn tất cả"
+                            : "Chọn tất cả"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setIsAddSkillDialogOpen(true)
+                          }}
+                        >
+                          <Plus className="mr-2 h-4 w-4" /> Thêm kỹ năng
+                        </Button>
+                      </div>
                     </div>
 
                     <Dialog open={isAddSkillDialogOpen} onOpenChange={setIsAddSkillDialogOpen}>
@@ -1934,9 +1996,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                             onClick={handleCreateSkill}
                             disabled={
                               isCreatingSkill ||
-                              !newSkillName.trim() ||
-                              !selectedJobCategoryId ||
-                              selectedJobCategoryId === DEFAULT_JOB_CATEGORY_ID
+                              !newSkillName.trim()
                             }
                           >
                             {isCreatingSkill ? "Đang lưu..." : "Lưu lại"}
