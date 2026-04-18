@@ -233,7 +233,7 @@ export default function FarmerLayout({
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex justify-self-center">
-              <nav className="flex items-center gap-1 rounded-full border border-border/70 bg-background/70 p-1 shadow-sm">
+              <nav className="flex items-center gap-4 rounded-full border border-border/70 bg-background/70 p-1 shadow-sm">
                 {navItems.map((item) => {
                   const isActive = item.href === "/farmer"
                     ? pathname === "/farmer"

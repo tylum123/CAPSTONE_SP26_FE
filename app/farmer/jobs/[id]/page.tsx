@@ -121,7 +121,36 @@ function JobReviews({ jobId }: { jobId: string }) {
                   {new Intl.DateTimeFormat("vi-VN", { dateStyle: "short" }).format(new Date(review.createdAt))}
                 </span>
               </div>
-              <p className="text-sm text-foreground leading-relaxed">{review.reviewText || "Không có nội dung đánh giá."}</p>
+              <div className="mt-1 flex flex-col gap-2">
+                {(() => {
+                  if (!review.reviewText) return <p className="text-sm text-foreground leading-relaxed">Không có nội dung đánh giá.</p>;
+                  
+                  // Extract format: [Tag 1, Tag 2] Review text
+                  const match = review.reviewText.match(/^\[([\s\S]*?)\]\s*([\s\S]*)$/);
+                  if (match) {
+                    const tags = match[1].split(',').map(t => t.trim()).filter(Boolean);
+                    const remainingText = match[2].trim();
+                    return (
+                      <>
+                        {tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {tags.map((tag, idx) => (
+                              <Badge key={idx} variant="secondary" className="bg-amber-100/50 text-amber-700 hover:bg-amber-100 border-amber-200/50 font-normal">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        {remainingText && (
+                          <p className="text-sm text-foreground leading-relaxed mt-1">{remainingText}</p>
+                        )}
+                      </>
+                    );
+                  }
+                  
+                  return <p className="text-sm text-foreground leading-relaxed">{review.reviewText}</p>;
+                })()}
+              </div>
             </div>
           ))
         )}
@@ -259,7 +288,7 @@ export default function FarmerJobDetailPage() {
     }
 
     if (statusId === APP_STATUS.accepted) {
-      return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Đã được ứng tuyển</Badge>
+      return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Đã ứng tuyển</Badge>
     }
 
     if (statusId === APP_STATUS.rejected) {
@@ -843,7 +872,10 @@ export default function FarmerJobDetailPage() {
     <div className="flex flex-col gap-8">
       {/* breadcrumb-ish header */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" asChild className="hover:bg-agro-green/5 text-muted-foreground hover:text-agro-green transition-all">
+        <Button 
+          variant="ghost"
+          asChild
+          className="w-auto flex-none justify-start gap-2 bg-agro-green text-white hover:bg-agro-green/90 hover:text-white">
           <Link href="/farmer/jobs">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Về danh sách bài đăng
@@ -1064,60 +1096,74 @@ export default function FarmerJobDetailPage() {
                   </CardContent>
                 </Card>
 
-                <div className="grid gap-8 sm:grid-cols-2">
-                  <Card className="border-0 shadow-sm bg-white/70 dark:bg-zinc-900/70">
-                    <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-3">
-                      <div className="p-2 rounded-lg bg-amber-100 text-amber-600">
-                        <CheckCircle2 className="h-5 w-5" />
+                <div className="grid gap-6 md:grid-cols-3">
+                  {/* Skills Card */}
+                  <Card className="border-0 shadow-sm bg-white/70 dark:bg-zinc-900/70 hover:shadow-md transition-shadow">
+                    <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-3 -mb-10 pt-2 px-6 border-b border-muted/30">
+                      <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 shadow-sm border border-blue-100 shrink-0">
+                        <Star className="h-5 w-5" />
                       </div>
-                      <CardTitle className="text-lg">Kỹ năng & Yêu cầu</CardTitle>
+                      <CardTitle className="text-lg">Kỹ năng</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="p-6">
                       <div className="flex flex-wrap gap-2">
                         {job.jobSkillRequirements?.length ? (
                           job.jobSkillRequirements.map((skill) => (
-                            <Badge key={skill.id} variant="secondary" className="px-3 py-1 font-medium bg-secondary/80">
+                            <Badge key={skill.id} variant="secondary" className="px-3 py-1 text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800/50 transition-colors rounded-full shadow-sm">
                               {skill.name}
                             </Badge>
                           ))
                         ) : (
-                          <p className="text-sm text-muted-foreground">Không có kỹ năng cụ thể.</p>
+                          <p className="text-sm text-muted-foreground italic">Không có kỹ năng cụ thể.</p>
                         )}
-                      </div>
-                      <div className="pt-2">
-                        {job.requirements?.length ? (
-                          <ul className="space-y-2">
-                            {job.requirements.map((item, index) => (
-                              <li key={`${item}-${index}`} className="flex items-start gap-2 text-sm text-muted-foreground">
-                                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
-                                <span>{item}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : null}
                       </div>
                     </CardContent>
                   </Card>
 
-                  <Card className="border-0 shadow-sm bg-white/70 dark:bg-zinc-900/70">
-                    <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-3">
-                      <div className="p-2 rounded-lg bg-emerald-100 text-emerald-600">
-                        <Banknote className="h-5 w-5" />
+                  {/* Requirements Card */}
+                  <Card className="border-0 shadow-sm bg-white/70 dark:bg-zinc-900/70 hover:shadow-md transition-shadow">
+                    <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-3 -mb-10 pt-2 px-6 border-b border-muted/30">
+                      <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 shadow-sm border border-amber-100 shrink-0">
+                        <CheckCircle2 className="h-5 w-5" />
                       </div>
-                      <CardTitle className="text-lg">Quyền lợi</CardTitle>
+                      <CardTitle className="text-lg">Yêu cầu</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      {job.privileges?.length ? (
-                        <ul className="space-y-2">
-                          {job.privileges.map((item, index) => (
-                            <li key={`${item}-${index}`} className="flex items-start gap-2 text-sm text-muted-foreground">
-                              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
-                              <span>{item}</span>
+                    <CardContent className="p-6">
+                      {job.requirements?.length ? (
+                        <ul className="space-y-3.5">
+                          {job.requirements.map((item, index) => (
+                            <li key={`${item}-${index}`} className="flex items-start gap-3 text-sm text-muted-foreground group">
+                              <div className="mt-1.5 shrink-0 h-1.5 w-1.5 rounded-full bg-amber-400 group-hover:scale-125 transition-transform" />
+                              <span className="leading-relaxed group-hover:text-foreground transition-colors">{item}</span>
                             </li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="text-sm text-muted-foreground">Không có quyền lợi bổ sung.</p>
+                        <p className="text-sm text-muted-foreground italic">Không có yêu cầu thêm.</p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Privileges Card */}
+                  <Card className="border-0 shadow-sm bg-white/70 dark:bg-zinc-900/70 hover:shadow-md transition-shadow">
+                    <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-3 -mb-10 pt-2 px-6 border-b border-muted/30">
+                      <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400 shadow-sm border border-emerald-100 shrink-0">
+                        <Banknote className="h-5 w-5" />
+                      </div>
+                      <CardTitle className="text-lg">Quyền lợi</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      {job.privileges?.length ? (
+                        <ul className="space-y-3.5">
+                          {job.privileges.map((item, index) => (
+                            <li key={`${item}-${index}`} className="flex items-start gap-3 text-sm text-muted-foreground group">
+                              <div className="mt-1.5 shrink-0 h-1.5 w-1.5 rounded-full bg-emerald-400 group-hover:scale-125 transition-transform" />
+                              <span className="leading-relaxed group-hover:text-foreground transition-colors">{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">Không có quyền lợi bổ sung.</p>
                       )}
                     </CardContent>
                   </Card>
@@ -1584,8 +1630,12 @@ export default function FarmerJobDetailPage() {
                     <p className="mt-2 font-medium">{formatDateTime(selectedApplication.appliedAt)}</p>
                   </div>
                   <div className="rounded-lg border p-4">
-                    <p className="text-xs text-muted-foreground">Kinh nghiệm</p>
-                    <p className="mt-2 font-medium">{selectedApplication.worker?.experienceLevel || "-"}</p>
+                    <p className="text-xs text-muted-foreground">Trình độ</p>
+                    <p className="mt-2 font-medium">
+                      {selectedApplication.worker?.experienceLevel === "Experienced" ? "Nhiều kinh nghiệm" : 
+                       selectedApplication.worker?.experienceLevel === "Intermediate" ? "Có kinh nghiệm" :
+                       selectedApplication.worker?.experienceLevel === "Beginner" ? "Mới bắt đầu" : "-"}
+                    </p>
                   </div>
                   <div className="rounded-lg border p-4">
                     <p className="text-xs text-muted-foreground">Công việc đã hoàn thành</p>

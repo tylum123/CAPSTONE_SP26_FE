@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Upload, Save, Loader2, RotateCcw } from "lucide-react"
+import { Upload, Save, Loader2, RotateCcw, UserCircle, Bell, MapPin } from "lucide-react"
 import { handleApiError } from "@/libs/utils/error-handler"
 import { FarmerProfile, UpdateFarmerRequest } from "@/libs/types"
 import { farmerService } from "@/libs/api/services/farmer.service"
@@ -258,11 +258,31 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="account" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 md:w-fit">
-          <TabsTrigger value="account">Tài khoản</TabsTrigger>
-          <TabsTrigger value="notifications">Thông báo</TabsTrigger>
-          <TabsTrigger value="farm">Quản lý địa điểm</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-2 -mb-2">
+          <TabsList className="inline-flex h-12 items-center gap-1 rounded-full border border-border/70 bg-white p-1 shadow-sm min-w-max">
+            <TabsTrigger 
+              value="account" 
+              className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-full px-4 text-sm font-medium transition-colors gap-2 data-[state=active]:bg-agro-green data-[state=active]:text-white data-[state=inactive]:text-foreground data-[state=inactive]:hover:bg-gray-100"
+            >
+              <UserCircle className="h-4 w-4" />
+              Tài khoản
+            </TabsTrigger>
+            {/* <TabsTrigger 
+              value="notifications" 
+              className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-full px-4 text-sm font-medium transition-colors gap-2 data-[state=active]:bg-agro-green data-[state=active]:text-white data-[state=inactive]:text-foreground data-[state=inactive]:hover:bg-gray-100"
+            >
+              <Bell className="h-4 w-4" />
+              Thông báo
+            </TabsTrigger> */}
+            <TabsTrigger 
+              value="farm" 
+              className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-full px-4 text-sm font-medium transition-colors gap-2 data-[state=active]:bg-agro-green data-[state=active]:text-white data-[state=inactive]:text-foreground data-[state=inactive]:hover:bg-gray-100"
+            >
+              <MapPin className="h-4 w-4" />
+              Quản lý địa điểm
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="account" className="space-y-6">
           <Card>
@@ -335,7 +355,7 @@ export default function SettingsPage() {
                       <SelectTrigger className="w-full bg-gray-50/50 border-gray-200 h-9">
                         <SelectValue placeholder="Ngày" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent> 
                         {Array.from({
                           length: getDaysInMonth(
                             Number(dobParts.year || new Date().getFullYear()),
