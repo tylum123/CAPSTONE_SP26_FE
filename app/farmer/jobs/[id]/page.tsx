@@ -43,6 +43,7 @@ import Image from "next/image"
 import { JobStatusChart } from "@/components/farmer/dashboard-charts"
 import { useAuth } from "@/libs/stores/auth.store"
 import { RatingType, type RatingCreateDTO, type RatingDTO } from "@/libs/types/rating.types"
+import { WorkerProfilePreviewDialog } from "@/components/farmer/worker-profile-preview-dialog"
 
 function JobReviews({ jobId }: { jobId: string }) {
   const { user } = useAuth();
@@ -89,12 +90,18 @@ function JobReviews({ jobId }: { jobId: string }) {
           reviews.map(review => (
             <div key={review.id} className="p-4 rounded-lg bg-muted/30 border border-muted/50 flex flex-col gap-2">
               <div className="flex items-center gap-3">
-                <Avatar className="h-9 w-9 border shadow-xs">
-                  <AvatarImage src={review.raterProfile?.workerProfile?.avatarUrl || "/placeholder.svg"} className="object-cover" />
-                  <AvatarFallback className="bg-agro-green/10 text-agro-green text-xs font-semibold">
-                    {(review.raterProfile?.workerProfile?.fullName || "W").charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
+                <WorkerProfilePreviewDialog
+                  workerId={review.raterProfile?.workerProfile?.id}
+                  workerUserId={review.raterProfile?.workerProfile?.userId}
+                  workerName={review.raterProfile?.workerProfile?.fullName}
+                >
+                  <Avatar className="h-9 w-9 border shadow-xs">
+                    <AvatarImage src={review.raterProfile?.workerProfile?.avatarUrl || "/placeholder.svg"} className="object-cover" />
+                    <AvatarFallback className="bg-agro-green/10 text-agro-green text-xs font-semibold">
+                      {(review.raterProfile?.workerProfile?.fullName || "W").charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                </WorkerProfilePreviewDialog>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">
                     {review.raterProfile?.workerProfile?.fullName || "Người làm"}
@@ -1203,12 +1210,18 @@ export default function FarmerJobDetailPage() {
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-3 min-w-0">
-                              <Avatar className="h-12 w-12 border-2 border-background shadow-sm hover:scale-105 transition-transform">
-                                <AvatarImage src={application.worker?.avatarUrl || "/placeholder.svg"} className="object-cover" />
-                                <AvatarFallback className="bg-agro-green/10 text-agro-green">
-                                  <Image src="/placeholder.svg" alt="placeholder" width={48} height={48} className="object-cover" />
-                                </AvatarFallback>
-                              </Avatar>
+                              <WorkerProfilePreviewDialog
+                                workerId={application.worker?.id}
+                                workerUserId={application.worker?.userId}
+                                workerName={application.worker?.fullName}
+                              >
+                                <Avatar className="h-12 w-12 border-2 border-background shadow-sm hover:scale-105 transition-transform">
+                                  <AvatarImage src={application.worker?.avatarUrl || "/placeholder.svg"} className="object-cover" />
+                                  <AvatarFallback className="bg-agro-green/10 text-agro-green">
+                                    <Image src="/placeholder.svg" alt="placeholder" width={48} height={48} className="object-cover" />
+                                  </AvatarFallback>
+                                </Avatar>
+                              </WorkerProfilePreviewDialog>
                               <div className="min-w-0">
                                 <p className="font-bold text-foreground truncate">{application.worker?.fullName || "Ứng viên"}</p>
                                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
@@ -1522,12 +1535,18 @@ export default function FarmerJobDetailPage() {
               <div className="space-y-4 text-sm">
                 <div className="rounded-lg border p-4">
                   <div className="flex items-center gap-5">
-                    <Avatar className="h-18 w-18 border-2 border-background shadow-sm hover:scale-105 transition-transform">
-                      <AvatarImage src={selectedApplication.worker?.avatarUrl || "/placeholder.svg"} className="object-cover" />
-                      <AvatarFallback className="bg-agro-green/10 text-agro-green">
-                        <Image src="/placeholder.svg" alt="placeholder" width={48} height={48} className="object-cover" />
-                      </AvatarFallback>
-                    </Avatar>
+                    <WorkerProfilePreviewDialog
+                      workerId={selectedApplication.worker?.id}
+                      workerUserId={selectedApplication.worker?.userId}
+                      workerName={selectedApplication.worker?.fullName}
+                    >
+                      <Avatar className="h-18 w-18 border-2 border-background shadow-sm hover:scale-105 transition-transform">
+                        <AvatarImage src={selectedApplication.worker?.avatarUrl || "/placeholder.svg"} className="object-cover" />
+                        <AvatarFallback className="bg-agro-green/10 text-agro-green">
+                          <Image src="/placeholder.svg" alt="placeholder" width={48} height={48} className="object-cover" />
+                        </AvatarFallback>
+                      </Avatar>
+                    </WorkerProfilePreviewDialog>
                     <div>
                       <p className="font-semibold text-base">{selectedApplication.worker?.fullName || "Ứng viên"}</p>
                       <p className="text-muted-foreground">SĐT: {selectedApplication.worker?.phoneNumber || "Không có"}</p>
@@ -1583,15 +1602,21 @@ export default function FarmerJobDetailPage() {
 
                 {job?.jobTypeId !== 1 && (
                   <div className="rounded-lg border p-4">
-                    <p className="text-xs text-muted-foreground">Ngày làm việc đề xuất</p>
+                    <p className="text-xs text-muted-foreground mb-3">Ngày làm việc đề xuất</p>
                     {selectedApplication.workDates?.length ? (
-                      <ul className="mt-2 grid gap-1">
-                        {selectedApplication.workDates.map((workDate) => (
-                          <Badge className="bg-agro-green">
-                            <li key={workDate} className="text-normal font-normal">{formatDate(workDate)}</li>
-                          </Badge>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {selectedApplication.workDates.map((workDate, index) => (
+                          <div 
+                            key={`${workDate}-${index}`} 
+                            className="flex items-center gap-3 rounded-xl border border-agro-green/20 bg-gradient-to-br from-agro-green/5 to-transparent p-3 shadow-sm transition-all hover:border-agro-green/40 hover:shadow-md"
+                          >
+                            <div className="flex flex-shrink-0 h-10 w-10 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-agro-green/10 text-agro-green">
+                              <CalendarDays className="h-5 w-5" />
+                            </div>
+                            <span className="font-semibold text-foreground/80 tracking-wide">{formatDate(workDate)}</span>
+                          </div>
                         ))}
-                      </ul>
+                      </div>
                     ) : (
                       <p className="mt-2 text-muted-foreground">Không có ngày làm việc cụ thể.</p>
                     )}
@@ -1909,12 +1934,18 @@ export default function FarmerJobDetailPage() {
                   <div className="rounded-xl border bg-muted/30 p-4">
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Người làm</p>
                     <div className="mt-2 flex items-center gap-3">
-                      <Avatar className="h-10 w-10 border shadow-sm">
-                        <AvatarImage src={selectedJobDetail.worker?.avatarUrl || "/placeholder.svg"} className="object-cover" />
-                        <AvatarFallback className="bg-agro-green/10 text-agro-green">
-                          <Users className="h-5 w-5" />
-                        </AvatarFallback>
-                      </Avatar>
+                      <WorkerProfilePreviewDialog
+                        workerId={selectedJobDetail.worker?.id || selectedJobDetail.workerId}
+                        workerUserId={selectedJobDetail.worker?.userId}
+                        workerName={selectedJobDetail.worker?.fullName}
+                      >
+                        <Avatar className="h-10 w-10 border shadow-sm">
+                          <AvatarImage src={selectedJobDetail.worker?.avatarUrl || "/placeholder.svg"} className="object-cover" />
+                          <AvatarFallback className="bg-agro-green/10 text-agro-green">
+                            <Users className="h-5 w-5" />
+                          </AvatarFallback>
+                        </Avatar>
+                      </WorkerProfilePreviewDialog>
                       <div>
                         <p className="font-semibold text-sm leading-tight text-foreground">{selectedJobDetail.worker?.fullName || `ID: ${selectedJobDetail.workerId.slice(0, 8)}`}</p>
                         <p className="text-[11px] text-muted-foreground">{selectedJobDetail.worker?.phoneNumber || "Không có SĐT"}</p>

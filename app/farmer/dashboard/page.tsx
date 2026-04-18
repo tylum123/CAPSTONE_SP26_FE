@@ -22,6 +22,7 @@ import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { formatCurrency } from "@/libs/utils/utils"
 import { cn } from "@/libs/utils/utils"
+import { WorkerProfilePreviewDialog } from "@/components/farmer/worker-profile-preview-dialog"
 
 export default function FarmerDashboard() {
   const [date, setDate] = useState<Date | undefined>(undefined)
@@ -311,16 +312,22 @@ export default function FarmerDashboard() {
                       pendingApplications.map((app) => (
                         <div key={app.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
                           <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10 border shrink-0">
-                              <AvatarImage
-                                src={app.worker?.avatarUrl || "/placeholder.svg"}
-                                alt={app.worker?.fullName}
-                                className="object-cover"
-                              />
-                              <AvatarFallback className="bg-agro-green/10 text-agro-green font-semibold">
-                                <Image src="/placeholder.svg" alt="placeholder" width={40} height={40} className="object-cover" />
-                              </AvatarFallback>
-                            </Avatar>
+                            <WorkerProfilePreviewDialog
+                              workerId={app.worker?.id}
+                              workerUserId={app.worker?.userId}
+                              workerName={app.worker?.fullName}
+                            >
+                              <Avatar className="h-10 w-10 border shrink-0">
+                                <AvatarImage
+                                  src={app.worker?.avatarUrl || "/placeholder.svg"}
+                                  alt={app.worker?.fullName}
+                                  className="object-cover"
+                                />
+                                <AvatarFallback className="bg-agro-green/10 text-agro-green font-semibold">
+                                  <Image src="/placeholder.svg" alt="placeholder" width={40} height={40} className="object-cover" />
+                                </AvatarFallback>
+                              </Avatar>
+                            </WorkerProfilePreviewDialog>
                             <div>
                               <div className="flex items-center gap-2">
                                 <p className="font-medium">{app.worker?.fullName || "Ẩn danh"}</p>

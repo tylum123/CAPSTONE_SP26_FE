@@ -26,9 +26,17 @@ export const API_ENDPOINTS = {
   // Farmer
   FARMER: {
     PROFILE: '/farmer',
+    PROFILE_BY_ID: (id: string) => `/farmer/${id}`,
     UPDATEPROFILE: '/farmer',
     UPDATEAVATAR: '/farmer/upload-avatar',
     DASHBOARD: '/farmer/dashboard',
+  },
+
+  WORKER: {
+    PROFILE: '/worker',
+    PROFILE_BY_ID: (id: string) => `/worker/${id}`,
+    UPDATEPROFILE: '/worker',
+    UPDATEAVATAR: '/worker/upload-avatar',
   },
 
   JOBS: {
@@ -89,6 +97,8 @@ export const API_ENDPOINTS = {
     UPDATE_PROFILE: '/profile/update',
     CHANGE_PASSWORD: '/profile/change-password',
     UPLOAD_AVATAR: '/profile/upload-avatar',
+    FARMER_ID: (id: string) => `/profile/farmer/${id}`,
+    WORKER_ID: (id: string) => `/profile/worker/${id}`
   },
 
   // Common
