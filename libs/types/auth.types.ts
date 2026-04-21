@@ -15,6 +15,7 @@ export interface LoginResponse {
   expiresAt: string;
   email: string;
   role: string;
+  userId: string;
   isVerified: boolean;
 }
 

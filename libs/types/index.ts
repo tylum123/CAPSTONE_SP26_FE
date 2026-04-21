@@ -13,3 +13,6 @@ export * from './skill.types';
 export * from './user.types';
 export * from './application.types';
 export * from './payment.types';
+export * from './jobDetails.type';
+export * from './rating.types';
+export * from './dispute.types';

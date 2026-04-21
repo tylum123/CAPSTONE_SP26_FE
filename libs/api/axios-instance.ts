@@ -7,6 +7,9 @@ export const axiosInstance = axios.create({
   timeout: API_CONFIG.TIMEOUT,
   headers: {
     'Content-Type': 'application/json',
+    // Bypass ngrok browser interstitial page in local dev/testing
+    // This header is a no-op in production environments
+    'ngrok-skip-browser-warning': 'true',
   },
 });
 

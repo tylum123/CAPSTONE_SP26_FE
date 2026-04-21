@@ -26,6 +26,10 @@ import {
   MessageCircle,
   Loader2,
   Home,
+  PersonStandingIcon,
+  ChevronLeft,
+  ChevronRight,
+  UserCircle,
 } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { farmerService, authService, notificationService } from "@/libs/api/services"
@@ -34,6 +38,7 @@ import type { NotificationDTO } from "@/libs/types/notifications.types";
 import { useAuth } from "@/libs/stores/auth.store";
 import { AnimatedBubbles } from "@/components/farmer/animated-bubbles";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SignalRProvider } from "@/contexts/signalr-context";
 
 export default function FarmerLayout({
   children,
@@ -47,24 +52,34 @@ export default function FarmerLayout({
   const [isProfileMissing, setIsProfileMissing] = useState(false);
   const [notifications, setNotifications] = useState<NotificationDTO[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [notifPage, setNotifPage] = useState(1);
+  const [notifTotalPages, setNotifTotalPages] = useState(1);
+  const NOTIF_PAGE_SIZE = 4;
   const notifRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const fetchNotifications = useCallback(async () => {
     try {
-      const res = await notificationService.getAll({ pageNumber: 1, pageSize: 99 });
-      // The actual array is likely nested under res.data.data
-      const data: NotificationDTO[] = res.data?.data ?? [];
-      setNotifications(Array.isArray(data) ? data : []);
+      const res = await notificationService.getAll({ pageNumber: notifPage, pageSize: NOTIF_PAGE_SIZE });
+      const payload = res.data;
+
+      if (Array.isArray(payload)) {
+        setNotifications(payload);
+        setNotifTotalPages(1);
+      } else {
+        const paginated = payload as any;
+        setNotifications(paginated?.data ?? []);
+        setNotifTotalPages(paginated?.pagination?.totalPages || 1);
+      }
     } catch {
-      // silently ignore notification fetch errors
-      setNotifications([]); // Ensure state is an array on error
+      setNotifications([]);
     }
-  }, []);
+  }, [notifPage]);
 
   const handleMarkRead = async (id: string) => {
     try {
+      
       await notificationService.markRead(id);
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, isRead: true, readAt: new Date().toISOString() } : n))
@@ -97,6 +112,7 @@ export default function FarmerLayout({
   const navItems = [
     { icon: LayoutDashboard, label: "Tổng quan", href: "/farmer/dashboard" },
     { icon: Leaf, label: "Bài đăng", href: "/farmer/jobs" },
+    // { icon: PersonStandingIcon, label: "Ứng viên", href: "/farmer/applications" },
     { icon: PlusCircle, label: "Đăng tin", href: "/farmer/create-job" },
     { icon: MessageCircle, label: "Tin nhắn", href: "/farmer/messages" },
     { icon: Wallet, label: "Thanh toán", href: "/farmer/payments" },
@@ -140,9 +156,6 @@ export default function FarmerLayout({
         // Also check if any requisite fields are missing 
         if (!response.data?.contactName && !response.data?.address) {
           setIsProfileMissing(true);
-          if (!pathname.startsWith("/farmer/setup-profile")) {
-            router.replace("/farmer/setup-profile");
-          }
         } else {
           setIsProfileMissing(false);
         }
@@ -155,11 +168,6 @@ export default function FarmerLayout({
         if (profileNotFound) {
           setIsProfileMissing(true);
           setProfile(null);
-
-          // Force users with missing profile to complete settings first.
-          if (!pathname.startsWith("/farmer/setup-profile")) {
-            router.replace("/farmer/setup-profile");
-          }
         } else {
           console.error("Failed to fetch farmer profile:", error);
         }
@@ -169,7 +177,8 @@ export default function FarmerLayout({
     };
 
     fetchProfile();
-  }, [isAuthenticated, pathname, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated && isProfileMissing && !pathname.startsWith("/farmer/setup-profile")) {
@@ -188,8 +197,10 @@ export default function FarmerLayout({
     }
   };
 
-  // Show loading state while checking authentication
-  if (isLoading || checkingProfile) {
+  // Show loading state only during initial auth check
+  // NOTE: We no longer block on checkingProfile to avoid unmounting
+  // SignalRProvider (and killing the real-time connection) on navigation.
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-agro-cream flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-agro-green" />
@@ -208,44 +219,44 @@ export default function FarmerLayout({
       {/* Top Header */}
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-border shadow-sm">
         <div className="container mx-auto px-4 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="grid h-16 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 md:gap-6">
             {/* Logo */}
-            <Link href="/farmer/dashboard" className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center">
+            <Link href="/farmer/dashboard" className="flex items-center gap-2 justify-self-start">
+              <div className="ml-20 w-10 h-10 rounded-full flex items-center justify-center">
                 <img
                   src="/logo.png"
                   alt="AgroTemp Logo"
                   className="h-10 w-10 object-contain"
                 />
               </div>
-              <span className="text-xl font-bold text-agro-green">AgroTemp</span>
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-1">
-              {navItems.map((item) => {
-                const isActive = item.href === "/farmer"
-                  ? pathname === "/farmer"
-                  : pathname === item.href || pathname.startsWith(item.href + "/");
-                return (
-                  <Link key={item.href} href={item.href}>
-                    <Button
-                      variant={isActive ? "default" : "ghost"}
-                      className={`gap-2 ${isActive
-                        ? "bg-agro-green text-white hover:bg-agro-green-dark"
-                        : "text-foreground hover:bg-gray-200"
-                        }`}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {item.label}
-                    </Button>
-                  </Link>
-                );
-              })}
-            </nav>
-
+            <div className="hidden md:flex justify-self-center">
+              <nav className="flex items-center gap-4 rounded-full border border-border/70 bg-background/70 p-1 shadow-sm">
+                {navItems.map((item) => {
+                  const isActive = item.href === "/farmer"
+                    ? pathname === "/farmer"
+                    : pathname === item.href || pathname.startsWith(item.href + "/");
+                  return (
+                    <Link key={item.href} href={item.href}>
+                      <Button
+                        variant={isActive ? "default" : "ghost"}
+                        className={`h-9 rounded-full px-3 gap-2 ${isActive
+                          ? "bg-agro-green text-white hover:bg-agro-green-dark"
+                          : "text-foreground hover:bg-gray-200"
+                          }`}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        {item.label}
+                      </Button>
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
             {/* Right Side - Notifications & Profile */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-self-end gap-2 md:gap-3 mr-20">
               {/* Notification Bell */}
               <div className="relative" ref={notifRef}>
                 <Button
@@ -257,7 +268,7 @@ export default function FarmerLayout({
                 >
                   <Bell className="h-5 w-5" />
                   {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 min-w-[16px] h-4 px-0.5 bg-agro-orange text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    <span className="absolute top-1 right-1 min-w-4 h-4 px-0.5 bg-agro-orange text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                       {unreadCount > 99 ? "99+" : unreadCount}
                     </span>
                   )}
@@ -266,21 +277,45 @@ export default function FarmerLayout({
                 {/* Notification Dropdown Panel */}
                 {notifOpen && (
                   <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-border rounded-xl shadow-xl z-50 overflow-hidden">
-                    {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3 border-b">
-                      <span className="font-semibold text-sm">Thông báo</span>
+                    <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/20">
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold text-sm text-agro-green">Thông báo</span>
+                        <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border rounded-md px-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 hover:bg-agro-green/10"
+                            onClick={() => setNotifPage((p) => Math.max(1, p - 1))}
+                            disabled={notifPage === 1}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <span className="text-[10px] font-bold min-w-8 text-center">
+                            {notifPage}/{notifTotalPages}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 hover:bg-agro-green/10"
+                            onClick={() => setNotifPage((p) => Math.min(notifTotalPages, p + 1))}
+                            disabled={notifPage === notifTotalPages || notifTotalPages === 0}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                       {unreadCount > 0 && (
                         <button
                           onClick={handleMarkAllRead}
-                          className="text-xs text-agro-green hover:underline font-medium"
+                          className="text-[10px] text-agro-green hover:text-agro-green-dark hover:underline font-bold"
                         >
-                          Đánh dấu tất cả đã đọc
+                          Đọc tất cả
                         </button>
                       )}
                     </div>
 
                     {/* List */}
-                    <div className="max-h-[400px] overflow-y-auto divide-y divide-border">
+                    <div className="max-h-100 overflow-y-auto divide-y divide-border">
                       {notifications.length === 0 ? (
                         <div className="py-8 text-center text-sm text-muted-foreground">
                           Không có thông báo nào
@@ -294,7 +329,7 @@ export default function FarmerLayout({
                           >
                             {/* Unread dot */}
                             <span
-                              className={`mt-1.5 flex-shrink-0 w-2 h-2 rounded-full ${!notif.isRead ? "bg-agro-orange" : "bg-transparent"
+                              className={`mt-1.5 shrink-0 w-2 h-2 rounded-full ${!notif.isRead ? "bg-agro-orange" : "bg-transparent"
                                 }`}
                             />
                             <div className="flex-1 min-w-0">
@@ -322,7 +357,7 @@ export default function FarmerLayout({
                             {/* Delete button */}
                             <button
                               onClick={() => handleDeleteNotif(notif.id)}
-                              className="flex-shrink-0 text-muted-foreground hover:text-destructive transition-colors text-xs mt-1"
+                              className="shrink-0 text-muted-foreground hover:text-destructive transition-colors text-xs mt-1"
                               aria-label="Xoá thông báo"
                             >
                               ✕
@@ -338,8 +373,8 @@ export default function FarmerLayout({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="gap-2 hidden md:flex">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} />
+                    <Avatar className="h-10 w-10 border-2 border-agro-white relative flex items-center justify-center">
+                      <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} className="object-cover" />
                       <AvatarFallback className="bg-agro-green text-white">
                         {profile?.contactName?.charAt(0).toUpperCase() || "NA"}
                       </AvatarFallback>
@@ -349,11 +384,18 @@ export default function FarmerLayout({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem asChild>
+                    <Link href="/farmer/profile" className="cursor-pointer">
+                      <UserCircle className="h-4 w-4 mr-2" />
+                      Hồ sơ
+                    </Link>
+                  </DropdownMenuItem>
+                  {/* <DropdownMenuItem asChild>
                     <Link href="/farmer/settings" className="cursor-pointer">
                       <Settings className="h-4 w-4 mr-2" />
                       Cài đặt
                     </Link>
-                  </DropdownMenuItem>
+                  </DropdownMenuItem> */}
+                  
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link href="/" className="cursor-pointer">
@@ -381,7 +423,7 @@ export default function FarmerLayout({
                   <div className="flex flex-col gap-4 mt-8">
                     <div className="flex items-center gap-3 pb-4 border-b">
                       <Avatar className="h-12 w-12">
-                        <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} />
+                        <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} className="object-cover" />
                         <AvatarFallback className="bg-agro-green text-white">
                           {profile?.contactName?.charAt(0).toUpperCase() || "NA"}
                         </AvatarFallback>
@@ -409,6 +451,18 @@ export default function FarmerLayout({
                       })}
                     </nav>
                     <div className="mt-auto pt-4 border-t">
+                      <Link href="/farmer/settings">
+                        <Button variant="ghost" className="w-full justify-start gap-3">
+                          <Settings className="h-5 w-5" />
+                          Cài đặt
+                        </Button>
+                      </Link>
+                      <Link href="/farmer/profile">
+                        <Button variant="ghost" className="w-full justify-start gap-3">
+                          <UserCircle className="h-5 w-5" />
+                          Hồ sơ
+                        </Button>
+                      </Link>
                       <Link href="/">
                         <Button variant="ghost" className="w-full justify-start gap-3">
                           <Leaf className="h-5 w-5" />
@@ -433,7 +487,9 @@ export default function FarmerLayout({
       </header>
 
       {/* Main Content */}
-      <main className="relative z-10 container mx-auto px-4 lg:px-8 py-6">{children}</main>
+      <main className="relative z-10 container mx-auto px-4 lg:px-8 py-6">
+        <SignalRProvider>{children}</SignalRProvider>
+      </main>
     </div>
   );
 }

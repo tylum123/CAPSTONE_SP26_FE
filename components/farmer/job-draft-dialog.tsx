@@ -12,11 +12,23 @@ import {
   Inbox,
   Loader2,
   Save,
+  Trash2,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { useToast } from "@/hooks/use-toast"
 import { jobService } from "@/libs/api/services/jobs.service"
 import type { Job } from "@/libs/types"
 import { cn } from "@/libs/utils/utils"
@@ -57,9 +69,12 @@ const getScheduleLabel = (job: Job) => {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function JobDraftDialog({ open, onOpenChange, onLoadDraft }: JobDraftDialogProps) {
+  const { toast } = useToast()
   const [drafts, setDrafts] = useState<Job[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null)
+  const [pendingDeleteDraft, setPendingDeleteDraft] = useState<Job | null>(null)
+  const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const fetchDrafts = useCallback(async () => {
@@ -80,9 +95,38 @@ export function JobDraftDialog({ open, onOpenChange, onLoadDraft }: JobDraftDial
   useEffect(() => {
     if (open) {
       setSelectedDraftId(null)
+      setPendingDeleteDraft(null)
       void fetchDrafts()
     }
   }, [open, fetchDrafts])
+
+  const handleDeleteDraft = useCallback(async () => {
+    if (!pendingDeleteDraft?.id) {
+      return
+    }
+
+    try {
+      setDeletingDraftId(pendingDeleteDraft.id)
+      await jobService.deleteJob(pendingDeleteDraft.id)
+
+      setDrafts((current) => current.filter((draft) => draft.id !== pendingDeleteDraft.id))
+      setSelectedDraftId((current) => (current === pendingDeleteDraft.id ? null : current))
+
+      toast({
+        title: "Đã xóa bản nháp",
+        description: `Bản nháp "${pendingDeleteDraft.title || "(Chưa có tiêu đề)"}" đã được xóa.`,
+      })
+    } catch {
+      toast({
+        title: "Xóa thất bại",
+        description: "Không thể xóa bản nháp. Vui lòng thử lại.",
+        variant: "destructive",
+      })
+    } finally {
+      setDeletingDraftId(null)
+      setPendingDeleteDraft(null)
+    }
+  }, [pendingDeleteDraft, toast])
 
   const handleLoad = () => {
     const draft = drafts.find((d) => d.id === selectedDraftId)
@@ -142,9 +186,11 @@ export function JobDraftDialog({ open, onOpenChange, onLoadDraft }: JobDraftDial
                   key={draft.id}
                   draft={draft}
                   isSelected={selectedDraftId === draft.id}
+                  isDeleting={deletingDraftId === draft.id}
                   onSelect={() =>
                     setSelectedDraftId((prev) => (prev === draft.id ? null : draft.id))
                   }
+                  onDelete={() => setPendingDeleteDraft(draft)}
                 />
               ))}
             </div>
@@ -168,6 +214,43 @@ export function JobDraftDialog({ open, onOpenChange, onLoadDraft }: JobDraftDial
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <AlertDialog
+        open={Boolean(pendingDeleteDraft)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setPendingDeleteDraft(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xóa bản nháp?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDeleteDraft
+                ? `Bản nháp "${pendingDeleteDraft.title || "(Chưa có tiêu đề)"}" sẽ bị xóa vĩnh viễn. Hành động này không thể hoàn tác.`
+                : "Hành động này không thể hoàn tác."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(deletingDraftId)}>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteDraft}
+              disabled={Boolean(deletingDraftId)}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {deletingDraftId ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xóa...
+                </>
+              ) : (
+                "Xóa bản nháp"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   )
 }
@@ -177,95 +260,119 @@ export function JobDraftDialog({ open, onOpenChange, onLoadDraft }: JobDraftDial
 function DraftCard({
   draft,
   isSelected,
+  isDeleting,
   onSelect,
+  onDelete,
 }: {
   draft: Job
   isSelected: boolean
+  isDeleting: boolean
   onSelect: () => void
+  onDelete: () => void
 }) {
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={cn(
-        "w-full text-left rounded-xl border p-4 transition-all duration-200 group",
-        "hover:border-primary/40 hover:bg-primary/5 hover:shadow-sm",
-        isSelected
-          ? "border-primary bg-primary/8 shadow-sm ring-1 ring-primary/20"
-          : "border-border bg-card"
-      )}
-    >
-      <div className="flex items-start gap-3">
-        {/* Icon */}
-        <div
-          className={cn(
-            "mt-0.5 shrink-0 rounded-lg p-2 transition-colors",
-            isSelected ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
-          )}
-        >
-          <Briefcase className="h-4 w-4" />
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 min-w-0 space-y-1.5">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className={cn(
-              "font-semibold text-sm leading-snug line-clamp-1",
-              isSelected ? "text-primary" : "text-foreground"
-            )}>
-              {draft.title || "(Chưa có tiêu đề)"}
-            </h3>
-            {draft.isUrgent && (
-              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-4 shrink-0">
-                Gấp
-              </Badge>
+    <div className={cn(
+      "rounded-xl border p-4 transition-all duration-200",
+      isSelected
+        ? "border-primary bg-primary/8 shadow-sm ring-1 ring-primary/20"
+        : "border-border bg-card"
+    )}>
+      <button
+        type="button"
+        onClick={onSelect}
+        className="w-full text-left group"
+      >
+        <div className="flex items-start gap-3">
+          {/* Icon */}
+          <div
+            className={cn(
+              "mt-0.5 shrink-0 rounded-lg p-2 transition-colors",
+              isSelected ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
             )}
+          >
+            <Briefcase className="h-4 w-4" />
           </div>
 
-          {/* Meta row */}
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            {draft.address && (
-              <span className="flex items-center gap-1 line-clamp-1 max-w-[200px]">
-                <MapPin className="h-3 w-3 shrink-0" />
-                <span className="truncate">{draft.address}</span>
-              </span>
-            )}
-            {draft.wageAmount > 0 && (
-              <span className="font-medium text-green-600 dark:text-green-400">
-                {formatCurrency(draft.wageAmount)}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {getScheduleLabel(draft)}
-            </span>
-          </div>
-        </div>
-
-        {/* Selection indicator */}
-        <div
-          className={cn(
-            "shrink-0 w-4 h-4 rounded-full border-2 transition-all mt-0.5",
-            isSelected ? "border-primary bg-primary" : "border-muted-foreground/30 bg-transparent"
-          )}
-        >
-          {isSelected && (
-            <div className="w-full h-full rounded-full flex items-center justify-center">
-              <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
+          {/* Content */}
+          <div className="flex-1 min-w-0 space-y-1.5">
+            <div className="flex items-start justify-between gap-2">
+              <h3 className={cn(
+                "font-semibold text-sm leading-snug line-clamp-1",
+                isSelected ? "text-primary" : "text-foreground"
+              )}>
+                {draft.title || "(Chưa có tiêu đề)"}
+              </h3>
+              {draft.isUrgent && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-4 shrink-0">
+                  Gấp
+                </Badge>
+              )}
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Saved time */}
-      <div className="mt-2.5 pl-9 text-[11px] text-muted-foreground/70 flex items-center gap-1">
-        <Save className="h-2.5 w-2.5" />
-        Lưu lúc {formatRelativeDate(draft.updatedAt ?? draft.createdAt)}
+            {/* Meta row */}
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              {draft.address && (
+                <span className="flex items-center gap-1 line-clamp-1 max-w-[200px]">
+                  <MapPin className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{draft.address}</span>
+                </span>
+              )}
+              {draft.wageAmount > 0 && (
+                <span className="font-medium text-green-600 dark:text-green-400">
+                  {formatCurrency(draft.wageAmount)}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {getScheduleLabel(draft)}
+              </span>
+            </div>
+          </div>
+
+          {/* Selection indicator */}
+          <div
+            className={cn(
+              "shrink-0 w-4 h-4 rounded-full border-2 transition-all mt-0.5",
+              isSelected ? "border-primary bg-primary" : "border-muted-foreground/30 bg-transparent"
+            )}
+          >
+            {isSelected && (
+              <div className="w-full h-full rounded-full flex items-center justify-center">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
+              </div>
+            )}
+          </div>
+        </div>
+      </button>
+
+      {/* Saved time + actions */}
+      <div className="mt-2.5 pl-9 text-[11px] text-muted-foreground/70 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1">
+          <Save className="h-2.5 w-2.5" />
+          Lưu lúc {formatRelativeDate(draft.updatedAt ?? draft.createdAt)}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-destructive hover:text-destructive"
+          onClick={onDelete}
+          disabled={isDeleting}
+        >
+          {isDeleting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <>
+              <Trash2 className="mr-1 h-3.5 w-3.5" />
+              Xóa
+            </>
+          )}
+        </Button>
       </div>
-    </button>
+    </div>
   )
 }
 

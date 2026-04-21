@@ -7,6 +7,8 @@ import {
   ArrowLeft,
   CalendarDays,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Eye,
   FileText,
   Loader2,
@@ -37,6 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { farmerService } from "@/libs/api/services/farmer.service"
 import type {
   ApplicationDTO,
@@ -45,6 +48,10 @@ import type {
   PaginatedResponse,
   RespondApplicationRequest,
 } from "@/libs/types"
+import { jobService } from "@/libs/api/services/jobs.service"
+import { jobApplicationService } from "@/libs/api/services/jobApplication.service"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import Image from "next/image"
 
 const APP_STATUS = {
   pending: 1,
@@ -66,6 +73,10 @@ export default function ApplicationsPage() {
   const [selectedApplication, setSelectedApplication] = useState<ApplicationDTO | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [responseMessage, setResponseMessage] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [isRespondDialogOpen, setIsRespondDialogOpen] = useState(false)
+  const [responseStatus, setResponseStatus] = useState<ApplicationStatusId>(APP_STATUS.accepted as ApplicationStatusId)
 
   const [isLoadingJobs, setIsLoadingJobs] = useState(true)
   const [isLoadingApplications, setIsLoadingApplications] = useState(false)
@@ -108,7 +119,7 @@ export default function ApplicationsPage() {
   const loadJobs = async () => {
     try {
       setIsLoadingJobs(true)
-      const response = await farmerService.getJobs()
+      const response = await jobService.getFilteredJobsByFarmer()
       const payload = response.data as Job[] | { data?: Job[]; items?: Job[] }
 
       if (Array.isArray(payload)) {
@@ -129,7 +140,7 @@ export default function ApplicationsPage() {
     }
   }
 
-  const loadApplicationsByJob = async (jobId: string) => {
+  const loadApplicationsByJob = async (jobId: string, page: number = 1) => {
     if (!jobId) {
       setApplications([])
       return
@@ -139,24 +150,16 @@ export default function ApplicationsPage() {
       setIsLoadingApplications(true)
       setError(null)
 
-      const response = await farmerService.getJobApplicationsByPost({
-        jobId,
+      const response = await jobApplicationService.getJobApplicationsByPost(jobId, {
         includeAll: true,
         statusId: statusFilter === "all" ? undefined : Number(statusFilter),
+        page,
+        limit: 5,
       })
 
-      const payload = response.data as
-        | PaginatedResponse<ApplicationDTO>
-        | ApplicationDTO[]
-        | { data?: ApplicationDTO[] }
-
-      if (Array.isArray(payload)) {
-        setApplications(payload)
-      } else if (Array.isArray(payload?.data)) {
-        setApplications(payload.data)
-      } else {
-        setApplications([])
-      }
+      const paginatedData = response.data
+      setApplications(paginatedData.data)
+      setTotalPages(paginatedData.pagination?.totalPages || 1)
     } catch (applicationsError) {
       console.error(applicationsError)
       setError("Không thể tải danh sách ứng tuyển cho công việc này.")
@@ -182,8 +185,8 @@ export default function ApplicationsPage() {
       return
     }
 
-    void loadApplicationsByJob(selectedJobId)
-  }, [selectedJobId, statusFilter])
+    void loadApplicationsByJob(selectedJobId, currentPage)
+  }, [selectedJobId, statusFilter, currentPage])
 
   const filteredApplications = useMemo(() => {
     if (!searchQuery.trim()) return applications
@@ -199,7 +202,7 @@ export default function ApplicationsPage() {
 
   const openApplicationDetail = async (applicationId: string) => {
     try {
-      const response = await farmerService.getApplicationDetail(applicationId)
+      const response = await jobApplicationService.getApplicationDetail(applicationId)
       setSelectedApplication(response.data)
       setResponseMessage(response.data.responseMessage ?? "")
       setIsDetailOpen(true)
@@ -221,12 +224,12 @@ export default function ApplicationsPage() {
         responseMessage: responseMessage.trim() || undefined,
       }
 
-      await farmerService.respondApplicant(selectedApplication.id, payload)
+      await jobApplicationService.respondApplicant(selectedApplication.id, payload)
 
-      setIsDetailOpen(false)
+      setIsRespondDialogOpen(false)
       setSelectedApplication(null)
       setResponseMessage("")
-      await loadApplicationsByJob(selectedJobId)
+      await loadApplicationsByJob(selectedJobId, currentPage)
     } catch (respondError) {
       console.error(respondError)
       setError("Không thể phản hồi hồ sơ. Vui lòng thử lại.")
@@ -239,24 +242,34 @@ export default function ApplicationsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Quản lý ứng tuyển</h1>
-          <p className="text-muted-foreground">Xem chi tiết hồ sơ và phản hồi ứng viên theo từng bài đăng</p>
+      <div className="relative overflow-hidden rounded-2xl border bg-linear-to-r from-emerald-50 via-teal-50 to-cyan-50 p-5 dark:from-emerald-950/30 dark:via-teal-950/20 dark:to-cyan-950/20">
+        <div className="pointer-events-none absolute -top-12 right-6 h-40 w-40 rounded-full bg-emerald-200/40 blur-3xl dark:bg-emerald-700/20" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Quản lý ứng viên</h1>
+            <p className="text-muted-foreground">Quản lý và theo dõi ứng viên theo từng bài đăng</p>
+          </div>
+          <Button variant="outline" asChild>
+            <Link href="/farmer/jobs">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Về danh sách bài đăng
+            </Link>
+          </Button>
         </div>
-        <Button variant="outline" asChild>
-          <Link href="/farmer/jobs">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Về danh sách bài đăng
-          </Link>
-        </Button>
       </div>
 
       <Card>
         <CardContent className="grid gap-4 p-4 md:grid-cols-3">
           <div className="space-y-2 md:col-span-1">
             <Label>Công việc</Label>
-            <Select value={selectedJobId || ""} onValueChange={setSelectedJobId} disabled={isLoadingJobs}>
+            <Select
+              value={selectedJobId || ""}
+              onValueChange={(val) => {
+                setSelectedJobId(val)
+                setCurrentPage(1)
+              }}
+              disabled={isLoadingJobs}
+            >
               <SelectTrigger>
                 <SelectValue placeholder={isLoadingJobs ? "Đang tải..." : "Chọn công việc"} />
               </SelectTrigger>
@@ -272,7 +285,13 @@ export default function ApplicationsPage() {
 
           <div className="space-y-2 md:col-span-1">
             <Label>Trạng thái</Label>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select
+              value={statusFilter}
+              onValueChange={(val) => {
+                setStatusFilter(val)
+                setCurrentPage(1)
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Lọc trạng thái" />
               </SelectTrigger>
@@ -312,7 +331,12 @@ export default function ApplicationsPage() {
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
             <div>
               <p className="text-xs text-muted-foreground">Đang xem hồ sơ cho bài đăng</p>
-              <p className="font-semibold">{selectedJob.title}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-semibold">{selectedJob.title}</p>
+                <Link href={`/farmer/jobs/${selectedJob.id}`} className="text-xs text-agro-green hover:underline flex items-center">
+                  (Xem tin đăng <Eye className="ml-1 h-3 w-3" />)
+                </Link>
+              </div>
             </div>
             <Badge variant="secondary">{filteredApplications.length} hồ sơ</Badge>
           </CardContent>
@@ -344,26 +368,37 @@ export default function ApplicationsPage() {
             <Card key={application.id}>
               <CardContent className="p-4">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold">{application.worker?.fullName || "Ứng viên"}</p>
-                      {statusBadge(application.statusId)}
+                  <div className="flex items-start gap-4">
+                    <Avatar className="h-16 w-16 shrink-0 border-2 border-background shadow-sm hover:scale-105 transition-transform">
+                      <AvatarImage src={application.worker?.avatarUrl || "/placeholder.svg"} className="object-cover" />
+                      <AvatarFallback className="bg-agro-green/10 text-agro-green">
+                        <Image src="/placeholder.svg" alt="placeholder" width={48} height={48} className="object-cover" />
+                      </AvatarFallback>
+                    </Avatar>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-base">{application.worker?.fullName || "Ứng viên"}</p>
+                        {statusBadge(application.statusId)}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                        <p className="text-sm text-muted-foreground flex items-center gap-2">
+                          <Phone className="h-3.5 w-3.5" />
+                          {application.worker?.phoneNumber || "-"}
+                        </p>
+
+                        <p className="text-sm text-muted-foreground flex items-center gap-2">
+                          <MapPin className="h-3.5 w-3.5" />
+                          <span className="truncate">{application.worker?.primaryLocation || application.locationName || "Không có vị trí"}</span>
+                        </p>
+
+                        <p className="text-xs text-muted-foreground flex items-center gap-2 col-span-1 sm:col-span-2 mt-1">
+                          <CalendarDays className="h-3 w-3" />
+                          Nộp lúc: {formatDateTime(application.appliedAt)}
+                        </p>
+                      </div>
                     </div>
-
-                    <p className="text-sm text-muted-foreground flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      {application.worker?.phoneNumber || "-"}
-                    </p>
-
-                    <p className="text-sm text-muted-foreground flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
-                      {application.worker?.primaryLocation || application.locationName || "Không có vị trí"}
-                    </p>
-
-                    <p className="text-sm text-muted-foreground flex items-center gap-2">
-                      <CalendarDays className="h-4 w-4" />
-                      Nộp lúc: {formatDateTime(application.appliedAt)}
-                    </p>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -379,24 +414,13 @@ export default function ApplicationsPage() {
                           className="border-rose-200 text-rose-700 hover:bg-rose-50"
                           onClick={() => {
                             setSelectedApplication(application)
+                            setResponseStatus(APP_STATUS.accepted as ApplicationStatusId)
                             setResponseMessage("")
-                            setIsDetailOpen(true)
-                          }}
-                        >
-                          <XCircle className="mr-2 h-4 w-4" />
-                          Từ chối
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="bg-emerald-600 hover:bg-emerald-700"
-                          onClick={() => {
-                            setSelectedApplication(application)
-                            setResponseMessage("")
-                            setIsDetailOpen(true)
+                            setIsRespondDialogOpen(true)
                           }}
                         >
                           <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Duyệt
+                          Phản hồi
                         </Button>
                       </>
                     ) : null}
@@ -405,6 +429,36 @@ export default function ApplicationsPage() {
               </CardContent>
             </Card>
           ))}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-4 pt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1 || isLoadingApplications}
+                className="h-9 px-4"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1.5" />
+                Trang trước
+              </Button>
+              <div className="flex items-center gap-1.5 font-medium text-sm">
+                <span className="text-agro-green">Trang {currentPage}</span>
+                <span className="text-muted-foreground">/</span>
+                <span>{totalPages}</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages || isLoadingApplications}
+                className="h-9 px-4"
+              >
+                Trang sau
+                <ChevronRight className="h-4 w-4 ml-1.5" />
+              </Button>
+            </div>
+          )}
         </div>
       ) : null}
 
@@ -440,6 +494,7 @@ export default function ApplicationsPage() {
                 </div>
               </div>
 
+
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
@@ -449,44 +504,99 @@ export default function ApplicationsPage() {
                   {selectedApplication.coverLetter || "Ứng viên không để lại thư giới thiệu."}
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="responseMessage">Phản hồi cho ứng viên</Label>
-                <Textarea
-                  id="responseMessage"
-                  value={responseMessage}
-                  onChange={(event) => setResponseMessage(event.target.value)}
-                  placeholder="Gửi lời nhắn khi duyệt/từ chối ứng viên..."
-                />
-              </div>
             </div>
           ) : null}
 
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setIsDetailOpen(false)} disabled={isSubmittingResponse}>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
               Đóng
             </Button>
-            {selectedApplication?.statusId === APP_STATUS.pending ? (
+            {selectedApplication?.statusId === APP_STATUS.pending && (
+              <Button
+                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => {
+                  setResponseStatus(APP_STATUS.accepted as ApplicationStatusId)
+                  setResponseMessage("")
+                  setIsDetailOpen(false)
+                  setIsRespondDialogOpen(true)
+                }}
+              >
+                Phản hồi hồ sơ
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isRespondDialogOpen} onOpenChange={setIsRespondDialogOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Phản hồi hồ sơ ứng tuyển</DialogTitle>
+            <DialogDescription>
+              {selectedApplication?.worker?.fullName
+                ? `Ứng viên: ${selectedApplication.worker.fullName}`
+                : "Gửi phản hồi cho ứng viên"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {selectedApplication ? (
               <>
-                <Button
-                  variant="outline"
-                  className="border-rose-200 text-rose-700 hover:bg-rose-50"
-                  disabled={isSubmittingResponse}
-                  onClick={() => void handleRespond(APP_STATUS.rejected as ApplicationStatusId)}
-                >
-                  {isSubmittingResponse ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
-                  Từ chối
-                </Button>
-                <Button
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                  disabled={isSubmittingResponse}
-                  onClick={() => void handleRespond(APP_STATUS.accepted as ApplicationStatusId)}
-                >
-                  {isSubmittingResponse ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                  Duyệt hồ sơ
-                </Button>
+                <div className="rounded-lg border p-4 text-sm">
+                  <p className="font-semibold">{selectedApplication.worker?.fullName || "Ứng viên"}</p>
+                  <p className="text-muted-foreground">SĐT: {selectedApplication.worker?.phoneNumber || "Không có"}</p>
+                </div>
+
+                <div className="rounded-lg border p-4">
+                  <p className="mb-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider">Chọn trạng thái phản hồi</p>
+                  <RadioGroup
+                    value={String(responseStatus)}
+                    onValueChange={(value) => setResponseStatus(Number(value) as ApplicationStatusId)}
+                    className="flex flex-row gap-6 mt-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem id="apps-resp-approved" value={String(APP_STATUS.accepted)} />
+                      <Label htmlFor="apps-resp-approved" className="cursor-pointer">Chấp nhận</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem id="apps-resp-rejected" value={String(APP_STATUS.rejected)} />
+                      <Label htmlFor="apps-resp-rejected" className="cursor-pointer">Từ chối</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="responseMessage" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tin nhắn phản hồi</Label>
+                  <Textarea
+                    id="responseMessage"
+                    value={responseMessage}
+                    onChange={(event) => setResponseMessage(event.target.value)}
+                    placeholder="Gửi lời nhắn khi duyệt/từ chối ứng viên..."
+                    rows={4}
+                  />
+                </div>
               </>
             ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRespondDialogOpen(false)} disabled={isSubmittingResponse}>
+              Hủy
+            </Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700"
+              disabled={isSubmittingResponse}
+              onClick={() => void handleRespond(responseStatus)}
+            >
+              {isSubmittingResponse ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : responseStatus === APP_STATUS.rejected ? (
+                <XCircle className="mr-2 h-4 w-4" />
+              ) : (
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+              )}
+              {isSubmittingResponse ? "Đang xử lý..." : "Gửi phản hồi"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

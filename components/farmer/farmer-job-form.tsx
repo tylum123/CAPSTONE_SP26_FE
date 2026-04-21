@@ -4,8 +4,9 @@ import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState }
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import { ArrowLeft, Check, CheckCheck, ChevronsUpDown, MapPin, Plus, X, Calendar as CalendarIcon, Briefcase, FileText, CalendarRange, CheckSquare, Award, Gift, AlignLeft, Layout, Clock, Info, DollarSign, DollarSignIcon, ChevronLeft, ChevronRight, User, Users } from "lucide-react"
+import { ArrowLeft, Banknote, Check, CheckCheck, ChevronsUpDown, MapPin, Plus, X, Calendar as CalendarIcon, Briefcase, FileText, CalendarRange, CheckSquare, Award, Gift, AlignLeft, Layout, Clock, Info, DollarSign, DollarSignIcon, ChevronLeft, ChevronRight, User, Users } from "lucide-react"
 import { eachDayOfInterval, format, isSameDay, startOfDay } from "date-fns"
+import type { DateRange } from "react-day-picker"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -31,7 +32,7 @@ import { farmerService } from "@/libs/api/services/farmer.service"
 import { FarmService } from "@/libs/api/services/farm.service"
 import { jobCategoryService } from "@/libs/api/services/job-category.service"
 import { skillService } from "@/libs/api/services/skill.service"
-import type { CreateJobRequest, GetFarmResponse, Job, JobCategory, Skill, UpdateJobRequest } from "@/libs/types"
+import { JobPostStatus, JobStatus, type CreateJobRequest, type GetFarmResponse, type Job, type JobCategory, type Skill, type UpdateJobRequest } from "@/libs/types"
 import { cn } from "@/libs/utils/utils"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@radix-ui/react-collapsible"
 import { jobService } from "@/libs/api/services/jobs.service"
@@ -71,14 +72,17 @@ type FarmerJobFormProps = {
   jobId?: string
 }
 
+type PendingLeaveAction =
+  | { type: "route"; url: string }
+  | { type: "reload" }
+  | null
+
 const DEFAULT_FARM_ID = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
 const DEFAULT_JOB_CATEGORY_ID = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
 const JOB_TYPE_CONTRACT_ID = 1
 const JOB_TYPE_DAILY_ID = 2
-const DEFAULT_STATUS_ID = 2
+const DEFAULT_STATUS_ID = JobPostStatus.Published
 const DEFAULT_IS_URGENT = false
-
-const OSM_REVERSE_URL = process.env.NEXT_PUBLIC_OSM_REVERSE_URL || "https://nominatim.openstreetmap.org/reverse"
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("vi-VN", {
@@ -86,6 +90,19 @@ const formatCurrency = (value: number) =>
     currency: "VND",
     maximumFractionDigits: 0,
   }).format(value)
+
+const toDigitsOnly = (value: string) => value.replace(/\D/g, "")
+
+const formatThousandsWithDots = (value: string) => {
+  const digits = toDigitsOnly(value)
+
+  if (!digits) {
+    return ""
+  }
+
+  const normalizedDigits = digits.replace(/^0+(?=\d)/, "")
+  return normalizedDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+}
 
 const formatDateDDMMYYYY = (dateValue: string) => {
   if (!dateValue) {
@@ -186,8 +203,10 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
   const [isLeavingPromptOpen, setIsLeavingPromptOpen] = useState(false)
   const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
-  // Stores the URL to navigate to after user decides on the leaving prompt
-  const pendingNavigationUrl = useRef<string | null>(null)
+  // Stores pending action after user confirms on leaving prompt
+  const pendingLeaveActionRef = useRef<PendingLeaveAction>(null)
+  // Allows browser-level exit after user confirms leaving
+  const allowBrowserExitRef = useRef(false)
   // Mirror of isDirty as a ref so callbacks always read the latest value without stale closures
   const isDirtyRef = useRef(false)
 
@@ -204,6 +223,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
   const [newRequirement, setNewRequirement] = useState("")
 
   const [availableSkills, setAvailableSkills] = useState<Skill[]>([])
+  const [skillLabelsById, setSkillLabelsById] = useState<Record<string, string>>({})
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([])
   const [isLoadingSkills, setIsLoadingSkills] = useState(true)
   const [skillPage, setSkillPage] = useState(1)
@@ -216,8 +236,6 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
   const [newSkillDesc, setNewSkillDesc] = useState("")
   const [isCreatingSkill, setIsCreatingSkill] = useState(false)
   const [skillListVersion, setSkillListVersion] = useState(0)
-  const [newSkillCategoryId, setNewSkillCategoryId] = useState("")
-  const [isAddSkillCategoryPopoverOpen, setIsAddSkillCategoryPopoverOpen] = useState(false)
 
   const [benefits, setBenefits] = useState<string[]>(["Bao ăn"])
   const [newBenefit, setNewBenefit] = useState("")
@@ -249,6 +267,11 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
 
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [postedJob, setPostedJob] = useState<PostedJobPreview | null>(null)
+  const postedJobRef = useRef<PostedJobPreview | null>(null)
+
+  useEffect(() => {
+    postedJobRef.current = postedJob
+  }, [postedJob])
 
   // Keep ref in sync with state so callbacks always see the latest value
   useEffect(() => {
@@ -276,10 +299,18 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
 
 
   const workersNeededNumber = Number.parseInt(workersNeeded, 10) || 0
-  const incomeNumber = Number.parseInt(income, 10) || 0
+  const incomeNumber = Number.parseInt(toDigitsOnly(income), 10) || 0
 
-  const selectedContractStartDate = contractStartDate ? parseDDMMYYYYToDate(contractStartDate) ?? undefined : undefined
-  const selectedContractEndDate = contractEndDate ? parseDDMMYYYYToDate(contractEndDate) ?? undefined : undefined
+  const selectedContractDateRange = useMemo<DateRange | undefined>(() => {
+    const from = contractStartDate ? parseDDMMYYYYToDate(contractStartDate) ?? undefined : undefined
+    const to = contractEndDate ? parseDDMMYYYYToDate(contractEndDate) ?? undefined : undefined
+
+    if (!from && !to) {
+      return undefined
+    }
+
+    return { from, to }
+  }, [contractStartDate, contractEndDate])
   const normalizedSelectedDailyDates = useMemo(() => mergeAndSortDates(selectedDailyDates), [selectedDailyDates])
   const calendarSelectedDates = useMemo(
     () => normalizedSelectedDailyDates.map((date) => new Date(date)),
@@ -303,7 +334,34 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
   tomorrow.setHours(0, 0, 0, 0)
   tomorrow.setDate(tomorrow.getDate() + 1)
 
+  const rememberSkillLabels = useCallback((skills: Array<{ id?: string | null; name?: string | null }>) => {
+    if (!skills.length) {
+      return
+    }
+
+    setSkillLabelsById((current) => {
+      const next = { ...current }
+
+      skills.forEach((skill) => {
+        const id = skill.id?.trim()
+        const name = skill.name?.trim()
+
+        if (id && name) {
+          next[id] = name
+        }
+      })
+
+      return next
+    })
+  }, [])
+
   const getSkillLabel = (skillId: string) => {
+    const rememberedLabel = skillLabelsById[skillId]
+
+    if (rememberedLabel) {
+      return rememberedLabel
+    }
+
     const foundSkill = availableSkills.find((item) => item.id === skillId)
     return foundSkill?.name ?? skillId
   }
@@ -365,22 +423,48 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
     )
   }
 
+  const toggleAllVisibleSkills = () => {
+    const visibleSkillIds = availableSkills.map((skill) => skill.id).filter(Boolean)
+
+    if (!visibleSkillIds.length) {
+      return
+    }
+
+    setSelectedSkillIds((currentSkills) => {
+      const hasAllVisibleSkills = visibleSkillIds.every((skillId) => currentSkills.includes(skillId))
+
+      if (hasAllVisibleSkills) {
+        return currentSkills.filter((skillId) => !visibleSkillIds.includes(skillId))
+      }
+
+      return Array.from(new Set([...currentSkills, ...visibleSkillIds]))
+    })
+  }
+
   const handleCreateSkill = async () => {
-    if (!newSkillName.trim() || !newSkillCategoryId) return
+    const skillCategoryId =
+      selectedJobCategoryId && selectedJobCategoryId !== DEFAULT_JOB_CATEGORY_ID
+        ? selectedJobCategoryId
+        : jobCategories[0]?.id
+
+    if (!newSkillName.trim() || !skillCategoryId) {
+      return
+    }
 
     try {
       setIsCreatingSkill(true)
       const response = await skillService.createSkill({
         name: newSkillName.trim(),
         description: newSkillDesc.trim() || newSkillName.trim(),
-        categoryId: newSkillCategoryId,
+        categoryId: skillCategoryId,
         isActive: true,
       })
 
       const createdSkill = response.data
 
-      if (createdSkill && createdSkill.id && newSkillCategoryId === selectedJobCategoryId) {
-        setSelectedSkillIds((prev) => [...prev, createdSkill.id])
+      if (createdSkill && createdSkill.id) {
+        rememberSkillLabels([createdSkill])
+        setSelectedSkillIds((prev) => (prev.includes(createdSkill.id) ? prev : [...prev, createdSkill.id]))
       }
 
       setIsAddSkillDialogOpen(false)
@@ -397,24 +481,30 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
   }
 
   const addRequirement = () => {
-    const value = newRequirement.trim()
+    const values = newRequirement
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
 
-    if (!value) {
+    if (!values.length) {
       return
     }
 
-    setRequirements((current) => [...current, value])
+    setRequirements((current) => [...current, ...values])
     setNewRequirement("")
   }
 
   const addBenefit = () => {
-    const value = newBenefit.trim()
+    const values = newBenefit
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
 
-    if (!value) {
+    if (!values.length) {
       return
     }
 
-    setBenefits((current) => [...current, value])
+    setBenefits((current) => [...current, ...values])
     setNewBenefit("")
   }
 
@@ -451,6 +541,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
         }
 
         setAvailableSkills(fetchedSkills)
+        rememberSkillLabels(fetchedSkills)
         setTotalSkillPages(totalPages)
       } catch (error) {
         console.error(error)
@@ -462,7 +553,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
     }
 
     void loadSkills()
-  }, [selectedJobCategoryId, skillPage, skillListVersion])
+  }, [selectedJobCategoryId, skillPage, skillListVersion, rememberSkillLabels])
 
   useEffect(() => {
     setSkillPage(1)
@@ -481,13 +572,14 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
 
         setTitle(existingJob.title ?? "")
         setDescription(extractEditableDescription(existingJob.description ?? ""))
-        setIncome(String(existingJob.wageAmount ?? ""))
+        setIncome(formatThousandsWithDots(String(existingJob.wageAmount ?? "")))
         setWorkersNeeded(String(existingJob.workersNeeded ?? 1))
         setLocation(existingJob.address ?? "")
         setLocationLat(existingJob.farm?.latitude)
         setLocationLng(existingJob.farm?.longitude)
         setRequirements(existingJob.requirements?.length ? existingJob.requirements : ["Có sức khỏe tốt"])
         setBenefits(existingJob.privileges?.length ? existingJob.privileges : ["Bao ăn"])
+        rememberSkillLabels(existingJob.jobSkillRequirements ?? [])
         setSelectedSkillIds((existingJob.jobSkillRequirements ?? []).map((skill) => skill.id).filter(Boolean))
         setSelectedJobCategoryId(existingJob.jobCategory?.id ?? DEFAULT_JOB_CATEGORY_ID)
         setSelectedFarmId(existingJob.farm?.farmId || (existingJob.farm as any)?.id || DEFAULT_FARM_ID)
@@ -532,7 +624,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
     }
 
     void hydrateJobForEdit()
-  }, [isEditMode, jobId])
+  }, [isEditMode, jobId, rememberSkillLabels])
 
   useEffect(() => {
     const loadJobCategories = async () => {
@@ -550,11 +642,14 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
         const activeCategories = fetchedCategories.filter((category) => category.isActive !== false)
         setJobCategories(activeCategories)
         setSelectedJobCategoryId((currentSelected) => {
-          if (currentSelected && currentSelected !== DEFAULT_JOB_CATEGORY_ID) {
-            return currentSelected
+          const firstCategoryId = activeCategories[0]?.id ?? DEFAULT_JOB_CATEGORY_ID
+
+          if (!currentSelected || currentSelected === DEFAULT_JOB_CATEGORY_ID) {
+            return firstCategoryId
           }
 
-          return activeCategories[0]?.id ?? DEFAULT_JOB_CATEGORY_ID
+          const isCurrentStillAvailable = activeCategories.some((category) => category.id === currentSelected)
+          return isCurrentStillAvailable ? currentSelected : firstCategoryId
         })
       } catch (error) {
         console.error(error)
@@ -653,54 +748,15 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
     }
   }
 
-  const handleMapPick = async (latitude: number, longitude: number) => {
-    setLocationLat(latitude)
-    setLocationLng(longitude)
-
-    // Reverse geocode to get address
-    try {
-      const response = await fetch(
-        `${OSM_REVERSE_URL}?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
-        {
-          headers: {
-            "Accept-Language": "vi",
-          },
-        },
-      )
-
-      if (response.ok) {
-        const data = (await response.json()) as { display_name?: string }
-        if (data.display_name) {
-          setLocation(data.display_name)
-        }
-      }
-    } catch {
-      // Continue with just coordinates if reverse geocode fails
-    }
-  }
-
-  const handleContractStartSelect = (date?: Date) => {
-    if (!date) {
+  const handleContractRangeSelect = (range?: DateRange) => {
+    if (!range?.from) {
       setContractStartDate("")
-      return
-    }
-
-    const formatted = format(date, "dd/MM/yyyy")
-    setContractStartDate(formatted)
-
-    const parsedEndDate = parseDDMMYYYYToDate(contractEndDate)
-    if (parsedEndDate && parsedEndDate < date) {
-      setContractEndDate("")
-    }
-  }
-
-  const handleContractEndSelect = (date?: Date) => {
-    if (!date) {
       setContractEndDate("")
       return
     }
 
-    setContractEndDate(format(date, "dd/MM/yyyy"))
+    setContractStartDate(format(range.from, "dd/MM/yyyy"))
+    setContractEndDate(range.to ? format(range.to, "dd/MM/yyyy") : "")
   }
 
   const toggleRangeSelectionMode = () => {
@@ -801,18 +857,6 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
 
     if (!selectedJobCategoryId) {
       return "Vui lòng chọn danh mục công việc."
-    }
-
-    if (!requirements.length) {
-      return "Vui lòng thêm ít nhất 1 yêu cầu."
-    }
-
-    if (!selectedSkillIds.length) {
-      return "Vui lòng chọn ít nhất 1 kỹ năng kinh nghiệm."
-    }
-
-    if (!benefits.length) {
-      return "Vui lòng thêm ít nhất 1 quyền lợi."
     }
 
     if (scheduleType === "contract") {
@@ -927,6 +971,12 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
 
     const jobTypeId = scheduleType === "daily" ? JOB_TYPE_DAILY_ID : JOB_TYPE_CONTRACT_ID
 
+    const selectedDaysForPayload =
+      scheduleType === "daily"
+        ? normalizedSelectedDailyDates.map((date) => toDateOnlyFromDate(date))
+        : []
+    const workersNeededForPayload = scheduleType === "daily" ? workersNeededNumber : 0
+
     const payload: UpdateJobRequest = {
       skillIds: selectedSkillIds,
       farmId: selectedFarmId || DEFAULT_FARM_ID,
@@ -939,11 +989,11 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       endDate,
       startTime,
       endTime,
-      selectedDays: normalizedSelectedDailyDates.map(date => toDateOnlyFromDate(date)),
+      selectedDays: selectedDaysForPayload,
       requirements,
       privileges: benefits,
       wageAmount: incomeNumber,
-      workersNeeded: workersNeededNumber,
+      workersNeeded: workersNeededForPayload,
       workersAccepted: 0,
       updatedAt: nowISO,
       isUrgent,
@@ -962,11 +1012,25 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
         })
       const savedJob = response.data
 
+      const savedJobUnitIncome = savedJob.wageAmount ?? incomeNumber
+      const savedJobWorkersNeeded =
+        scheduleType === "daily"
+          ? (savedJob.workersNeeded && savedJob.workersNeeded > 0 ? savedJob.workersNeeded : workersNeededNumber)
+          : 1
+      const savedJobDailyDaysCount =
+        scheduleType === "daily"
+          ? ((savedJob.selectedDays?.length ?? 0) > 0 ? savedJob.selectedDays.length : selectedDailyDaysCount)
+          : 1
+      const postedIncome =
+        scheduleType === "daily"
+          ? savedJobUnitIncome * savedJobWorkersNeeded * savedJobDailyDaysCount
+          : savedJobUnitIncome
+
       const postedPayload: PostedJobPreview = {
         id: savedJob.id,
         createdAt: savedJob.createdAt ?? nowISO,
         title: savedJob.title ?? title.trim(),
-        income: savedJob.wageAmount ?? incomeNumber,
+        income: postedIncome,
         workersNeeded:
           savedJob.workersNeeded ?? (scheduleType === "daily" ? workersNeededNumber : 1),
         location: savedJob.address ?? location.trim(),
@@ -1074,11 +1138,14 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       endDate,
       startTime,
       endTime,
-      selectedDays: normalizedSelectedDailyDates.map((d) => toDateOnlyFromDate(d)),
+      selectedDays:
+        scheduleType === "daily"
+          ? normalizedSelectedDailyDates.map((d) => toDateOnlyFromDate(d))
+          : [],
       requirements,
       privileges: benefits,
       wageAmount: incomeNumber,
-      workersNeeded: workersNeededNumber || 1,
+      workersNeeded: scheduleType === "daily" ? workersNeededNumber || 1 : 0,
       workersAccepted: 0,
       isUrgent,
       statusId: 1, // Draft status
@@ -1093,7 +1160,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
     benefits, incomeNumber, workersNeededNumber, isUrgent,
   ])
 
-  const saveDraft = useCallback(async () => {
+  const saveDraft = useCallback(async (): Promise<boolean> => {
     try {
       setIsSavingDraft(true)
       const payload = buildDraftPayload()
@@ -1104,12 +1171,14 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
         title: "Đã lưu bản nháp",
         description: "Bản nháp của bạn đã được lưu thành công.",
       })
+      return true
     } catch {
       toast({
         title: "Lưu thất bại",
         description: "Không thể lưu bản nháp. Vui lòng thử lại.",
         variant: "destructive",
       })
+      return false
     } finally {
       setIsSavingDraft(false)
     }
@@ -1118,11 +1187,12 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
   const loadDraft = useCallback((draft: Job) => {
     setTitle(draft.title ?? "")
     setDescription(extractEditableDescription(draft.description ?? ""))
-    setIncome(String(draft.wageAmount ?? ""))
+    setIncome(formatThousandsWithDots(String(draft.wageAmount ?? "")))
     setWorkersNeeded(String(draft.workersNeeded ?? 1))
     setLocation(draft.address ?? "")
     setRequirements(draft.requirements?.length ? draft.requirements : ["Có sức khỏe tốt"])
     setBenefits(draft.privileges?.length ? draft.privileges : ["Bao ăn"])
+    rememberSkillLabels(draft.jobSkillRequirements ?? [])
     setSelectedSkillIds((draft.jobSkillRequirements ?? []).map((s) => s.id).filter(Boolean))
     setSelectedJobCategoryId(draft.jobCategory?.id ?? DEFAULT_JOB_CATEGORY_ID)
     setSelectedFarmId(draft.farm?.farmId || (draft.farm as any)?.id || DEFAULT_FARM_ID)
@@ -1147,54 +1217,149 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
 
     setStep(1)
     toast({ title: "Đã tải bản nháp", description: `"${draft.title}" đã được tải vào form.` })
-  }, [toast])
+  }, [toast, rememberSkillLabels])
 
   // ─── Navigation interception ──────────────────────────────────────────────
+
+  const queueLeaveAction = useCallback((action: Exclude<PendingLeaveAction, null>) => {
+    pendingLeaveActionRef.current = action
+    setIsLeavingPromptOpen(true)
+  }, [])
+
+  const continuePendingLeaveAction = useCallback(() => {
+    const pendingAction = pendingLeaveActionRef.current
+    pendingLeaveActionRef.current = null
+
+    if (!pendingAction) {
+      return
+    }
+
+    if (pendingAction.type === "route") {
+      router.push(pendingAction.url)
+      return
+    }
+
+    allowBrowserExitRef.current = true
+
+    if (pendingAction.type === "reload") {
+      window.location.reload()
+    }
+  }, [router])
 
   // Intercept browser tab close / refresh
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isDirtyRef.current && !postedJob) {
+      if (allowBrowserExitRef.current) {
+        return
+      }
+
+      if (isDirtyRef.current && !postedJobRef.current) {
         e.preventDefault()
         e.returnValue = ""
       }
     }
     window.addEventListener("beforeunload", handleBeforeUnload)
     return () => window.removeEventListener("beforeunload", handleBeforeUnload)
-  }, [postedJob])
+  }, [])
+
+  // Intercept in-app anchor navigation and show leave dialog if form has unsaved changes.
+  useEffect(() => {
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (!isDirtyRef.current || postedJobRef.current) {
+        return
+      }
+
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return
+      }
+
+      const target = event.target as HTMLElement | null
+      const anchor = target?.closest("a[href]") as HTMLAnchorElement | null
+
+      if (!anchor) {
+        return
+      }
+
+      if (anchor.target === "_blank" || anchor.hasAttribute("download")) {
+        return
+      }
+
+      const href = anchor.getAttribute("href")
+      if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) {
+        return
+      }
+
+      const destination = new URL(anchor.href, window.location.href)
+      const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      const next = `${destination.pathname}${destination.search}${destination.hash}`
+
+      if (destination.origin !== window.location.origin || current === next) {
+        return
+      }
+
+      event.preventDefault()
+      queueLeaveAction({ type: "route", url: next })
+    }
+
+    document.addEventListener("click", handleDocumentClick, true)
+    return () => document.removeEventListener("click", handleDocumentClick, true)
+  }, [queueLeaveAction])
+
+  // Intercept keyboard reload and route it through the leave prompt.
+  useEffect(() => {
+    const handleKeyboardReload = (event: globalThis.KeyboardEvent) => {
+      const key = event.key.toLowerCase()
+      const isReloadShortcut = event.key === "F5" || ((event.ctrlKey || event.metaKey) && key === "r")
+
+      if (!isReloadShortcut || !isDirtyRef.current || postedJobRef.current) {
+        return
+      }
+
+      event.preventDefault()
+      queueLeaveAction({ type: "reload" })
+    }
+
+    window.addEventListener("keydown", handleKeyboardReload)
+    return () => window.removeEventListener("keydown", handleKeyboardReload)
+  }, [queueLeaveAction])
 
   // Uses the ref (not state) so the callback never captures a stale dirty value
   const handleNavigateAway = useCallback((url: string) => {
-    if (isDirtyRef.current && !postedJob) {
-      pendingNavigationUrl.current = url
-      setIsLeavingPromptOpen(true)
+    if (isDirtyRef.current && !postedJobRef.current) {
+      queueLeaveAction({ type: "route", url })
     } else {
       router.push(url)
     }
-  }, [router, postedJob])
+  }, [queueLeaveAction, router])
 
   const handleLeavingPromptSaveDraft = useCallback(async () => {
-    await saveDraft()
-    setIsLeavingPromptOpen(false)
-    if (pendingNavigationUrl.current) {
-      router.push(pendingNavigationUrl.current)
-      pendingNavigationUrl.current = null
+    const isSaved = await saveDraft()
+    if (!isSaved) {
+      return
     }
-  }, [saveDraft, router])
+
+    setIsLeavingPromptOpen(false)
+    continuePendingLeaveAction()
+  }, [continuePendingLeaveAction, saveDraft])
 
   const handleLeavingPromptLeave = useCallback(() => {
     setIsLeavingPromptOpen(false)
     setIsDirty(false)
     isDirtyRef.current = false
-    if (pendingNavigationUrl.current) {
-      router.push(pendingNavigationUrl.current)
-      pendingNavigationUrl.current = null
-    }
-  }, [router])
+    continuePendingLeaveAction()
+  }, [continuePendingLeaveAction])
 
   const handleLeavingPromptStay = useCallback(() => {
     setIsLeavingPromptOpen(false)
-    pendingNavigationUrl.current = null
+    pendingLeaveActionRef.current = null
+    allowBrowserExitRef.current = false
   }, [])
 
   if (isLoadingExistingJob) {
@@ -1207,18 +1372,11 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-12">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="icon"
-            className="rounded-full h-10 w-10 border-muted-foreground/20"
-            onClick={() => handleNavigateAway("/farmer/jobs")}
-          >
-            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-          </Button>
+      <div className="relative overflow-hidden rounded-2xl border bg-linear-to-r from-emerald-50 via-teal-50 to-cyan-50 p-5 dark:from-emerald-950/30 dark:via-teal-950/20 dark:to-cyan-950/20">
+        <div className="pointer-events-none absolute -top-12 right-6 h-40 w-40 rounded-full bg-emerald-200/40 blur-3xl dark:bg-emerald-700/20" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
               {isEditMode ? "Chỉnh sửa tin tuyển dụng" : "Đăng tin tuyển dụng"}
             </h1>
             <p className="text-muted-foreground mt-1 mb-2">
@@ -1227,132 +1385,133 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                 : "Tạo nhân công phù hợp cho địa điểm canh tác của bạn."}
             </p>
           </div>
-        </div>
 
-        {!postedJob && (
-          <div className="flex items-center gap-3">
-            {/* Draft buttons */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 hover:text-foreground"
-              onClick={() => setIsDraftDialogOpen(true)}
-            >
-              <FileText className="h-4 w-4" />
-              Bản nháp
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={saveDraft}
-              disabled={isSavingDraft}
-            >
-              {isSavingDraft ? (
-                <>
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent inline-block" />
-                  Đang lưu...
-                </>
-              ) : (
-                <>
-                  <FileText className="h-4 w-4" />
-                  Lưu nháp
-                </>
-              )}
-            </Button>
-
-            {/* Step indicator */}
-            <div className="flex items-center rounded-lg border bg-card p-1 shadow-sm">
-              <div
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-md transition-all",
-                  step === 1 ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"
-                )}
-              >
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/20 text-xs font-bold">1</span>
-                <span className="text-sm font-medium">Soạn thảo</span>
+          {!postedJob && (
+            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 sm:gap-6 mt-4 sm:mt-0">
+              {/* Draft buttons */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 bg-white/50 backdrop-blur-sm border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 transition-colors shadow-sm"
+                  onClick={() => setIsDraftDialogOpen(true)}
+                >
+                  <FileText className="h-4 w-4 text-emerald-600" />
+                  <span className="font-medium">Bản nháp</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 bg-white/50 backdrop-blur-sm border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 transition-colors shadow-sm"
+                  onClick={() => {
+                    void saveDraft()
+                  }}
+                  disabled={isSavingDraft}
+                >
+                  {isSavingDraft ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-600 border-r-transparent inline-block" />
+                      <span className="font-medium">Đang lưu...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-4 w-4 text-emerald-600" />
+                      <span className="font-medium">Lưu nháp</span>
+                    </>
+                  )}
+                </Button>
               </div>
-              <div
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-md transition-all",
-                  step === 2 ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"
-                )}
-              >
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background/20 text-xs font-bold">2</span>
-                <span className="text-sm font-medium">Xác nhận</span>
+
+              {/* Divider for desktop */}
+              <div className="hidden sm:block h-8 w-px bg-emerald-200/60 dark:bg-emerald-800/60" />
+
+              {/* Step indicator */}
+              <div className="flex items-center gap-2 sm:gap-3 py-1">
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300 shadow-sm",
+                    step === 1 ? "border-agro-green bg-agro-green text-white scale-110" : "border-agro-green bg-white text-agro-green"
+                  )}>
+                    {step > 1 ? <Check className="h-4 w-4" /> : <span className="text-sm font-bold">1</span>}
+                  </div>
+                  <div className="hidden lg:block">
+                    <p className={cn("text-[10px] font-bold uppercase tracking-wider", step === 1 ? "text-agro-green" : "text-muted-foreground")}>Bước 1</p>
+                    <p className={cn("text-xs font-semibold", step === 1 ? "text-foreground" : "text-muted-foreground")}>Soạn thảo</p>
+                  </div>
+                </div>
+
+                <div className="h-0.5 w-8 sm:w-10 overflow-hidden rounded-full bg-emerald-100">
+                  <div className={cn("h-full bg-agro-green transition-all duration-500", step === 2 ? "w-full" : "w-0")} />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300 shadow-sm",
+                    step === 2 ? "border-agro-green bg-agro-green text-white scale-110" : "border-emerald-100 bg-white text-muted-foreground"
+                  )}>
+                    <span className="text-sm font-bold">2</span>
+                  </div>
+                  <div className="hidden lg:block">
+                    <p className={cn("text-[10px] font-bold uppercase tracking-wider", step === 2 ? "text-agro-green" : "text-muted-foreground")}>Bước 2</p>
+                    <p className={cn("text-xs font-semibold", step === 2 ? "text-foreground" : "text-muted-foreground")}>Xác nhận</p>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {postedJob ? (
-        <Card className="border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-900/10 overflow-hidden">
-          <div className="h-2 bg-green-500 w-full" />
-          <CardHeader>
-            <div className="flex items-start gap-4">
-              <div className="bg-green-100 p-3 rounded-full text-green-600 dark:bg-green-900 dark:text-green-400">
-                <CheckCheck className="h-8 w-8" />
+        <div className="max-w-3xl mx-auto animate-in zoom-in-95 duration-500">
+          <Card className="border-emerald-100 shadow-2xl shadow-emerald-500/10 overflow-hidden bg-white dark:bg-zinc-900">
+            <div className="h-2 bg-gradient-to-r from-agro-green to-emerald-400 w-full" />
+            <div className="p-8 md:p-12 text-center space-y-6">
+              <div className="inline-flex items-center justify-center h-20 w-20 r ounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 mb-2 relative">
+                <div className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-20" />
+                <CheckCheck className="h-10 w-10 relative z-10" />
               </div>
-              <div className="space-y-1">
-                <CardTitle className="text-2xl text-green-700 dark:text-green-400">
-                  {isEditMode ? "Cập nhật tin thành công!" : "Đăng tin thành công!"}
-                </CardTitle>
-                <CardDescription className="text-base text-green-600/80 dark:text-green-400/80">
-                  {isEditMode
-                    ? "Thông tin bài đăng đã được cập nhật thành công."
-                    : "Tin tuyển dụng của bạn đã được công khai. Ứng viên sẽ sớm liên hệ với bạn."}
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6 pt-2">
-            <div className="rounded-xl border bg-background/80 p-6 shadow-sm backdrop-blur-sm">
-              <div className="grid gap-6 sm:grid-cols-2">
-                <div className="space-y-1 border-l-4 border-primary pl-4">
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Tiêu đề công việc</span>
-                  <p className="font-semibold text-lg">{postedJob.title}</p>
-                </div>
-                <div className="space-y-1 border-l-4 border-green-500 pl-4">
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Mức thu nhập</span>
-                  <p className="font-semibold text-lg text-green-600 dark:text-green-400">{formatCurrency(postedJob.income)}</p>
-                </div>
-                <div className="space-y-1 border-l-4 border-orange-400 pl-4">
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Thời gian làm việc</span>
-                  <p className="font-medium">
-                    {postedJob.scheduleType === "contract"
-                      ? `${formatDateDDMMYYYY(postedJob.contractStartDate ?? "")} - ${formatDateDDMMYYYY(postedJob.contractEndDate ?? "")}`
-                      : `${postedJob.daysToHire} ngày, ${postedJob.dailyStartTime?.slice(0, 5)} - ${postedJob.dailyEndTime?.slice(0, 5)}`
-                    }
-                  </p>
-                </div>
-                <div className="space-y-1 border-l-4 border-blue-400 pl-4">
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Địa điểm</span>
-                  <p className="font-medium truncate" title={postedJob.location}>{postedJob.location}</p>
-                </div>
-              </div>
-            </div>
 
-            <div className="flex gap-4 justify-end pt-4">
-              <Button variant="outline" size="lg" asChild className="border-green-200 hover:bg-green-50 text-green-700 dark:border-green-800 dark:hover:bg-green-900/20">
-                <Link href="/farmer/jobs">Quản lý tin đăng</Link>
-              </Button>
-              {isEditMode ? (
-                <Button size="lg" onClick={() => setPostedJob(null)} className="bg-green-600 hover:bg-green-700 text-white shadow-md">
-                  Chỉnh sửa lại
+              <div className="space-y-2">
+                <h3 className="text-3xl font-bold tracking-tight text-foreground">
+                  {isEditMode ? "Cập nhật thành công!" : "Đăng tin thành công!"}
+                </h3>
+                <p className="text-muted-foreground max-w-md mx-auto text-lg">
+                  {isEditMode
+                    ? "Nội dung bài đăng đã được cập nhật và hiển thị đến các ứng viên."
+                    : "Tin tuyển dụng của bạn đã được đăng công khai và sẵn sàng nhận ứng viên."}
+                </p>
+              </div>
+
+              <div className="grid gap-4 py-8">
+                <div className="rounded-2xl border bg-muted/30 p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="text-left space-y-1 w-full md:w-auto">
+                    <p className="text-sm font-medium text-muted-foreground">{postedJob.title}</p>
+                    <p className="text-2xl font-bold text-agro-green">{formatCurrency(postedJob.income)}</p>
+                  </div>
+                  <div className="h-px w-full md:h-12 md:w-px bg-border sm:hidden md:block" />
+                  <div className="text-left space-y-1 w-full md:w-auto">
+                    <p className="text-sm font-medium text-muted-foreground">Địa điểm</p>
+                    <p className="font-semibold text-foreground truncate max-w-[200px]">{postedJob.location}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+                <Button size="lg" variant="outline" asChild className="h-12 px-8 font-semibold hover:bg-muted transition-all">
+                  <Link href="/farmer/jobs">Quản lý bài đăng</Link>
                 </Button>
-              ) : (
-                <Button size="lg" onClick={resetAll} className="bg-green-600 hover:bg-green-700 text-white shadow-md">
-                  <Plus className="mr-2 h-4 w-4" /> Đăng tin khác
+                <Button size="lg" className="h-12 px-8 font-semibold bg-agro-green hover:bg-agro-green-dark text-white shadow-lg shadow-agro-green/20 transition-all transform hover:scale-105" onClick={() => (isEditMode ? setPostedJob(null) : resetAll())}>
+                  {isEditMode ? "Chỉnh sửa thêm" : "Tiếp tục đăng tin"}
                 </Button>
-              )}
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </Card>
+        </div>
       ) : (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
           {step === 1 ? (
-            <div className="space-y-8 max-w-4xl mx-auto">
+            <div className="space-y-8 max-w-7xl mx-auto">
               {/* Card thông tin */}
               <Card className="overflow-hidden border-t-4 border-t-primary shadow-md">
                 <CardHeader className="bg-muted/10 pb-0">
@@ -1381,7 +1540,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                       <Label className="font-semibold flex items-center justify-between">
                         <span></span>
                       </Label>
-                      <div className="flex items-center justify-between rounded-lg border border-muted-foreground/30 p-3 h-11">
+                      <div className="flex items-center justify-between rounded-lg border border-red-500 bg-red-100 p-3 h-11">
                         <span className="text-sm">Tuyển gấp</span>
                         <Switch checked={isUrgent} onCheckedChange={setIsUrgent} />
                       </div>
@@ -1489,36 +1648,63 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                   {scheduleType === "contract" ? (
                     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
                       <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase text-muted-foreground">Ngày bắt đầu</Label>
-                        <div className="relative">
-                          <Input value={contractStartDate} onChange={(e) => setContractStartDate(e.target.value)} placeholder="dd/mm/yyyy" className="pl-10" />
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button type="button" variant="ghost" size="icon" className="absolute left-0 top-0 h-10 w-10 text-muted-foreground"><CalendarIcon className="h-4 w-4" /></Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar mode="single" selected={selectedContractStartDate} onSelect={handleContractStartSelect} disabled={(d) => d < tomorrow} />
-                            </PopoverContent>
-                          </Popover>
+                        <Label className="text-xs font-bold uppercase text-muted-foreground">Khoảng thời gian</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full justify-start text-left font-normal"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                              {contractStartDate && contractEndDate
+                                ? `${contractStartDate} - ${contractEndDate}`
+                                : contractStartDate
+                                  ? `${contractStartDate} - Chọn ngày kết thúc`
+                                  : "Chọn ngày bắt đầu và ngày kết thúc"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="range"
+                              selected={selectedContractDateRange}
+                              onSelect={handleContractRangeSelect}
+                              numberOfMonths={2}
+                              disabled={(d) => d < tomorrow}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-muted-foreground">Ngày bắt đầu</Label>
+                          <Input value={contractStartDate} placeholder="dd/mm/yyyy" readOnly className="bg-muted/30" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase text-muted-foreground">Ngày kết thúc</Label>
+                          <Input value={contractEndDate} placeholder="dd/mm/yyyy" readOnly className="bg-muted/30" />
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase text-muted-foreground">Ngày kết thúc</Label>
+                      <div className="space-y-2 border-t pt-4">
+                        <div className="flex justify-between text-sm">
+                          <span>Tiền công</span>
+                        </div>
                         <div className="relative">
-                          <Input value={contractEndDate} onChange={(e) => setContractEndDate(e.target.value)} placeholder="dd/mm/yyyy" className="pl-10" />
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button type="button" variant="ghost" size="icon" className="absolute left-0 top-0 h-10 w-10 text-muted-foreground"><CalendarIcon className="h-4 w-4" /></Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar mode="single" selected={selectedContractEndDate} onSelect={handleContractEndSelect} disabled={(d) => d < tomorrow || (selectedContractStartDate ? d < selectedContractStartDate : false)} />
-                            </PopoverContent>
-                          </Popover>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            value={income}
+                            onChange={(e) => setIncome(formatThousandsWithDots(e.target.value))}
+                            className="pr-12 text-lg font-medium text-teal-700 dark:text-teal-400"
+                            placeholder="300.000"
+                          />
+                          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">VNĐ</span>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
+                    <div className="grid gap-4 animate-in fade-in zoom-in-95 duration-300 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:items-start">
                       <div className="rounded-lg border bg-card p-3 shadow-inner">
                         <div className="mb-3 flex items-center justify-between">
                           <Label className="text-xs font-bold">CHỌN NGÀY</Label>
@@ -1531,14 +1717,13 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                             </Button>
                           </div>
                         </div>
-                        <div className="flex justify-center bg-background rounded-md p-1">
+                        <div className="flex justify-center rounded-md bg-background p-1">
                           <Calendar
                             key={calendarSelectionSignature}
                             mode="multiple"
                             selected={calendarSelectedDates}
                             onDayClick={handleDailyCalendarDayClick}
                             disabled={(d) => d < tomorrow}
-                            className="rounded-md scale-100 w-full"
                           />
                         </div>
                         <div className="mt-2 text-center">
@@ -1548,40 +1733,44 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-[10px] uppercase text-muted-foreground font-bold">Giờ bắt đầu</Label>
-                          <TimePicker value={dailyStartTime} onChange={setDailyStartTime} />
+                      <div className="space-y-4 rounded-lg border bg-muted/20 p-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">Giờ bắt đầu</Label>
+                            <TimePicker value={dailyStartTime} onChange={setDailyStartTime} />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">Giờ kết thúc</Label>
+                            <TimePicker value={dailyEndTime} onChange={setDailyEndTime} />
+                          </div>
                         </div>
-                        <div className="space-y-1">
-                          <Label className="text-[10px] uppercase text-muted-foreground font-bold">Giờ kết thúc</Label>
-                          <TimePicker value={dailyEndTime} onChange={setDailyEndTime} />
+
+                        <div className="space-y-2 border-t pt-4">
+                          <Label className="flex justify-between">
+                            <span>Số lượng nhân công</span>
+                          </Label>
+                          <Input type="number" min="1" value={workersNeeded} onChange={(e) => setWorkersNeeded(e.target.value)} />
+                        </div>
+
+                        <div className="space-y-2 border-t pt-4">
+                          <div className="flex justify-between text-sm">
+                            <span>Đơn giá</span>
+                          </div>
+                          <div className="relative">
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              value={income}
+                              onChange={(e) => setIncome(formatThousandsWithDots(e.target.value))}
+                              className="pr-12 text-lg font-medium text-teal-700 dark:text-teal-400"
+                              placeholder="300.000"
+                            />
+                            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">VNĐ</span>
+                          </div>
                         </div>
                       </div>
-
-                      <div className="space-y-2 pt-5 border-t">
-                        <Label className="flex justify-between">
-                          <span>Số lượng nhân công</span>
-                          <span className="font-bold text-primary">{workersNeeded}</span>
-                        </Label>
-                        <Input type="number" min="1" value={workersNeeded} onChange={(e) => setWorkersNeeded(e.target.value)} />
-                      </div>
-
-
                     </div>
                   )}
-
-                  <div className="relative">
-                    <div className="absolute left-3 top-2.5 text-muted-foreground text-xs pr-3">VNĐ</div>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={income}
-                      onChange={(e) => setIncome(e.target.value)}
-                      className="pl-12 text-lg font-medium text-teal-700 dark:text-teal-400"
-                      placeholder="300,000"
-                    />
-                  </div>
                 </CardContent>
               </Card>
 
@@ -1707,11 +1896,10 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                     <OsmLocationPicker
                       latitude={locationLat ?? null}
                       longitude={locationLng ?? null}
-                      onPick={handleMapPick}
                       className="h-full"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">Bấm vào bản đồ để chọn vị trí công việc</p>
+                  <p className="text-xs text-muted-foreground">Bản đồ chỉ hiển thị vị trí đã chọn.</p>
                 </CardContent>
               </Card>
 
@@ -1732,18 +1920,30 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                         <Label className="text-sm font-semibold text-muted-foreground uppercase">Kỹ năng</Label>
                         <p className="text-sm text-muted-foreground">Chọn các kỹ năng ứng viên cần có:</p>
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setIsAddSkillDialogOpen(true)
-                          setNewSkillCategoryId(selectedJobCategoryId)
-                        }}
-                        disabled={selectedJobCategoryId === DEFAULT_JOB_CATEGORY_ID}
-                      >
-                        <Plus className="mr-2 h-4 w-4" /> Thêm kỹ năng
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={toggleAllVisibleSkills}
+                          disabled={isLoadingSkills || availableSkills.length === 0}
+                        >
+                          <CheckSquare className="mr-2 h-4 w-4" />
+                          {availableSkills.length > 0 && availableSkills.every((skill) => selectedSkillIds.includes(skill.id))
+                            ? "Bỏ chọn tất cả"
+                            : "Chọn tất cả"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setIsAddSkillDialogOpen(true)
+                          }}
+                        >
+                          <Plus className="mr-2 h-4 w-4" /> Thêm kỹ năng
+                        </Button>
+                      </div>
                     </div>
 
                     <Dialog open={isAddSkillDialogOpen} onOpenChange={setIsAddSkillDialogOpen}>
@@ -1754,41 +1954,15 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                         <div className="grid gap-4 py-4">
                           <div className="space-y-2">
                             <Label>Danh mục công việc <span className="text-destructive">*</span></Label>
-                            <Popover open={isAddSkillCategoryPopoverOpen} onOpenChange={setIsAddSkillCategoryPopoverOpen}>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  role="combobox"
-                                  className="w-full justify-between font-normal"
-                                >
-                                  {getJobCategoryLabel(newSkillCategoryId) || "Chọn danh mục"}
-                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-[375px] p-0" align="start">
-                                <Command>
-                                  <CommandInput placeholder="Tìm kiếm danh mục..." />
-                                  <CommandList>
-                                    <CommandEmpty>Không tìm thấy.</CommandEmpty>
-                                    <CommandGroup>
-                                      {jobCategories.map((category) => (
-                                        <CommandItem
-                                          key={category.id}
-                                          value={category.name}
-                                          onSelect={() => {
-                                            setNewSkillCategoryId(category.id)
-                                            setIsAddSkillCategoryPopoverOpen(false)
-                                          }}
-                                        >
-                                          <Check className={cn("mr-2 h-4 w-4", newSkillCategoryId === category.id ? "opacity-100" : "opacity-0")} />
-                                          {category.name}
-                                        </CommandItem>
-                                      ))}
-                                    </CommandGroup>
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className="w-full justify-between font-normal"
+                              disabled
+                            >
+                              {selectedJobCategoryLabel || "Chọn danh mục ở phần thông tin công việc"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="new-skill-name">
@@ -1815,7 +1989,14 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                           <Button type="button" variant="outline" onClick={() => { setIsAddSkillDialogOpen(false); setNewSkillName(""); setNewSkillDesc(""); }}>
                             Hủy
                           </Button>
-                          <Button type="button" onClick={handleCreateSkill} disabled={isCreatingSkill || !newSkillName.trim() || !newSkillCategoryId}>
+                          <Button
+                            type="button"
+                            onClick={handleCreateSkill}
+                            disabled={
+                              isCreatingSkill ||
+                              !newSkillName.trim()
+                            }
+                          >
                             {isCreatingSkill ? "Đang lưu..." : "Lưu lại"}
                           </Button>
                         </div>
@@ -1839,7 +2020,8 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                                 id={`skill-${skill.id}`}
                                 checked={selectedSkillIds.includes(skill.id)}
                                 onCheckedChange={() => toggleSkill(skill.id)}
-                                className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                onClick={() => toggleSkill(skill.id)}
+                                className="data-[state=checked]:bg-primary data-[state=checked]:border-primary cursor-pointer"
                               />
                               <span className="text-sm font-medium">{skill.name}</span>
                             </div>
@@ -1937,148 +2119,149 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
               </Card>
 
               {/* Action Bar */}
-              <div className="sticky bottom-4 z-1000 bg-background/95 backdrop-blur p-4 border rounded-xl shadow-lg flex flex-col sm:flex-row justify-between items-center gap-4">
-                <div className="text-sm text-muted-foreground">
+              <div className="sticky bottom-6 z-1000 bg-white dark:bg-zinc-900/80 p-5 border rounded-2xl shadow-xl flex flex-col sm:flex-row justify-between items-center gap-4 animate-in slide-in-from-bottom-4 duration-500">
+                <div className="text-sm flex items-center gap-2">
                   {submitError ? (
-                    <span className="flex items-center text-destructive font-semibold"><Info className="mr-2 h-4 w-4" /> {submitError}</span>
+                    <span className="flex items-center text-rose-600 font-semibold bg-rose-50 px-3 py-1.5 rounded-full border border-rose-100"><Info className="mr-2 h-4 w-4" /> {submitError}</span>
                   ) : (
-                    <span>Vui lòng điền đầy đủ thông tin có dấu <span className="text-destructive">*</span></span>
+                    <div className="flex items-center gap-2 text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
+                      <div className="h-1.5 w-1.5 rounded-full bg-agro-green animate-pulse" />
+                      <span>Vui lòng điền đủ thông tin <span className="text-destructive font-bold">*</span></span>
+                    </div>
                   )}
                 </div>
                 <div className="flex gap-3 w-full sm:w-auto">
-                  <Button type="button" variant="outline" asChild className="flex-1 sm:flex-none">
-                    <Link href="/farmer/jobs">Hủy bỏ</Link>
+                  <Button type="button" variant="ghost" className="flex-1 sm:flex-none font-semibold hover:bg-muted" onClick={() => handleNavigateAway("/farmer/jobs")}>
+                    Hủy bỏ
                   </Button>
-                  <Button type="button" onClick={goToPreview} className="flex-1 sm:flex-none shadow-sm">
-                    {isEditMode ? "Xem trước cập nhật" : "Xem trước tin đăng"} <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                  <Button type="button" onClick={goToPreview} className="flex-1 sm:flex-none shadow-lg shadow-agro-green/10 bg-agro-green hover:bg-agro-green-dark text-white font-bold h-11 px-8">
+                    Tiếp theo <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
                   </Button>
                 </div>
               </div>
             </div>
           ) : (
             /* Step 2: Preview */
-            <div className="max-w-4xl mx-auto space-y-8 pb-10">
-              <Card className="shadow-lg border-2 border-primary/10">
-                <CardHeader className="bg-muted/30 border-b pb-6">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                      <CardTitle className="text-2xl">Xác nhận thông tin</CardTitle>
-                      <CardDescription>Vui lòng kiểm tra kỹ nội dung tin tuyển dụng trước khi đăng công khai.</CardDescription>
+            <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
+              <Card className="shadow-2xl border-0 overflow-hidden rounded-3xl bg-white dark:bg-zinc-900">
+                <div className="bg-gradient-to-r from-agro-green/10 via-background to-background p-8 md:p-12 border-b">
+                  <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                    <div className="space-y-2">
+                      <Badge className="bg-agro-green/10 text-agro-green border-agro-green/20 hover:bg-agro-green/20 mb-2">XÁC NHẬN BÀI ĐĂNG</Badge>
+                      <CardTitle className="text-3xl md:text-4xl font-bold tracking-tight">{title}</CardTitle>
+                      <CardDescription className="text-lg">Kiểm tra kỹ thông tin trước khi xuất bản tin tuyển dụng</CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={cn("px-3 py-1 font-normal", isUrgent ? "bg-red-100 text-red-700 border-red-200" : "bg-blue-50 text-blue-700 border-blue-200")}>
-                        {isUrgent ? "🔥 Tuyển gấp" : "Tiêu chuẩn"}
+                    <div className="flex flex-col items-end gap-2">
+                      <Badge variant="outline" className={cn("px-4 py-1.5 text-sm font-bold uppercase tracking-widest", isUrgent ? "bg-rose-50 text-rose-600 border-rose-200 shadow-sm" : "bg-blue-50 text-blue-700 border-blue-200")}>
+                        {isUrgent ? "Tuyển gấp" : "Tiêu chuẩn"}
                       </Badge>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-8 pt-8 px-6 md:px-10">
-                  {/* Job Status Banner */}
-                  <div className="bg-primary/5 rounded-xl p-6 border border-primary/10">
-                    <h3 className="text-2xl font-bold text-foreground mb-4">{title}</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="space-y-1">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase">Mức lương</p>
-                        <div className="flex items-center font-medium text-primary"><DollarSign className="mr-1 h-4 w-4" /> {formatCurrency(incomeNumber)}</div>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase">Hình thức</p>
-                        <div className="flex items-center font-medium"><CalendarRange className="mr-1 h-4 w-4" /> {scheduleType === "contract" ? "Khoán việc" : "Theo ngày"}</div>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase">Số lượng</p>
-                        <div className="flex items-center font-medium"><User className="mr-1 h-4 w-4" /> {workersNeededNumber} người</div>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase">Địa điểm</p>
-                        <div className="flex items-center font-medium truncate" title={selectedFarmLabel}><MapPin className="mr-1 h-4 w-4" /> {selectedFarmLabel}</div>
-                      </div>
-                      <div className="space-y-1 bg-primary/10 p-3 rounded-md col-span-2 md:col-span-4 flex items-center justify-between border border-primary/20 mt-2">
-                        <span className="font-semibold text-primary uppercase text-sm">Tổng chi phí dự kiến:</span>
-                        <span className="text-xl font-bold text-primary">{formatCurrency(scheduleType === "contract" ? incomeNumber : incomeNumber * workersNeededNumber * selectedDailyDaysCount)}</span>
-                      </div>
+                </div>
+
+                <CardContent className="p-8 md:p-12 space-y-12">
+                  {/* Key Stats Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 bg-muted/20 p-8 rounded-3xl border border-muted-foreground/10">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Mức lương</p>
+                      <div className="flex items-center text-xl font-extrabold text-agro-green"><Banknote className="mr-2 h-5 w-5" /> {formatCurrency(incomeNumber)}</div>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Loại hình</p>
+                      <div className="flex items-center text-xl font-bold"><CalendarRange className="mr-2 h-5 w-5 text-indigo-500" /> {scheduleType === "contract" ? "Khoán" : "Theo ngày"}</div>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Nhân công</p>
+                      <div className="flex items-center text-xl font-bold"><Users className="mr-2 h-5 w-5 text-amber-500" /> {workersNeededNumber} người</div>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Khu vực</p>
+                      <div className="flex items-center text-xl font-bold truncate" title={selectedFarmLabel}><MapPin className="mr-2 h-5 w-5 text-rose-500" /> {selectedFarmLabel.split(',')[0]}</div>
                     </div>
                   </div>
 
-                  <div className="grid md:grid-cols-3 gap-8">
-                    <div className="md:col-span-2 space-y-6">
-                      <div className="space-y-3">
-                        <h4 className="flex items-center text-sm font-bold uppercase text-muted-foreground tracking-wide border-b pb-2">
-                          <AlignLeft className="mr-2 h-4 w-4" /> Chi tiết công việc
+                  <div className="flex items-center justify-between bg-agro-green p-6 rounded-2xl text-white shadow-xl shadow-agro-green/20">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase opacity-80 mb-1">Tổng chi phí dự tính</p>
+                      <p className="text-2xl font-black">{formatCurrency(scheduleType === "contract" ? incomeNumber : incomeNumber * workersNeededNumber * selectedDailyDaysCount)}</p>
+                    </div>
+                    <div className="bg-white/20 p-3 rounded-xl">
+                      <div className="h-8 w-8 text-white font-bold flex items-center">VNĐ</div>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-5 gap-12">
+                    <div className="md:col-span-3 space-y-8">
+                      <div className="space-y-4">
+                        <h4 className="flex items-center text-xs font-black uppercase text-foreground bg-muted/50 w-fit px-3 py-1 rounded-full">
+                          Mô tả công việc
                         </h4>
-                        <div className="bg-muted/10 rounded-lg p-4 text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 border">
+                        <div className="text-lg leading-relaxed text-muted-foreground whitespace-pre-wrap">
                           {description}
                         </div>
                       </div>
 
-                      <div className="space-y-3">
-                        <h4 className="flex items-center text-sm font-bold uppercase text-muted-foreground tracking-wide border-b pb-2">
-                          <Award className="mr-2 h-4 w-4" /> Yêu cầu kỹ năng
+                      <div className="space-y-4">
+                        <h4 className="flex items-center text-xs font-black uppercase text-foreground bg-muted/50 w-fit px-3 py-1 rounded-full">
+                          Kỹ năng
                         </h4>
                         <div className="flex flex-wrap gap-2">
                           {selectedSkillIds.length > 0 ? (
                             selectedSkillIds.map(id => (
-                              <Badge key={id} variant="secondary" className="px-3 py-1">{getSkillLabel(id)}</Badge>
+                              <Badge key={id} variant="secondary" className="px-4 py-1.5 font-bold bg-secondary text-secondary-foreground">{getSkillLabel(id)}</Badge>
                             ))
                           ) : (
-                            <span className="text-sm text-muted-foreground italic">Không yêu cầu kỹ năng đặc biệt</span>
+                            <span className="text-muted-foreground italic">Không yêu cầu</span>
                           )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="space-y-6">
-                      <div className="space-y-3">
-                        <h4 className="flex items-center text-sm font-bold uppercase text-muted-foreground tracking-wide border-b pb-2">
-                          <CalendarRange className="mr-2 h-4 w-4" /> Thời gian
+                    <div className="md:col-span-2 space-y-8">
+                      <div className="space-y-4">
+                        <h4 className="flex items-center text-xs font-black uppercase text-foreground bg-muted/50 w-fit px-3 py-1 rounded-full">
+                          Thời gian cụ thể
                         </h4>
-                        <div className="bg-blue-50/50 dark:bg-blue-900/10 rounded-lg p-4 border border-blue-100 dark:border-blue-900 space-y-2 text-sm">
+                        <div className="bg-slate-50 dark:bg-zinc-800/50 rounded-2xl p-6 border space-y-4">
                           {scheduleType === "contract" ? (
-                            <>
-                              <div className="flex justify-between"><span>Bắt đầu:</span> <span className="font-semibold">{formatDateDDMMYYYY(contractStartDate)}</span></div>
-                              <div className="flex justify-between"><span>Kết thúc:</span> <span className="font-semibold">{formatDateDDMMYYYY(contractEndDate)}</span></div>
-                            </>
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-center"><span className="text-muted-foreground font-medium">Ngày bắt đầu:</span> <span className="font-bold text-lg">{formatDateDDMMYYYY(contractStartDate)}</span></div>
+                              <div className="flex justify-between items-center"><span className="text-muted-foreground font-medium">Ngày kết thúc:</span> <span className="font-bold text-lg">{formatDateDDMMYYYY(contractEndDate)}</span></div>
+                            </div>
                           ) : (
-                            <>
-                              <div className="flex justify-between"><span>Số ngày:</span> <span className="font-semibold">{selectedDailyDaysCount} ngày</span></div>
-                              <div className="flex justify-between"><span>Ca làm:</span> <span className="font-semibold">{dailyStartTime} - {dailyEndTime}</span></div>
-                            </>
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-center"><span className="text-muted-foreground font-medium">Tổng số ngày:</span> <span className="font-bold text-lg text-agro-green">{selectedDailyDaysCount} ngày</span></div>
+                              <div className="flex justify-between items-center"><span className="text-muted-foreground font-medium">Khung giờ làm:</span> <span className="font-bold text-lg">{dailyStartTime} - {dailyEndTime}</span></div>
+                            </div>
                           )}
                         </div>
                       </div>
 
-                      <div className="space-y-3">
-                        <h4 className="flex items-center text-sm font-bold uppercase text-muted-foreground tracking-wide border-b pb-2">
-                          <Gift className="mr-2 h-4 w-4" /> Quyền lợi
+                      <div className="space-y-4">
+                        <h4 className="flex items-center text-xs font-black uppercase text-foreground bg-muted/50 w-fit px-3 py-1 rounded-full">
+                          Quyền lợi & Yêu cầu
                         </h4>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="grid gap-3">
                           {benefits.length > 0 ? benefits.map(b => (
-                            <Badge key={b} variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800">{b}</Badge>
-                          )) : <span className="text-sm text-muted-foreground">Cơ bản</span>}
-                        </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <h4 className="flex items-center text-sm font-bold uppercase text-muted-foreground tracking-wide border-b pb-2">
-                          <Info className="mr-2 h-4 w-4" /> Yêu cầu khác
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
+                            <div key={b} className="flex items-center gap-2 text-sm font-semibold text-emerald-600"><CheckCheck className="h-4 w-4 shrink-0" /> {b}</div>
+                          )) : null}
                           {requirements.length > 0 ? requirements.map(r => (
-                            <Badge key={r} variant="outline">{r}</Badge>
-                          )) : <span className="text-sm text-muted-foreground">Không có</span>}
+                            <div key={r} className="flex items-center gap-2 text-sm font-semibold text-muted-foreground"><Plus className="h-4 w-4 shrink-0" /> {r}</div>
+                          )) : null}
                         </div>
                       </div>
                     </div>
                   </div>
                 </CardContent>
-                <CardContent className="bg-muted/20 border-t p-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-                  {submitError && <p className="text-destructive font-semibold flex items-center"><Info className="mr-2 h-4 w-4" /> {submitError}</p>}
+
+                <CardContent className="bg-muted/10 border-t p-8 md:p-12 flex flex-col sm:flex-row justify-between items-center gap-6">
+                  {submitError && <p className="text-rose-600 font-bold flex items-center bg-rose-50 px-4 py-2 rounded-xl"><Info className="mr-2 h-4 w-4" /> {submitError}</p>}
                   <div className="flex gap-4 w-full sm:w-auto ml-auto">
-                    <Button type="button" variant="outline" onClick={() => setStep(1)} className="flex-1 sm:flex-none">
+                    <Button type="button" variant="ghost" onClick={() => setStep(1)} className="flex-1 sm:flex-none font-bold h-12">
                       <ArrowLeft className="mr-2 h-4 w-4" /> Chỉnh sửa
                     </Button>
-                    <Button type="button" size="lg" onClick={submitJob} disabled={isSubmitting} className="flex-1 sm:flex-none shadow-md min-w-[200px]">
-                      {isSubmitting ? "Đang xử lý..." : isEditMode ? "Xác nhận & Cập nhật" : "Xác nhận & Đăng tin"}
+                    <Button type="button" size="lg" onClick={submitJob} disabled={isSubmitting} className="flex-1 sm:flex-none shadow-2xl shadow-agro-green/20 bg-agro-green hover:bg-agro-green-dark text-white font-black h-14 px-10 rounded-2xl">
+                      {isSubmitting ? "ĐANG XỬ LÝ..." : isEditMode ? "CẬP NHẬT NGAY" : "XÁC NHẬN & ĐĂNG TIN"}
                     </Button>
                   </div>
                 </CardContent>

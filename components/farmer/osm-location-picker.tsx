@@ -6,7 +6,7 @@ import L from "leaflet"
 type OsmLocationPickerProps = {
   latitude: number | null
   longitude: number | null
-  onPick: (latitude: number, longitude: number) => void
+  onPick?: (latitude: number, longitude: number) => void
   className?: string
 }
 
@@ -24,7 +24,7 @@ const markerIcon = L.icon({
   shadowSize: [41, 41],
 })
 
-export function OsmLocationPicker({ latitude, longitude, onPick, className }: OsmLocationPickerProps) {
+export function OsmLocationPicker({ latitude, longitude, className }: OsmLocationPickerProps) {
   const mapElementRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
   const markerRef = useRef<L.Marker | null>(null)
@@ -43,17 +43,13 @@ export function OsmLocationPicker({ latitude, longitude, onPick, className }: Os
       center: initialCenter,
       zoom: initialZoom,
       zoomControl: true,
-      attributionControl: true,
+      attributionControl: false,
     })
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map)
-
-    map.on("click", (e: L.LeafletMouseEvent) => {
-      onPick(e.latlng.lat, e.latlng.lng)
-    })
 
     mapRef.current = map
 
@@ -87,5 +83,5 @@ export function OsmLocationPicker({ latitude, longitude, onPick, className }: Os
     map.setView(nextLatLng, PICKED_ZOOM)
   }, [latitude, longitude])
 
-  return <div ref={mapElementRef} className={`w-full ${className ?? "h-64"}`} aria-label="Bản đồ chọn vị trí nông trại" />
+  return <div ref={mapElementRef} className={`w-full ${className ?? "h-64"}`} aria-label="Bản đồ vị trí nông trại" />
 }
