@@ -6,7 +6,7 @@ import type {
   WalletTransactionDTO,
   CreateWithdrawalRequest,
   WithdrawalRequest,
-  WithdrawalAccountBalanceResponse
+  WithdrawalAccountBalanceResponse,
 } from "@/libs/types/wallet.types";
 
 export const WalletService = {
@@ -22,33 +22,69 @@ export const WalletService = {
   },
 
   getWalletDetail: async (id: string): Promise<ApiResponse<WalletDTO>> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.WALLET.GET_DETAIL(id));
+    const response = await axiosInstance.get(
+      API_ENDPOINTS.WALLET.GET_DETAIL(id),
+    );
     return response.data;
   },
 
   // Transactions
-  getTransactionsByWallet: async (walletId: string, page = 1, limit = 10): Promise<PaginatedResponse<WalletTransactionDTO>> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.WALLET_TRANSACTION.GET_BY_WALLET(walletId), {
-      params: { page, limit }
-    });
+  getTransactionsByWallet: async (
+    walletId: string,
+    page = 1,
+    limit = 10,
+  ): Promise<PaginatedResponse<WalletTransactionDTO>> => {
+    const response = await axiosInstance.get(
+      API_ENDPOINTS.WALLET_TRANSACTION.GET_BY_WALLET(walletId),
+      {
+        params: { page, limit },
+      },
+    );
+    return response.data;
+  },
+
+  // Admin: get all wallet transactions with filters
+  getAllTransactions: async (params?: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    status?: string;
+    search?: string;
+  }): Promise<PaginatedResponse<WalletTransactionDTO>> => {
+    const response = await axiosInstance.get(
+      API_ENDPOINTS.WALLET_TRANSACTION.GET_ALL,
+      { params },
+    );
     return response.data;
   },
 
   // Withdrawals
-  createWithdrawal: async (data: CreateWithdrawalRequest): Promise<ApiResponse<any>> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.WITHDRAWAL.CREATE, data);
+  createWithdrawal: async (
+    data: CreateWithdrawalRequest,
+  ): Promise<ApiResponse<any>> => {
+    const response = await axiosInstance.post(
+      API_ENDPOINTS.WITHDRAWAL.CREATE,
+      data,
+    );
     return response.data;
   },
 
-  getMyWithdrawals: async (page = 1, limit = 10): Promise<PaginatedResponse<WithdrawalRequest>> => {
+  getMyWithdrawals: async (
+    page = 1,
+    limit = 10,
+  ): Promise<PaginatedResponse<WithdrawalRequest>> => {
     const response = await axiosInstance.get(API_ENDPOINTS.WITHDRAWAL.CURRENT, {
-      params: { page, limit }
+      params: { page, limit },
     });
     return response.data;
   },
 
-  getWithdrawalAccountBalance: async (): Promise<ApiResponse<WithdrawalAccountBalanceResponse>> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.WITHDRAWAL.ACCOUNT_BALANCE);
+  getWithdrawalAccountBalance: async (): Promise<
+    ApiResponse<WithdrawalAccountBalanceResponse>
+  > => {
+    const response = await axiosInstance.get(
+      API_ENDPOINTS.WITHDRAWAL.ACCOUNT_BALANCE,
+    );
     return response.data;
-  }
+  },
 };

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback } from "react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 interface LoadingContextType {
   isLoading: boolean;
@@ -14,7 +15,7 @@ export function LoadingProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <LoadingContext.Provider value={{ isLoading, setIsLoading }}>
-      {children}
+      <ErrorBoundary>{children}</ErrorBoundary>
     </LoadingContext.Provider>
   );
 }
