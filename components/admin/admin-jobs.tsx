@@ -7,6 +7,13 @@ import type {
   AdminJob,
   AdminJobListResponse,
 } from "@/libs/types/admin-job.types";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export function AdminJobs() {
   const [jobs, setJobs] = useState<AdminJob[]>([]);
@@ -23,6 +30,7 @@ export function AdminJobs() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedJob, setSelectedJob] = useState<AdminJob | null>(null);
 
   // Tính tổng số trang
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -125,7 +133,7 @@ export function AdminJobs() {
                   Người đăng
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                  Người nhận việc
+                  Nhân công
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
                   Trạng thái
@@ -167,7 +175,7 @@ export function AdminJobs() {
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-foreground">
-                      {job.worker?.fullName || "-"}
+                      {job.worker || "-"}
                     </p>
                   </td>
                   <td className="px-6 py-4">
@@ -190,6 +198,7 @@ export function AdminJobs() {
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
                       <button
+                        onClick={() => setSelectedJob(job)}
                         className="p-2 hover:bg-muted rounded-lg transition-colors"
                         title="Xem chi tiết"
                       >
@@ -286,24 +295,62 @@ export function AdminJobs() {
 
       {/* Pagination */}
       {/* <div className="flex justify-end items-center gap-2 mt-4">
-        <button
-          className="px-3 py-1 rounded border border-border bg-card text-foreground disabled:opacity-50"
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1 || loading}
-        >
-          Trang trước
-        </button>
-        <span className="text-sm">Trang {page}</span>
-        <button
-          className="px-3 py-1 rounded border border-border bg-card text-foreground disabled:opacity-50"
-          onClick={() =>
-            setPage((p) => (total && page * limit < total ? p + 1 : p))
-          }
-          disabled={loading || (total && page * limit >= total)}
-        >
-          Trang sau
-        </button>
+        ... (commented out code) ...
       </div> */}
+      
+      {/* Job Details Dialog */}
+      <Dialog open={!!selectedJob} onOpenChange={() => setSelectedJob(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">{selectedJob?.title}</DialogTitle>
+          </DialogHeader>
+          {selectedJob && (
+            <div className="grid grid-cols-2 gap-4 mt-2">
+              <div>
+                <p className="text-sm text-muted-foreground">Người đăng</p>
+                <p className="font-semibold text-foreground">{selectedJob.farmer?.fullName || "Chưa cập nhật"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Trạng thái</p>
+                <span className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-semibold ${statusColors[selectedJob.status] ?? "bg-muted text-muted-foreground"}`}>
+                  {selectedJob.status}
+                </span>
+              </div>
+              <div className="col-span-2">
+                <p className="text-sm text-muted-foreground">Mô tả công việc</p>
+                <div className="p-3 mt-1 rounded-lg bg-muted text-sm text-foreground whitespace-pre-wrap">
+                  {selectedJob.description || "Không có mô tả"}
+                </div>
+              </div>
+              <div className="col-span-2">
+                <p className="text-sm text-muted-foreground">Địa chỉ</p>
+                <p className="font-medium text-foreground">{selectedJob.address || "Chưa cập nhật"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Lương (VNĐ)</p>
+                <p className="font-semibold text-foreground">{selectedJob.salary?.toLocaleString() || "Thỏa thuận"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Thời gian bắt đầu</p>
+                <p className="font-semibold text-foreground">{selectedJob.startDate || "Chưa cập nhật"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Số người nhận việc</p>
+                <p className="font-semibold text-foreground">{selectedJob.workersAccepted} / {selectedJob.workersNeeded} người</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Mã công việc</p>
+                <p className="text-xs text-foreground font-mono truncate">{selectedJob.id}</p>
+              </div>
+            </div>
+          )}
+          <div className="mt-4 flex justify-end">
+            <Button variant="outline" onClick={() => setSelectedJob(null)}>
+              Đóng
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { authService } from "@/libs/api"
+import { authService } from "@/libs/api/services"
 import { useAuth } from "@/libs/stores/auth.store"
 import {
   LayoutDashboard,

@@ -12,7 +12,11 @@ export interface AdminJob {
   id: string;
   title: string;
   farmer: AdminJobFarmer;
-  worker?: AdminJobWorker;
+  worker?: string;
+  workersAccepted: number;
+  workersNeeded: number;
+  description: string;
+  address: string;
   status: string;
   salary: number;
   startDate: string;

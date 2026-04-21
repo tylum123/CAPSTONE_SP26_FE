@@ -55,12 +55,12 @@ export function Header() {
       }
     };
 
-    if (isAuthenticated) {
+    if (isAuthenticated && user?.role === "farmer") {
       fetchProfile();
     } else {
       setProfile(null);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user]);
 
   return (
     <header 

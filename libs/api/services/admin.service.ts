@@ -9,9 +9,9 @@ const ROLE_TO_ID: Record<string, number> = {
 };
 
 const ADMIN_FALLBACK_ENDPOINTS = {
-  DISPUTES: '/admin/disputes',
-  DISPUTE_DETAIL: (id: string) => `/admin/disputes/${id}`,
-  RESOLVE_DISPUTE: (id: string) => `/admin/disputes/${id}/resolve`,
+  DISPUTES: '/disputes',
+  DISPUTE_DETAIL: (id: string) => `/disputes/${id}`,
+  RESOLVE_DISPUTE: (id: string) => `/disputes/${id}/resolve`,
   SETTINGS: '/admin/settings',
   STATISTICS: '/admin/statistics',
 } as const;

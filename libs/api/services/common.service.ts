@@ -11,7 +11,7 @@ export const commonService = {
     limit?: number;
     read?: boolean;
   }): Promise<ApiResponse<PaginatedResponse<Notification>>> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.NOTIFICATIONS, { params });
+    const response = await axiosInstance.get(API_ENDPOINTS.NOTIFICATIONS.GET_ALL, { params });
     return response.data;
   },
 
@@ -19,7 +19,7 @@ export const commonService = {
    * Mark notification as read
    */
   markNotificationAsRead: async (id: string): Promise<ApiResponse<void>> => {
-    const response = await axiosInstance.put(`${API_ENDPOINTS.NOTIFICATIONS}/${id}/read`);
+    const response = await axiosInstance.put(`${API_ENDPOINTS.NOTIFICATIONS.GET_ALL}/${id}/read`);
     return response.data;
   },
 
@@ -27,7 +27,7 @@ export const commonService = {
    * Mark all notifications as read
    */
   markAllNotificationsAsRead: async (): Promise<ApiResponse<void>> => {
-    const response = await axiosInstance.put(`${API_ENDPOINTS.NOTIFICATIONS}/read-all`);
+    const response = await axiosInstance.put(API_ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ);
     return response.data;
   },
 
@@ -39,7 +39,7 @@ export const commonService = {
     limit?: number;
     userId?: string;
   }): Promise<ApiResponse<PaginatedResponse<Message>>> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.MESSAGES, { params });
+    const response = await axiosInstance.get(API_ENDPOINTS.MESSAGES.GET, { params });
     return response.data;
   },
 
@@ -47,7 +47,7 @@ export const commonService = {
    * Send message
    */
   sendMessage: async (receiverId: string, content: string): Promise<ApiResponse<Message>> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.MESSAGES, {
+    const response = await axiosInstance.post(API_ENDPOINTS.MESSAGES.SEND, {
       receiverId,
       content,
     });
@@ -58,7 +58,7 @@ export const commonService = {
    * Mark messages from `senderId` to current user as read.
    */
   markConversationAsRead: async (senderId: string): Promise<ApiResponse<number>> => {
-    const response = await axiosInstance.patch(`${API_ENDPOINTS.MESSAGES}/read`, {
+    const response = await axiosInstance.patch(API_ENDPOINTS.MESSAGES.READ, {
       senderId,
     });
     return response.data;

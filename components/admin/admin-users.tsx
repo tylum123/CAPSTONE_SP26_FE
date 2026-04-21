@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   Search,
@@ -58,7 +58,7 @@ export function AdminUsers() {
       const res = await adminService.getUsers(
         params as Parameters<typeof adminService.getUsers>[0],
       );
-      const payload = res;
+      const payload = res.data;
 
       if (Array.isArray(payload)) {
         setUsers(payload);
@@ -66,8 +66,8 @@ export function AdminUsers() {
         setTotalPages(1);
       } else {
         setUsers(payload.data);
-        setTotal(payload.total);
-        setTotalPages(payload.totalPages);
+        setTotal(payload.pagination.total);
+        setTotalPages(payload.pagination.totalPages);
       }
     } catch (err) {
       console.error(err);
