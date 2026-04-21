@@ -106,12 +106,26 @@ export const adminService = {
   },
 
   /**
+   * Get dispute comments
+   */
+  getDisputeComments: async (id: string): Promise<ApiResponse<any[]>> => {
+    const response = await axiosInstance.get(`/disputes/${id}/comments`);
+    return response.data;
+  },
+
+  /**
+   * Add a dispute comment (admin can optionally target a specific party)
+   */
+  addDisputeComment: async (id: string, content: string, targetUserId?: string): Promise<ApiResponse<any>> => {
+    const response = await axiosInstance.post(`/disputes/${id}/comments`, { content, targetUserId: targetUserId ?? null });
+    return response.data;
+  },
+
+  /**
    * Resolve dispute
    */
-  resolveDispute: async (id: string, resolution: string): Promise<ApiResponse<any>> => {
-    const response = await axiosInstance.post(ADMIN_FALLBACK_ENDPOINTS.RESOLVE_DISPUTE(id), {
-      resolution,
-    });
+  resolveDispute: async (id: string, resolution: any): Promise<ApiResponse<any>> => {
+    const response = await axiosInstance.put(ADMIN_FALLBACK_ENDPOINTS.RESOLVE_DISPUTE(id), resolution);
     return response.data;
   },
 

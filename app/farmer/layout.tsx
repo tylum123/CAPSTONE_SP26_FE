@@ -26,6 +26,7 @@ import {
   MessageCircle,
   Loader2,
   Home,
+  AlertTriangle,
 } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { farmerService, authService, notificationService } from "@/libs/api/services"
@@ -100,6 +101,7 @@ export default function FarmerLayout({
     { icon: PlusCircle, label: "Đăng tin", href: "/farmer/create-job" },
     { icon: MessageCircle, label: "Tin nhắn", href: "/farmer/messages" },
     { icon: Wallet, label: "Thanh toán", href: "/farmer/payments" },
+    { icon: AlertTriangle, label: "Khiếu nại", href: "/farmer/disputes" },
   ];
   const [profile, setProfile] = useState<FarmerProfile | null>(null)
 

@@ -45,7 +45,12 @@ export function AdminShell({ initialPage = "dashboard" }: AdminShellProps) {
   return (
     <div className="flex h-screen bg-background adshell">
       <AdminSidebar currentPage={currentPage} onPageChange={(page) => setCurrentPage(page as AdminPageKey)} />
-      <main className="flex-1 overflow-auto">{renderPage()}</main>
+      <main className="flex-1 overflow-hidden flex flex-col">
+        {currentPage === 'disputes'
+          ? renderPage()
+          : <div className="flex-1 overflow-auto">{renderPage()}</div>
+        }
+      </main>
     </div>
   );
 }

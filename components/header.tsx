@@ -22,7 +22,7 @@ export function Header() {
   const [profile, setProfile] = useState<FarmerProfile | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const router = useRouter();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
 
   const navItems = [
     { label: "Giới thiệu", href: "#about" },

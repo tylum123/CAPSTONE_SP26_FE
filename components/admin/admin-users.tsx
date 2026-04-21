@@ -50,20 +50,42 @@ export function AdminUsers() {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, unknown> = { page, limit: LIMIT };
-      if (debouncedSearch) params.search = debouncedSearch;
-      if (roleFilter) params.role = roleFilter;
-      if (statusFilter !== "") params.isActive = statusFilter === "active";
-
-      const res = await adminService.getUsers(
-        params as Parameters<typeof adminService.getUsers>[0],
-      );
+      // The backend does not support server-side pagination for users yet, it returns all users.
+      // So don't pass params that might be broken, just get all and filter locally.
+      const res = await adminService.getUsers();
       const payload = res.data;
 
       if (Array.isArray(payload)) {
-        setUsers(payload);
-        setTotal(payload.length);
-        setTotalPages(1);
+        let filtered = payload;
+        
+        // Manual search filter
+        if (debouncedSearch) {
+          const lowerSearch = debouncedSearch.toLowerCase();
+          filtered = filtered.filter(
+            (u) =>
+              u.fullName?.toLowerCase().includes(lowerSearch) ||
+              u.email?.toLowerCase().includes(lowerSearch)
+          );
+        }
+        
+        // Manual role filter
+        if (roleFilter) {
+          filtered = filtered.filter((u) => u.role === roleFilter);
+        }
+        
+        // Manual status filter
+        if (statusFilter !== "") {
+          const isActiveFilter = statusFilter === "active";
+          filtered = filtered.filter((u) => u.isActive === isActiveFilter);
+        }
+
+        setTotal(filtered.length);
+        setTotalPages(Math.max(1, Math.ceil(filtered.length / LIMIT)));
+        
+        // Manual pagination slice
+        const startIndex = (page - 1) * LIMIT;
+        const endIndex = startIndex + LIMIT;
+        setUsers(filtered.slice(startIndex, endIndex));
       } else {
         setUsers(payload.data);
         setTotal(payload.pagination.total);
