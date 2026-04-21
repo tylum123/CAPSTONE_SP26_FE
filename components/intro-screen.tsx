@@ -7,9 +7,9 @@ export function IntroScreen() {
 
   useEffect(() => {
     // Bắt đầu fade out sau 2.8 giây
-    const fadeTimer = setTimeout(() => setPhase("fadeout"), 2800)
+    const fadeTimer = setTimeout(() => setPhase("fadeout"), 1600)
     // Ẩn hoàn toàn sau khi fade xong (~3.6s)
-    const hideTimer = setTimeout(() => setPhase("hidden"), 3600)
+    const hideTimer = setTimeout(() => setPhase("hidden"), 2800)
 
     return () => {
       clearTimeout(fadeTimer)

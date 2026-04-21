@@ -1,16 +1,5 @@
 import type { JobSkillRequirement } from "./job.types";
-
-export interface Application {
-  id: string;
-  jobId: string;
-  workerId: string;
-  workerName: string;
-  workerPhone: string;
-  workerAvatar?: string;
-  status: 'pending' | 'approved' | 'rejected';
-  appliedAt: string;
-  reviewedAt?: string;
-}
+import { Skill } from "./skill.types";
 
 export enum ApplicationStatusId {
   Pending = 1,
@@ -24,6 +13,7 @@ export interface ApplicationWorkerDTO {
   userId: string;
   fullName: string;
   age: string;
+  date_of_birth: string;
   primaryLocation: string;
   travelRadiusKmPreference: number;
   experienceLevelId: number;
@@ -36,6 +26,9 @@ export interface ApplicationWorkerDTO {
   updatedAt: string;
   email: string;
   phoneNumber: string;
+  skills: Skill[];
+  genderId: number;
+  gender: string;
 }
 
 export interface ApplicationJobPostDTO {

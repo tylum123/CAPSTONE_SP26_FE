@@ -1,10 +1,5 @@
-import { AdminLayout } from "@/components/admin/admin-layout"
-import { AdminSettings } from "@/components/admin/admin-settings"
+import { AdminShell } from "@/components/admin/admin-shell";
 
 export default function AdminSettingsPage() {
-  return (
-    <AdminLayout>
-      <AdminSettings />
-    </AdminLayout>
-  )
+  return <AdminShell initialPage="config" />;
 }

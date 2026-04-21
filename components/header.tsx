@@ -128,8 +128,8 @@ export function Header() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="group flex items-center gap-2 rounded-full border border-white/20 bg-white/10 p-1 pr-3 backdrop-blur-md outline-none transition-all hover:bg-white/20 hover:border-white/40">
-                    <Avatar className="h-8 w-8 border border-white/40 group-hover:scale-105 transition-transform">
-                      <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} />
+                    <Avatar className="h-8 w-8 border-2 border-agro-white relative flex items-center justify-center">
+                      <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} className="object-cover"/>
                       <AvatarFallback className="bg-agro-green text-white">
                         {profile?.contactName?.charAt(0).toUpperCase() || "NA"}
                       </AvatarFallback>

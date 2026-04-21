@@ -1,10 +1,5 @@
-import { AdminLayout } from "@/components/admin/admin-layout"
-import { AdminDisputes } from "@/components/admin/admin-disputes"
+import { AdminShell } from "@/components/admin/admin-shell";
 
 export default function AdminDisputesPage() {
-  return (
-    <AdminLayout>
-      <AdminDisputes />
-    </AdminLayout>
-  )
+  return <AdminShell initialPage="disputes" />;
 }

@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Wallet, Plus, ArrowDownLeft, ArrowUpRight, Clock, Banknote, Loader2, AlertCircle, CheckCircle2, XCircle, Timer, CreditCard, Building, DollarSign, Wallet2 } from "lucide-react"
@@ -17,6 +18,8 @@ import { WalletService } from "@/libs/api/services/wallet.service"
 import { BankService, type VietQRBank } from "@/libs/api/services/bank.service"
 import type { WalletDTO, WalletTransactionDTO, WithdrawalRequest, CreateWithdrawalRequest } from "@/libs/types/wallet.types"
 import { BinBank, TransactionType } from "@/libs/types/wallet.types"
+
+const TRANSACTION_PAGE_SIZE = 10
 
 const WITHDRAWAL_STATUS_MAP: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode; color: string }> = {
   PENDING: { label: "Đang chờ", variant: "secondary", icon: <Timer className="h-3 w-3" />, color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
@@ -33,6 +36,17 @@ const TRANSACTION_TYPE_LABELS: Record<number, string> = {
   [TransactionType.JOB_LOCK]: "Số dư Escrow",
 }
 
+const toDigitsOnly = (value: string) => value.replace(/\D/g, "")
+
+const formatThousandsWithDots = (value: string) => {
+  const digits = toDigitsOnly(value)
+  if (!digits) return ""
+  const normalizedDigits = digits.replace(/^0+(?=\d)/, "")
+  return normalizedDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+}
+
+const parseFormattedAmount = (value: string) => Number.parseInt(toDigitsOnly(value), 10) || 0
+
 export default function PaymentsPage() {
   const [depositAmount, setDepositAmount] = useState("")
   const [isDepositing, setIsDepositing] = useState(false)
@@ -40,6 +54,9 @@ export default function PaymentsPage() {
 
   const [wallet, setWallet] = useState<WalletDTO | null>(null)
   const [transactions, setTransactions] = useState<WalletTransactionDTO[]>([])
+  const [transactionPage, setTransactionPage] = useState(1)
+  const [transactionTotalPages, setTransactionTotalPages] = useState(1)
+  const [isTransactionsLoading, setIsTransactionsLoading] = useState(false)
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -56,17 +73,37 @@ export default function PaymentsPage() {
     description: "",
   })
 
+  const fetchTransactions = async (walletId: string, page: number) => {
+    try {
+      setIsTransactionsLoading(true)
+      const txRes = await WalletService.getTransactionsByWallet(walletId, {
+        page,
+        limit: TRANSACTION_PAGE_SIZE,
+      })
+
+      if (txRes?.data) {
+        setTransactions(txRes.data.data ?? [])
+        setTransactionTotalPages(Math.max(1, txRes.data.pagination?.totalPages ?? 1))
+      }
+    } catch (error) {
+      console.error("Failed to fetch transactions:", error)
+      setTransactions([])
+      setTransactionTotalPages(1)
+    } finally {
+      setIsTransactionsLoading(false)
+    }
+  }
+
   const fetchWalletData = async () => {
     try {
       setIsLoading(true)
       const walletRes = await WalletService.getMyWallet()
       if (walletRes.data) {
         setWallet(walletRes.data)
-        const txRes = await WalletService.getTransactionsByWallet(walletRes.data.id, 1, 50)
-        if (txRes.data) {
-          const txItems = Array.isArray(txRes.data) ? txRes.data : (txRes.data as any).items || [];
-          setTransactions(txItems)
-        }
+        await fetchTransactions(walletRes.data.id, transactionPage)
+      } else {
+        setTransactions([])
+        setTransactionTotalPages(1)
       }
     } catch (error) {
       console.error("Failed to fetch wallet data:", error)
@@ -79,8 +116,7 @@ export default function PaymentsPage() {
     try {
       const res = await WalletService.getMyWithdrawals(1, 50)
       if (res.data) {
-        const items = Array.isArray(res.data) ? res.data : (res.data as any).items || [];
-        setWithdrawals(items)
+        setWithdrawals(res.data ?? [])
       }
     } catch (error) {
       console.error("Failed to fetch withdrawals:", error)
@@ -99,6 +135,11 @@ export default function PaymentsPage() {
     fetchWithdrawals()
     fetchBanks()
   }, [])
+
+  useEffect(() => {
+    if (!wallet?.id) return
+    fetchTransactions(wallet.id, transactionPage)
+  }, [transactionPage])
 
   useEffect(() => {
     const lookup = async () => {
@@ -120,7 +161,9 @@ export default function PaymentsPage() {
   }, [withdrawForm.toBin, withdrawForm.toAccountNumber])
 
   const handleDeposit = async () => {
-    if (!depositAmount || Number(depositAmount) <= 0) {
+    const depositValue = parseFormattedAmount(depositAmount)
+
+    if (!depositValue || depositValue <= 0) {
       toast({
         title: "Lỗi",
         description: "Vui lòng nhập số tiền hợp lệ",
@@ -132,7 +175,7 @@ export default function PaymentsPage() {
     setIsDepositing(true)
     try {
       const response = await PaymentService.create({
-        totalAmount: Number(depositAmount),
+        totalAmount: depositValue,
         description: "Nạp tiền vào ví AgroTemp",
       })
 
@@ -158,7 +201,7 @@ export default function PaymentsPage() {
   }
 
   const handleWithdraw = async () => {
-    const amount = Number(withdrawForm.amount)
+    const amount = parseFormattedAmount(withdrawForm.amount)
 
     if (!amount || amount <= 0) {
       toast({ title: "Lỗi", description: "Vui lòng nhập số tiền rút hợp lệ", variant: "destructive" })
@@ -223,12 +266,26 @@ export default function PaymentsPage() {
     }
   }
 
+  const visibleTransactionPages = (() => {
+    const maxVisible = 5
+    const start = Math.max(1, transactionPage - Math.floor(maxVisible / 2))
+    const end = Math.min(transactionTotalPages, start + maxVisible - 1)
+    const normalizedStart = Math.max(1, end - maxVisible + 1)
+
+    return Array.from({ length: end - normalizedStart + 1 }, (_, idx) => normalizedStart + idx)
+  })()
+
   return (
     <div className="p-4 lg:p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Quản lý thanh toán</h1>
-        <p className="text-muted-foreground">Ví tiền và thanh toán Escrow</p>
-      </div>
+      <div className="relative overflow-hidden rounded-2xl border bg-linear-to-r from-emerald-50 via-teal-50 to-cyan-50 p-5 dark:from-emerald-950/30 dark:via-teal-950/20 dark:to-cyan-950/20">
+        <div className="pointer-events-none absolute -top-12 right-6 h-40 w-40 rounded-full bg-emerald-200/40 blur-3xl dark:bg-emerald-700/20" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Quản lý thanh toán</h1>
+            <p className="text-muted-foreground">Ví tiền và thanh toán Escrow </p>
+          </div>
+        </div>
+      </div>  
 
       {/* Balance Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -240,7 +297,7 @@ export default function PaymentsPage() {
                 {isLoading ? (
                   <p className="text-3xl font-bold text-agro-green animate-pulse">...</p>
                 ) : (
-                  <p className="text-3xl font-bold text-agro-green">{(wallet?.balance || 0).toLocaleString()}đ</p>
+                  <p className="text-3xl font-bold text-agro-green">{(wallet?.balance || 0).toLocaleString("vi-VN")}đ</p>
                 )}
               </div>
               <div className="p-4 rounded-full bg-agro-green/10">
@@ -256,7 +313,7 @@ export default function PaymentsPage() {
                     Nạp tiền
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[700px] w-[95vw] p-0 gap-0 border-none shadow-2xl overflow-hidden rounded-3xl">
+                <DialogContent className="sm:max-w-175 w-[95vw] p-0 gap-0 border-none shadow-2xl overflow-hidden rounded-3xl">
                   <div className="bg-agro-green/5 border-b px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                       <div className="p-3 bg-agro-green/10 rounded-2xl shadow-inner group-hover:scale-110 transition-transform">
@@ -267,11 +324,11 @@ export default function PaymentsPage() {
                         <p className="text-sm text-muted-foreground mt-1">Giao dịch nhanh qua cổng thanh toán PayOS</p>
                       </div>
                     </div>
-                    <div className="bg-white px-5 py-3 rounded-2xl border border-agro-green/10 shadow-sm flex flex-col items-end min-w-[160px]">
+                    <div className="bg-white px-5 py-3 rounded-2xl border border-agro-green/10 shadow-sm flex flex-col items-end min-w-40">
                       <span className="text-[11px] text-muted-foreground font-bold uppercase tracking-widest mb-1">Số dư hiện tại</span>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-2xl font-black text-agro-green">
-                          {(wallet?.balance || 0).toLocaleString()}
+                        <span className="text-2xl font-bold text-agro-green">
+                          {(wallet?.balance || 0).toLocaleString("vi-VN")}
                         </span>
                         <span className="text-xs font-bold text-agro-green/70 pt-1 uppercase ">VNĐ</span>
                       </div>
@@ -284,51 +341,46 @@ export default function PaymentsPage() {
                       <div className="space-y-4">
                         <Label className="text-sm font-bold flex items-center gap-2.5 text-slate-700">
                           <div className="p-1.5 bg-agro-green/10 rounded-lg">
-                            <div className="text-agro-green text-[10px] font-black">VNĐ</div>
+                            <div className="text-agro-green text-[10px] font-bold">VNĐ</div>
                           </div>
-                          Số tiền muốn nạp <span className="text-red-500 font-black">*</span>
+                          Số tiền muốn nạp <span className="text-red-500 font-bold">*</span>
                         </Label>
                         <div className="relative group">
                           <Input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
                             placeholder="Nhập số tiền..."
                             value={depositAmount}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val === "" || Number(val) >= 0) {
-                                setDepositAmount(val);
-                              }
-                            }}
-                            className="pl-12 h-14 text-2xl font-black border-slate-200 focus:border-agro-green focus:ring-agro-green/20 transition-all rounded-xl placeholder:text-slate-300"
-                            min={0}
+                            onChange={(e) => setDepositAmount(formatThousandsWithDots(e.target.value))}
+                            className="pl-12 h-14 text-2xl font-bold border-slate-200 focus:border-agro-green focus:ring-agro-green/20 transition-all rounded-xl placeholder:text-slate-300"
                           />
                           <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-agro-green transition-colors">
                             <Wallet2 className="h-6 w-6" />
                           </div>
-                          <div className="absolute right-10 top-1/2 -translate-y-1/2 font-black text-sm text-agro-green/50">VNĐ</div>
+                          <div className="absolute right-10 top-1/2 -translate-y-1/2 font-bold text-sm text-agro-green/50">VNĐ</div>
                         </div>
 
                         <div className="grid grid-cols-4 gap-2.5 mt-4">
-                          {[500000, 1000000, 2000000, 5000000].map((amount) => (
+                          {[{ amount: 50000 }, { amount: 1000000 }, { amount: 2000000 }, { amount: 5000000 }].map((amountObj) => (
                             <Button
-                              key={amount}
+                              key={amountObj.amount}
                               type="button"
-                              variant={depositAmount === amount.toString() ? "default" : "outline"}
+                              variant={parseFormattedAmount(depositAmount) === amountObj.amount ? "default" : "outline"}
                               size="sm"
-                              onClick={() => setDepositAmount(amount.toString())}
-                              className={`text-[12px] h-11 font-black transition-all rounded-xl border-2 ${depositAmount === amount.toString()
+                              onClick={() => setDepositAmount(formatThousandsWithDots(amountObj.amount.toString()))}
+                              className={`text-[12px] h-11 font-normal transition-all rounded-xl border-2 ${parseFormattedAmount(depositAmount) === amountObj.amount
                                 ? "bg-agro-green hover:bg-agro-green/90 border-agro-green shadow-lg shadow-agro-green/20 scale-105"
                                 : "bg-white border-slate-100 hover:border-agro-green/30 hover:bg-agro-green/5 text-slate-600"
                                 }`}
                             >
-                              {(amount / 1000000).toFixed(0)}M
+                              {amountObj.amount.toLocaleString("vi-VN")}
                             </Button>
                           ))}
                         </div>
                       </div>
 
                       {/* Payment Method Section */}
-                      <div className="space-y-4 pt-4 border-t border-slate-50">
+                      {/* <div className="space-y-4 pt-4 border-t border-slate-50">
                         <Label className="text-sm font-bold flex items-center gap-2.5 text-slate-700">
                           <div className="p-1.5 bg-agro-green/10 rounded-lg">
                             <Building className="h-4 w-4 text-agro-green" />
@@ -353,7 +405,7 @@ export default function PaymentsPage() {
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </div> */}
                     </div>
                   </div>
 
@@ -368,7 +420,7 @@ export default function PaymentsPage() {
                       </Button>
                       <Button
                         onClick={handleDeposit}
-                        disabled={isDepositing || !depositAmount || Number(depositAmount) <= 0}
+                        disabled={isDepositing || parseFormattedAmount(depositAmount) <= 0}
                         className="w-full sm:w-auto h-12 px-10 bg-agro-green hover:bg-agro-green/90 shadow-xl shadow-agro-green/30 rounded-xl font-black text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
                       >
                         {isDepositing ? (
@@ -393,7 +445,7 @@ export default function PaymentsPage() {
                     Rút tiền
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[800px] w-[95vw] max-h-[95vh] overflow-y-auto p-0 gap-0 border-none shadow-2xl">
+                <DialogContent className="sm:max-w-200 w-[95vw] max-h-[95vh] overflow-y-auto p-0 gap-0 border-none shadow-2xl">
                   <div className="bg-agro-green/5 border-b px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                       <div className="p-3 bg-agro-green/10 rounded-2xl shadow-inner transition-transform">
@@ -404,11 +456,11 @@ export default function PaymentsPage() {
                         <p className="text-sm text-muted-foreground mt-1">Chuyển tiền nhanh chóng về tài khoản của bạn</p>
                       </div>
                     </div>
-                    <div className="bg-white px-5 py-3 rounded-2xl border border-agro-green/10 shadow-sm flex flex-col items-end min-w-[160px]">
+                    <div className="bg-white px-5 py-3 rounded-2xl border border-agro-green/10 shadow-sm flex flex-col items-end min-w-40">
                       <span className="text-[11px] text-muted-foreground font-bold uppercase tracking-widest mb-1">Số dư khả dụng</span>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-2xl font-black text-agro-green">
-                          {(wallet?.balance || 0).toLocaleString()}
+                        <span className="text-2xl font-bold text-agro-green">
+                          {(wallet?.balance || 0).toLocaleString("vi-VN")}
                         </span>
                         <span className="text-xs font-bold text-agro-green/70 pt-1 uppercase">VNĐ</span>
                       </div>
@@ -424,27 +476,24 @@ export default function PaymentsPage() {
                             <div className="p-1.5 bg-agro-green/10 rounded-lg">
                               <div className="text-agro-green">VNĐ</div>
                             </div>
-                            Số tiền muốn rút <span className="text-red-500 font-black">*</span>
+                            Số tiền muốn rút <span className="text-red-500 font-bold">*</span>
                           </Label>
                           <div className="relative group">
                             <Input
                               id="withdraw-amount"
-                              type="number"
+                              type="text"
+                              inputMode="numeric"
                               placeholder="0"
                               value={withdrawForm.amount}
                               onChange={(e) => {
-                                const val = e.target.value;
-                                if (val === "" || Number(val) >= 0) {
-                                  setWithdrawForm(prev => ({ ...prev, amount: val }));
-                                }
+                                setWithdrawForm(prev => ({ ...prev, amount: formatThousandsWithDots(e.target.value) }))
                               }}
-                              className="pl-12 h-14 text-2xl font-black border-slate-200 focus:border-agro-green focus:ring-agro-green/20 transition-all rounded-xl placeholder:text-slate-300"
-                              min={0}
+                              className="pl-12 h-14 text-2xl font-bold border-slate-200 focus:border-agro-green focus:ring-agro-green/20 transition-all rounded-xl placeholder:text-slate-300"
                             />
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-agro-green transition-colors">
                               <Wallet2 className="h-6 w-6" />
                             </div>
-                            <div className="absolute right-10 top-1/2 -translate-y-1/2 font-black text-sm text-agro-green/50">VNĐ</div>
+                            <div className="absolute right-10 top-1/2 -translate-y-1/2 font-bold text-sm text-agro-green/50">VNĐ</div>
                           </div>
 
                           <div className="grid grid-cols-4 gap-2.5 mt-4">
@@ -452,20 +501,20 @@ export default function PaymentsPage() {
                               <Button
                                 key={amount}
                                 type="button"
-                                variant={withdrawForm.amount === amount.toString() ? "default" : "outline"}
+                                variant={parseFormattedAmount(withdrawForm.amount) === amount ? "default" : "outline"}
                                 size="sm"
-                                onClick={() => setWithdrawForm(prev => ({ ...prev, amount: amount.toString() }))}
-                                className={`text-[12px] h-11 font-black transition-all rounded-xl border-2 ${withdrawForm.amount === amount.toString()
+                                onClick={() => setWithdrawForm(prev => ({ ...prev, amount: formatThousandsWithDots(amount.toString()) }))}
+                                className={`text-[12px] h-11 font-bold transition-all rounded-xl border-2 ${parseFormattedAmount(withdrawForm.amount) === amount
                                   ? "bg-agro-green hover:bg-agro-green/90 border-agro-green shadow-lg shadow-agro-green/20 scale-105"
                                   : "bg-white border-slate-100 hover:border-agro-green/30 hover:bg-agro-green/5 text-slate-600"
                                   }`}
                               >
-                                {amount >= 1000000 ? `${(amount / 1000000).toFixed(0)}M` : `${(amount / 1000).toFixed(0)}K`}
+                                {amount.toLocaleString("vi-VN")}
                               </Button>
                             ))}
                           </div>
 
-                          {Number(withdrawForm.amount) > (wallet?.balance || 0) && Number(withdrawForm.amount) > 0 && (
+                          {parseFormattedAmount(withdrawForm.amount) > (wallet?.balance || 0) && parseFormattedAmount(withdrawForm.amount) > 0 && (
                             <div className="flex items-center gap-3 text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl p-4 animate-in fade-in slide-in-from-top-2">
                               <AlertCircle className="h-5 w-5 shrink-0" />
                               <span>Số dư ví của bạn không đủ để rút số tiền này.</span>
@@ -481,17 +530,18 @@ export default function PaymentsPage() {
                             <div className="p-1.5 bg-agro-green/10 rounded-lg">
                               <Building className="h-4 w-4 text-agro-green" />
                             </div>
-                            Ngân hàng thụ hưởng <span className="text-red-500 font-black">*</span>
+                            Ngân hàng thụ hưởng <span className="text-red-500 font-bold">*</span>
                           </Label>
-                          <Select
-                            value={withdrawForm.toBin}
-                            onValueChange={(value) => setWithdrawForm(prev => ({ ...prev, toBin: value }))}
-                            disabled={banks.length === 0}
-                          >
-                            <SelectTrigger className="h-14 border-slate-200 focus:ring-agro-green/20 rounded-xl text-left bg-white shadow-sm transition-all hover:border-agro-green/40">
-                              <SelectValue placeholder={banks.length === 0 ? "Đang tải danh sách..." : "Chọn ngân hàng"} />
-                            </SelectTrigger>
-                            <SelectContent className="max-h-80 w-[var(--radix-select-trigger-width)] min-w-[350px] overflow-y-auto rounded-xl shadow-2xl border-slate-100">
+                          <div className="relative group">
+                            <Select
+                              value={withdrawForm.toBin}
+                              onValueChange={(value) => setWithdrawForm(prev => ({ ...prev, toBin: value }))}
+                              disabled={banks.length === 0}
+                            >
+                              <SelectTrigger className="mt-5 pl-12 h-14 pb-6 pt-7 max-w-87 border-slate-200 focus:border-agro-green focus:ring-agro-green/20 rounded-xl text-left bg-white transition-all hover:border-agro-green/40 font-bold">
+                                <SelectValue placeholder={banks.length === 0 ? "Đang tải danh sách..." : "Chọn ngân hàng"} />
+                              </SelectTrigger>
+                            <SelectContent className="h-100 w-(--radix-select-trigger-width) min-w-87 overflow-y-auto rounded-xl shadow-2xl border-slate-100">
                               {banks.length > 0 ? (
                                 banks.map((bank) => (
                                   <SelectItem key={bank.bin} value={bank.bin} className="py-3 px-4 focus:bg-agro-green/5 cursor-pointer border-b border-slate-50 last:border-0 transition-colors">
@@ -500,7 +550,7 @@ export default function PaymentsPage() {
                                         <img src={bank.logo} alt={bank.shortName} className="w-full h-full object-contain p-1" />
                                       </div>
                                       <div className="flex flex-col gap-0.5">
-                                        <span className="font-black text-sm text-agro-green uppercase tracking-tight">{bank.shortName}</span>
+                                        <span className="font-bold   text-sm text-agro-green uppercase tracking-tight">{bank.shortName}</span>
                                         <span className="text-[11px] text-slate-400 font-medium leading-tight line-clamp-1">{bank.name}</span>
                                       </div>
                                     </div>
@@ -510,7 +560,11 @@ export default function PaymentsPage() {
                                 <SelectItem value="loading" disabled className="py-4 text-center text-slate-400">Đang tải danh sách...</SelectItem>
                               )}
                             </SelectContent>
-                          </Select>
+                            </Select>
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-agro-green transition-colors pointer-events-none">
+                              <Building className="h-6 w-6" />
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -522,7 +576,7 @@ export default function PaymentsPage() {
                           <div className="p-1.5 bg-agro-green/10 rounded-lg">
                             <CreditCard className="h-4 w-4 text-agro-green" />
                           </div>
-                          Số tài khoản <span className="text-red-500 font-black">*</span>
+                          Số tài khoản <span className="text-red-500 font-bold">*</span>
                         </Label>
                         <div className="relative group">
                           <Input
@@ -617,7 +671,7 @@ export default function PaymentsPage() {
                 {isLoading ? (
                   <p className="text-3xl font-bold text-agro-orange animate-pulse">...</p>
                 ) : (
-                  <p className="text-3xl font-bold text-agro-orange">{(wallet?.lockedBalance || 0).toLocaleString()}đ</p>
+                  <p className="text-3xl font-bold text-agro-orange">{(wallet?.lockedBalance || 0).toLocaleString("vi-VN")}đ</p>
                 )}
               </div>
               <div className="p-4 rounded-full bg-agro-orange/10">
@@ -647,7 +701,16 @@ export default function PaymentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions.length === 0 && !isLoading ? (
+              {isTransactionsLoading ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Đang tải giao dịch...
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ) : transactions?.length === 0 && !isLoading ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
                     Không có giao dịch nào
@@ -687,12 +750,12 @@ export default function PaymentsPage() {
                       </TableCell>
                       <TableCell className="text-xs">{new Date(tx.createdAt).toLocaleString("vi-VN")}</TableCell>
                       <TableCell className="text-right font-mono text-sm">
-                        {tx.balanceAfter.toLocaleString()} VNĐ
+                        {tx.balanceAfter.toLocaleString("vi-VN")} VNĐ
                       </TableCell>
                       <TableCell className="text-right">
                         <span className={isIncoming ? "text-agro-green font-medium" : "text-agro-orange font-medium"}>
                           {isIncoming ? "+" : "-"}
-                          {Math.abs(tx.amount).toLocaleString()} VNĐ
+                          {Math.abs(tx.amount).toLocaleString("vi-VN")} VNĐ
                         </span>
                       </TableCell>
                     </TableRow>
@@ -701,6 +764,53 @@ export default function PaymentsPage() {
               )}
             </TableBody>
           </Table>
+
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              Trang {transactionPage}/{transactionTotalPages}
+            </p>
+
+            <Pagination className="mx-0 w-auto justify-end">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      if (transactionPage > 1) setTransactionPage((prev) => prev - 1)
+                    }}
+                    className={transactionPage <= 1 ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+
+                {visibleTransactionPages.map((page) => (
+                  <PaginationItem key={page}>
+                    <PaginationLink
+                      href="#"
+                      isActive={transactionPage === page}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setTransactionPage(page)
+                      }}
+                    >
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      if (transactionPage < transactionTotalPages) setTransactionPage((prev) => prev + 1)
+                    }}
+                    className={transactionPage >= transactionTotalPages ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
         </CardContent>
       </Card>
     </div>

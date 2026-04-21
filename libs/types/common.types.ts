@@ -8,6 +8,12 @@ export interface Notification {
   createdAt: string;
 }
 
+export interface MessageUser {
+  id: string;
+  name: string;
+  avatarUrl: string;
+}
+
 export interface Message {
   id: string;
   senderId: string;
@@ -15,6 +21,14 @@ export interface Message {
   content: string;
   read: boolean;
   createdAt: string;
+  sender: MessageUser
+  receiver: MessageUser
+}
+
+export interface LastConversationsDTO {
+  contact: MessageUser;
+  lastMessage: Message;
+  unreadCount: number;
 }
 
 export interface PaginationParams {

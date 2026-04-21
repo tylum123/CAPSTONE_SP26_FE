@@ -7,18 +7,29 @@ import type {
   Job,
   CreateJobRequest,
   UpdateJobRequest,
-  Application,
   ApplicationDTO,
   FarmerProfile,
+  FarmerProfileDTO,
   RespondApplicationRequest,
   UpdateFarmerRequest,
   DashboardStats,
+  WorkerProfileDTO,
 } from '@/libs/types';
 
 export const farmerService = {
 
   getProfile: async (): Promise<ApiResponse<FarmerProfile>> => {
     const response = await axiosInstance.get(API_ENDPOINTS.FARMER.PROFILE);
+    return response.data;
+  },
+
+  getFarmerProfileById: async (id: string): Promise<ApiResponse<FarmerProfileDTO>> => {
+    const response = await axiosInstance.get(API_ENDPOINTS.FARMER.PROFILE_BY_ID(id));
+    return response.data;
+  },
+
+  getWorkerProfileById: async (id: string): Promise<ApiResponse<WorkerProfileDTO>> => {
+    const response = await axiosInstance.get(API_ENDPOINTS.WORKER.PROFILE_BY_ID(id));
     return response.data;
   },
 

@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react"
 import Link from "next/link"
-import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Users, Clock, Banknote, MapPin, Copy, Calendar, Inbox, LayoutGrid, LayoutList, Loader2, Filter, ChevronLeft, ChevronRight, ArrowUpDown, ArrowDownUp } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Users, Clock, Banknote, MapPin, Copy, Calendar, Inbox, LayoutGrid, LayoutList, Loader2, Filter, ChevronLeft, ChevronRight, ArrowUpDown, ArrowDownUp, XCircle, RefreshCw, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -34,11 +35,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { farmerService } from "@/libs/api/services/farmer.service"
 import { jobCategoryService } from "@/libs/api/services/job-category.service"
 import { skillService } from "@/libs/api/services/skill.service"
 import { useProvinces } from "@/hooks/use-provinces"
-import type { Application, Job, JobCategory, PaginatedResponse, Skill } from "@/libs/types"
+import type { ApplicationDTO, Job, JobCategory, PaginatedResponse, Skill } from "@/libs/types"
+import { ApplicationStatusId, JobPostStatus } from "@/libs/types"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,9 +53,12 @@ import { Progress } from "@/components/ui/progress"
 import { jobService } from "@/libs/api/services/jobs.service"
 import { jobApplicationService } from "@/libs/api/services/jobApplication.service"
 
+type JobFilterTab = "all" | "draft" | "active" | "filled" | "in-progress" | "completed" | "passed" | "cancelled"
+
 export function FarmerJobsList() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
-  const [activeTab, setActiveTab] = useState("active")
+  const [activeTab, setActiveTab] = useState<JobFilterTab>("active")
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid")
   const [jobs, setJobs] = useState<Job[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -66,12 +72,13 @@ export function FarmerJobsList() {
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false)
   const [isApplicationsDialogOpen, setIsApplicationsDialogOpen] = useState(false)
   const [selectedJobForApplications, setSelectedJobForApplications] = useState<Job | null>(null)
-  const [applications, setApplications] = useState<Application[]>([])
+  const [applications, setApplications] = useState<ApplicationDTO[]>([])
   const [isLoadingApplications, setIsLoadingApplications] = useState(false)
   const [applicationsError, setApplicationsError] = useState<string | null>(null)
-  const [deletingJobId, setDeletingJobId] = useState<string | null>(null)
-  const [jobPendingDelete, setJobPendingDelete] = useState<Job | null>(null)
+  const [cancellingJobId, setCancellingJobId] = useState<string | null>(null)
+  const [jobPendingCancel, setJobPendingCancel] = useState<Job | null>(null)
   const [sortByDatesDescending, setSortByDatesDescending] = useState(true)
+  const [updatingUrgencyJobId, setUpdatingUrgencyJobId] = useState<string | null>(null)
 
   // For combo boxes
   const [categories, setCategories] = useState<JobCategory[]>([])
@@ -103,32 +110,32 @@ export function FarmerJobsList() {
     return new Intl.DateTimeFormat("vi-VN").format(date)
   }
 
-  const normalizeStatus = (status?: string, startDate?: string) => {
-    const normalized = (status ?? "").toLowerCase()
-
-    // If job start date has reached or passed today, it's considered past deadline/completed
-    if (startDate) {
+  const normalizeStatus = (statusId?: JobPostStatus, startDate?: string): "draft" | "active" | "filled" | "in-progress" | "completed" | "passed" | "cancelled" => {
+    if (statusId === JobPostStatus.Published && startDate) {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const jobStart = new Date(startDate)
-      if (jobStart <= today) {
+      if (jobStart < today) {
         return "passed"
       }
     }
 
-    if (["open", "active", "published", "recruiting"].includes(normalized)) {
-      return "active"
+    switch (statusId) {
+      case JobPostStatus.Draft:
+        return "draft"
+      case JobPostStatus.Published:
+        return "active"
+      case JobPostStatus.Closed:
+        return "filled"
+      case JobPostStatus.InProgress:
+        return "in-progress"
+      case JobPostStatus.Completed:
+        return "completed"
+      case JobPostStatus.Cancelled:
+        return "cancelled"
+      default:
+        return "draft"
     }
-
-    if (["filled", "full"].includes(normalized)) {
-      return "filled"
-    }
-
-    if (["completed", "closed", "done"].includes(normalized)) {
-      return "completed"
-    }
-
-    return "active"
   }
 
   // Fetch categories on mount
@@ -213,57 +220,57 @@ export function FarmerJobsList() {
     }
   }, [filterCategory, categories, skillPage])
 
-  useEffect(() => {
-    const loadJobs = async () => {
-      try {
-        setIsLoading(true)
-        setError(null)
+  const loadJobs = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
 
-        // Use getFilteredJobs if any filter parameters exist, otherwise use getJobs
-        const hasFilters = searchQuery || (filterCategory && filterCategory !== "all-categories") || (filterAddress && filterAddress !== "all-provinces") || filterSkills.length > 0
+      // Use getFilteredJobs if any filter parameters exist, otherwise use getJobs
+      const hasFilters = searchQuery || (filterCategory && filterCategory !== "all-categories") || (filterAddress && filterAddress !== "all-provinces") || filterSkills.length > 0
 
-        let response
-        if (hasFilters) {
-          response = await jobService.getFilteredJobsByFarmer({
-            title: searchQuery || undefined,
-            category: (filterCategory && filterCategory !== "all-categories") ? filterCategory : undefined,
-            address: (filterAddress && filterAddress !== "all-provinces") ? filterAddress : undefined,
-            skill: filterSkills.length > 0 ? filterSkills : undefined,
-            sortByDatesDescending,
-          })
-        } else {
-          response = await jobService.getFilteredJobsByFarmer()
-        }
-
-        const payload = response.data as Job[] | { data?: Job[]; items?: Job[] }
-
-        if (Array.isArray(payload)) {
-          setJobs(payload)
-          return
-        }
-
-        if (Array.isArray(payload?.data)) {
-          setJobs(payload.data)
-          return
-        }
-
-        if (Array.isArray(payload?.items)) {
-          setJobs(payload.items)
-          return
-        }
-
-        setJobs([])
-      } catch (fetchError) {
-        console.error(fetchError)
-        setError("Không thể tải danh sách công việc. Vui lòng thử lại.")
-        setJobs([])
-      } finally {
-        setIsLoading(false)
+      let response
+      if (hasFilters) {
+        response = await jobService.getFilteredJobsByFarmer({
+          title: searchQuery || undefined,
+          category: (filterCategory && filterCategory !== "all-categories") ? filterCategory : undefined,
+          address: (filterAddress && filterAddress !== "all-provinces") ? filterAddress : undefined,
+          skill: filterSkills.length > 0 ? filterSkills : undefined,
+          sortByDatesDescending,
+        })
+      } else {
+        response = await jobService.getFilteredJobsByFarmer()
       }
-    }
 
-    void loadJobs()
+      const payload = response.data as Job[] | { data?: Job[]; items?: Job[] }
+
+      if (Array.isArray(payload)) {
+        setJobs(payload)
+        return
+      }
+
+      if (Array.isArray(payload?.data)) {
+        setJobs(payload.data)
+        return
+      }
+
+      if (Array.isArray(payload?.items)) {
+        setJobs(payload.items)
+        return
+      }
+
+      setJobs([])
+    } catch (fetchError) {
+      console.error(fetchError)
+      setError("Không thể tải danh sách công việc. Vui lòng thử lại.")
+      setJobs([])
+    } finally {
+      setIsLoading(false)
+    }
   }, [searchQuery, filterCategory, filterAddress, filterSkills, sortByDatesDescending])
+
+  useEffect(() => {
+    void loadJobs()
+  }, [loadJobs])
 
   const filteredJobs = useMemo(() => {
     const filtered = jobs.filter((job) => {
@@ -271,13 +278,8 @@ export function FarmerJobsList() {
         .filter(Boolean)
         .some((value) => value.toLowerCase().includes(searchQuery.toLowerCase()))
 
-      const status = normalizeStatus(job.status, job.startDate)
-      const matchesTab =
-        activeTab === "all" ||
-        (activeTab === "active" && status === "active") ||
-        (activeTab === "filled" && status === "filled") ||
-        (activeTab === "completed" && status === "completed") ||
-        (activeTab === "passed" && status === "passed")
+      const status = normalizeStatus(job.statusId, job.startDate)
+      const matchesTab = activeTab === "all" || activeTab === status
 
       return matchesSearch && matchesTab
     })
@@ -290,12 +292,16 @@ export function FarmerJobsList() {
     })
   }, [activeTab, jobs, searchQuery, sortByDatesDescending])
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: "draft" | "active" | "filled" | "in-progress" | "completed" | "passed" | "cancelled") => {
     switch (status) {
+      case "draft":
+        return <Badge variant="outline" className="bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800/60 dark:text-slate-300 border-slate-300">Bản nháp</Badge>
       case "active":
         return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 border-emerald-200">Đang tuyển</Badge>
       case "filled":
         return <Badge variant="secondary" className="bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-400 border-amber-200">Đã đủ người</Badge>
+      case "in-progress":
+        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-400 border-blue-200">Đang làm việc</Badge>
       case "completed":
         return (
           <Badge variant="outline" className="bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800/60 dark:text-slate-400 border-slate-200 dark:border-slate-700">
@@ -308,17 +314,23 @@ export function FarmerJobsList() {
             Quá hạn
           </Badge>
         )
+      case "cancelled":
+        return (
+          <Badge variant="destructive" className="bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-400 border-red-200">
+            Đã hủy
+          </Badge>
+        )
       default:
         return null
     }
   }
 
-  const getApplicationStatusBadge = (status: Application["status"]) => {
-    if (status === "approved") {
+  const getApplicationStatusBadge = (statusId: number) => {
+    if (statusId === 2) { // Approved/Accepted
       return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Đã duyệt</Badge>
     }
 
-    if (status === "rejected") {
+    if (statusId === 3) { // Rejected
       return <Badge variant="destructive" className="bg-rose-100 text-rose-800 border-rose-200">Từ chối</Badge>
     }
 
@@ -333,17 +345,13 @@ export function FarmerJobsList() {
     setApplications([])
 
     try {
-      const response = await jobApplicationService.getJobApplicationsByPost({
-        jobId: job.id,
+      const response = await jobApplicationService.getJobApplicationsByPost(job.id, {
         includeAll: true,
       })
 
-      const payload = response.data as PaginatedResponse<Application> | Application[] | { data?: Application[] }
-
-      if (Array.isArray(payload)) {
-        setApplications(payload)
-      } else if (Array.isArray(payload?.data)) {
-        setApplications(payload.data)
+      const paginatedData = response.data
+      if (Array.isArray(paginatedData.data)) {
+        setApplications(paginatedData.data)
       } else {
         setApplications([])
       }
@@ -355,18 +363,52 @@ export function FarmerJobsList() {
     }
   }
 
-  const handleDeleteJob = async (job: Job) => {
+  const handleCancelJob = async (job: Job) => {
     try {
-      setDeletingJobId(job.id)
-      await jobService.deleteJob(job.id)
-      setJobs((currentJobs) => currentJobs.filter((currentJob) => currentJob.id !== job.id))
-      setJobPendingDelete(null)
-    } catch (deleteError) {
-      console.error(deleteError)
-      setError("Không thể xóa bài đăng. Vui lòng thử lại.")
+      setCancellingJobId(job.id)
+      await jobService.cancelJob(job.id)
+      setJobPendingCancel(null)
+      // Auto-reload to get the latest status from the server
+      await loadJobs()
+    } catch (cancelError) {
+      console.error(cancelError)
+      setError("Không thể hủy bài đăng. Vui lòng thử lại.")
     } finally {
-      setDeletingJobId(null)
+      setCancellingJobId(null)
     }
+  }
+
+  const handleToggleUrgency = async (job: Job) => {
+    try {
+      setUpdatingUrgencyJobId(job.id)
+      const response = await jobService.updateUrgency(job.id, !Boolean(job.isUrgent))
+      console.log(response)
+      await loadJobs()
+
+
+    } catch (urgencyError) {
+      console.error(urgencyError)
+      setError("Không thể đánh dấu bài đăng là cần gấp. Vui lòng thử lại.")
+    } finally {
+      setUpdatingUrgencyJobId(null)
+    }
+  }
+
+  const handleActiveTabChange = (value: string) => {
+    setActiveTab(value as JobFilterTab)
+  }
+
+  const handleCardClick = (event: MouseEvent<HTMLDivElement>, jobId: string) => {
+    const target = event.target as HTMLElement
+    const clickedInteractiveElement = target.closest(
+      "a, button, input, textarea, select, [role='menuitem'], [data-radix-collection-item]"
+    )
+
+    if (clickedInteractiveElement) {
+      return
+    }
+
+    router.push(`/farmer/jobs/${jobId}`)
   }
 
   return (
@@ -379,12 +421,14 @@ export function FarmerJobsList() {
             <h1 className="text-2xl font-bold text-foreground">Tin tuyển dụng</h1>
             <p className="text-muted-foreground">Quản lý các tin tuyển dụng và theo dõi ứng viên theo từng bài đăng</p>
           </div>
-          <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
-            <Link href="/farmer/create-job">
-              <Plus className="mr-2 h-4 w-4" />
-              Đăng tin mới
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
+              <Link href="/farmer/create-job">
+                <Plus className="mr-2 h-4 w-4" />
+                Đăng tin mới
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
       <div className="flex flex-col sm:flex-row items-center gap-3 bg-card p-3 rounded-xl border shadow-sm">
@@ -403,19 +447,21 @@ export function FarmerJobsList() {
         <div className="flex items-center gap-3 pl-3 sm:w-auto overflow-x-auto">
           {/* Status Select */}
           <div className="w-full sm:w-[180px] shrink-0">
-            <Select value={activeTab} onValueChange={setActiveTab}>
+            <Select value={activeTab} onValueChange={handleActiveTabChange}>
               <SelectTrigger className="h-10 font-medium bg-white dark:bg-slate-900 border-slate-200">
                 <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
                   <SelectValue placeholder="Trạng thái" />
                 </div>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả bài đăng</SelectItem>
+                {/* <SelectItem value="draft">Bản nháp</SelectItem> */}
                 <SelectItem value="active">Đang tuyển</SelectItem>
-                <SelectItem value="filled">Đã đủ / Full</SelectItem>
+                <SelectItem value="filled">Đã tuyển đủ</SelectItem>
+                <SelectItem value="in-progress">Đang làm việc</SelectItem>
                 <SelectItem value="completed">Đã xong</SelectItem>
-                <SelectItem value="passed">Quá hạn</SelectItem>
+                {/* <SelectItem value="passed">Quá hạn</SelectItem> */}
+                <SelectItem value="cancelled">Đã hủy</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -456,6 +502,14 @@ export function FarmerJobsList() {
               <LayoutList className="h-4 w-4" />
             </Button>
           </div>
+          <Button
+            variant="outline"
+            onClick={() => void loadJobs()}
+            disabled={isLoading}
+            className="bg-white/70 dark:bg-slate-900/70 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+          </Button>
         </div>
       </div>
 
@@ -615,14 +669,20 @@ export function FarmerJobsList() {
         ) : null}
 
         {filteredJobs.map((job) => (
-          <Card key={job.id} className="overflow-hidden hover:shadow-md transition-all duration-200 border-slate-200 dark:border-slate-800 flex flex-col h-full">
+          <Card key={job.id} className="overflow-hidden hover:shadow-md transition-all duration-200 border-slate-200 dark:border-slate-800 flex flex-col h-full cursor-pointer" onClick={(event) => handleCardClick(event, job.id)}>
             <CardContent className="p-0 flex flex-col h-full">
               <div className={`flex flex-col gap-5 p-6 flex-1 ${viewMode === "grid" ? "" : "lg:flex-row lg:items-start lg:justify-between"}`}>
                 <div className="flex-1 space-y-4">
                   <div className="flex flex-wrap items-start gap-3 justify-between">
                     <div className="flex flex-wrap items-center gap-3 flex-1">
                       <h3 className="text-xl font-bold text-foreground hover:text-primary transition-colors cursor-pointer line-clamp-1" title={job.title}>{job.title}</h3>
-                      {getStatusBadge(normalizeStatus(job.status, job.startDate))}
+                      {getStatusBadge(normalizeStatus(job.statusId, job.startDate))}
+                      {job.isUrgent && (
+                        <Badge className="bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/40 dark:text-orange-400 gap-1">
+                          <Zap className="h-3 w-3" />
+                          Gấp
+                        </Badge>
+                      )}
                     </div>
                     {viewMode === "grid" && (
                       <div className="flex items-center gap-1 shrink-0 bg-slate-50 dark:bg-slate-900 rounded-md p-1 border">
@@ -639,53 +699,76 @@ export function FarmerJobsList() {
                                 Xem chi tiết
                               </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem asChild className="cursor-pointer">
-                              <Link href={`/farmer/jobs/${job.id}/edit`}>
-                                <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
-                                Chỉnh sửa
-                              </Link>
-                            </DropdownMenuItem>
-                            {/* <DropdownMenuItem className="cursor-pointer">
-                              <Copy className="mr-2 h-4 w-4 text-muted-foreground" />
-                              Đăng lại
-                            </DropdownMenuItem> */}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive cursor-pointer"
-                              onClick={() => setJobPendingDelete(job)}
-                              disabled={deletingJobId === job.id}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              {deletingJobId === job.id ? "Đang xóa..." : "Xóa tin"}
-                            </DropdownMenuItem>
+                            {Number(job.statusId) === JobPostStatus.Published && (
+                              <DropdownMenuItem asChild className="cursor-pointer">
+                                <Link href={`/farmer/jobs/${job.id}/edit`}>
+                                  <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
+                                  Chỉnh sửa
+                                </Link>
+                              </DropdownMenuItem>
+                            )}
+                            {Number(job.statusId) === JobPostStatus.Published && (
+                              <DropdownMenuItem
+                                className="cursor-pointer"
+                                onClick={() => void handleToggleUrgency(job)}
+                                disabled={updatingUrgencyJobId === job.id}
+                              >
+                                <Zap className={`mr-2 h-4 w-4 ${job.isUrgent ? "text-orange-500" : "text-muted-foreground"}`} />
+                                {updatingUrgencyJobId === job.id
+                                  ? "Đang cập nhật..."
+                                  : job.isUrgent
+                                    ? "Bỏ đánh dấu gấp"
+                                    : "Đánh dấu gấp"}
+                              </DropdownMenuItem>
+                            )}
+                            {Number(job.statusId) === JobPostStatus.Published && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive cursor-pointer"
+                                  onClick={() => setJobPendingCancel(job)}
+                                  disabled={cancellingJobId === job.id}
+                                >
+                                  <XCircle className="mr-2 h-4 w-4" />
+                                  {cancellingJobId === job.id ? "Đang hủy..." : "Hủy tin đăng"}
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
                     )}
                   </div>
 
-                  <Badge variant="secondary" className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800">{job.jobSkillRequirements?.[0]?.name ?? job.requiredSkills ?? "Nông nghiệp"}</Badge>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="secondary" className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                      {job.jobSkillRequirements?.[0]?.name ?? job.requiredSkills ?? "Nông nghiệp"}
+                    </Badge>
+                    <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400">
+                      {job.jobTypeId === 1 ? "Khoán" : job.jobTypeId === 2 ? "Ngày" : "Khác"}
+                    </Badge>
+                  </div>
                   <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed max-w-4xl">{job.description || "Không có mô tả chi tiết."}</p>
 
-                  <div className={`grid gap-y-3 text-sm ${viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2" : "flex flex-wrap gap-x-6"}`}>
-                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                  <div className={viewMode === "grid" ? "grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-2 text-sm" : "flex flex-wrap items-center gap-x-6 gap-y-3 text-sm"}>
+                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 min-w-0">
                       <MapPin className="h-4 w-4 shrink-0 text-emerald-500" />
-                      <span className={`truncate ${viewMode === "grid" ? "" : "max-w-50 sm:max-w-xs"}`} title={job.address}>{job.address}</span>
+                      <span className={`truncate ${viewMode === "grid" ? "" : "max-w-xs lg:max-w-xl"}`} title={job.address}>{job.address}</span>
                     </div>
-                    <div className="flex items-center gap-2 font-medium text-primary">
+                    <div className="flex items-center gap-2 font-medium text-primary shrink-0">
                       <Banknote className="h-4 w-4 shrink-0" />
                       <span className="truncate">{formatCurrency(job.wageAmount)}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 shrink-0">
                       <Users className="h-4 w-4 shrink-0 text-amber-500" />
                       <span className="truncate">{job.workersAccepted}/{job.workersNeeded} người</span>
                     </div>
                   </div>
 
-                  {normalizeStatus(job.status, job.startDate) !== "completed" && (
-                    <div className={`max-w-md bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800 mt-2 ${viewMode === "grid" ? "w-full" : ""}`}>
+                  {normalizeStatus(job.statusId, job.startDate) !== "completed" && (
+                    <div className={`bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800 mt-2 w-full ${viewMode === "grid" ? "max-w-md" : "max-w-xl"}`}>
                       <div className="mb-2 flex items-center justify-between text-xs font-medium">
-                        <span className="text-muted-foreground uppercase tracking-wider text-[10px]">Tiến độ</span>
+                        <span className="text-muted-foreground uppercase tracking-wider text-[10px]">Tiến độ tuyển dụng</span>
                         <span className="text-primary">
                           {Math.round(job.workersNeeded > 0 ? (job.workersAccepted / job.workersNeeded) * 100 : 0)}%
                         </span>
@@ -719,25 +802,45 @@ export function FarmerJobsList() {
                             Xem chi tiết
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild className="cursor-pointer">
-                          <Link href={`/farmer/jobs/${job.id}/edit`}>
-                            <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
-                            Chỉnh sửa
-                          </Link>
-                        </DropdownMenuItem>
+                        {Number(job.statusId) === JobPostStatus.Published && (
+                          <DropdownMenuItem asChild className="cursor-pointer">
+                            <Link href={`/farmer/jobs/${job.id}/edit`}>
+                              <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
+                              Chỉnh sửa
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem className="cursor-pointer">
                           <Copy className="mr-2 h-4 w-4 text-muted-foreground" />
                           Đăng lại
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive cursor-pointer"
-                          onClick={() => setJobPendingDelete(job)}
-                          disabled={deletingJobId === job.id}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          {deletingJobId === job.id ? "Đang xóa..." : "Xóa tin"}
-                        </DropdownMenuItem>
+                        {Number(job.statusId) === JobPostStatus.Published && (
+                          <DropdownMenuItem
+                            className="cursor-pointer"
+                            onClick={() => void handleToggleUrgency(job)}
+                            disabled={updatingUrgencyJobId === job.id}
+                          >
+                            <Zap className={`mr-2 h-4 w-4 ${job.isUrgent ? "text-orange-500" : "text-muted-foreground"}`} />
+                            {updatingUrgencyJobId === job.id
+                              ? "Đang cập nhật..."
+                              : job.isUrgent
+                                ? "Bỏ đánh dấu gấp"
+                                : "Đánh dấu gấp"}
+                          </DropdownMenuItem>
+                        )}
+                        {Number(job.statusId) === JobPostStatus.Published && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive cursor-pointer"
+                              onClick={() => setJobPendingCancel(job)}
+                              disabled={cancellingJobId === job.id}
+                            >
+                              <XCircle className="mr-2 h-4 w-4" />
+                              {cancellingJobId === job.id ? "Đang hủy..." : "Hủy tin đăng"}
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -759,39 +862,94 @@ export function FarmerJobsList() {
       </div>
 
       <AlertDialog
-        open={Boolean(jobPendingDelete)}
+        open={Boolean(jobPendingCancel)}
         onOpenChange={(open) => {
-          if (!open && !deletingJobId) {
-            setJobPendingDelete(null)
+          if (!open && !cancellingJobId) {
+            setJobPendingCancel(null)
           }
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xóa bài đăng?</AlertDialogTitle>
+            <AlertDialogTitle>Hủy bài đăng?</AlertDialogTitle>
             <AlertDialogDescription>
-              {jobPendingDelete
-                ? `Bạn có chắc muốn xóa bài đăng "${jobPendingDelete.title}"? Hành động này không thể hoàn tác.`
-                : "Bạn có chắc muốn xóa bài đăng này?"}
+              {jobPendingCancel
+                ? `Bạn có chắc muốn hủy bài đăng "${jobPendingCancel.title}"? Hành động này không thể hoàn tác.`
+                : "Bạn có chắc muốn hủy bài đăng này?"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={Boolean(deletingJobId)}>Hủy</AlertDialogCancel>
+            <AlertDialogCancel disabled={Boolean(cancellingJobId)}>Không</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (jobPendingDelete) {
-                  void handleDeleteJob(jobPendingDelete)
+                if (jobPendingCancel) {
+                  void handleCancelJob(jobPendingCancel)
                 }
               }}
-              disabled={Boolean(deletingJobId)}
+              disabled={Boolean(cancellingJobId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deletingJobId ? "Đang xóa..." : "Xóa"}
+              {cancellingJobId ? "Đang hủy..." : "Xác nhận hủy"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
+      <Dialog open={isApplicationsDialogOpen} onOpenChange={setIsApplicationsDialogOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Danh sách ứng viên</DialogTitle>
+            <DialogDescription>
+              {selectedJobForApplications ? `Ứng viên cho: ${selectedJobForApplications.title}` : "Danh sách ứng viên"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[60vh] overflow-y-auto pr-2 py-2">
+            {isLoadingApplications ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-agro-green mb-2" />
+                <p className="text-sm text-muted-foreground">Đang tải ứng viên...</p>
+              </div>
+            ) : applicationsError ? (
+              <div className="p-4 rounded-lg bg-destructive/10 text-destructive text-center border border-destructive/20">
+                {applicationsError}
+              </div>
+            ) : applications.length === 0 ? (
+              <div className="text-center py-12 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-dashed">
+                <Inbox className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Chưa có ứng viên nào ứng tuyển.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {applications.map((app) => (
+                  <div key={app.id} className="flex items-center justify-between p-4 rounded-xl border bg-card hover:shadow-sm transition-all">
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-10 w-10 border shadow-xs">
+                        <AvatarImage src={app.worker?.avatarUrl || "/placeholder.svg"} className="object-cover" />
+                        <AvatarFallback className="bg-agro-green/10 text-agro-green">
+                          {app.worker?.fullName?.charAt(0) || "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-semibold text-sm">{app.worker?.fullName || "Ứng viên"}</p>
+                        <p className="text-xs text-muted-foreground">{app.worker?.phoneNumber || "Không có SĐT"}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {getApplicationStatusBadge(app.statusId)}
+                      <Button variant="ghost" size="sm" asChild className="text-agro-green hover:text-agro-green hover:bg-agro-green/10">
+                        <Link href={`/farmer/applications?jobId=${selectedJobForApplications?.id}`}>
+                          Xem chi tiết
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

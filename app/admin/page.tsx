@@ -1,10 +1,7 @@
-import { AdminLayout } from "@/components/admin/admin-layout"
-import { AdminDashboard } from "@/components/admin/admin-dashboard"
+"use client";
+
+import { AdminShell } from "@/components/admin/admin-shell";
 
 export default function AdminPage() {
-  return (
-    <AdminLayout>
-      <AdminDashboard />
-    </AdminLayout>
-  )
+  return <AdminShell initialPage="dashboard" />;
 }

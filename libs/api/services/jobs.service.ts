@@ -5,7 +5,10 @@ import type {
     Job,
     CreateJobRequest,
     UpdateJobRequest,
+    JobPostStatus,
 } from '@/libs/types';
+
+// Removed local JOB_POST_STATUS as it is now centrally managed in libs/types/job.types.ts
 
 export const jobService = {
 
@@ -19,17 +22,22 @@ export const jobService = {
     },
 
     getMyJobPosts: async (): Promise<ApiResponse<Job[]>> => {
-        const response = await axiosInstance.get(API_ENDPOINTS.JOBS.MY_JOB_POSTS);
+        const response = await axiosInstance.get(API_ENDPOINTS.JOBS.GET_BY_FARMER_HISTORY);
         return response.data;
     },
 
-    getJobsByFarmer: async (farmerId: string): Promise<ApiResponse<Job[]>> => {
-        const response = await axiosInstance.get(API_ENDPOINTS.JOBS.GET_BY_FARMER(farmerId));
+    getJobsByFarmer: async (): Promise<ApiResponse<Job[]>> => {
+        const response = await axiosInstance.get(API_ENDPOINTS.JOBS.GET_BY_FARMER);
         return response.data;
     },
 
     getJobDetail: async (id: string): Promise<ApiResponse<Job>> => {
         const response = await axiosInstance.get(API_ENDPOINTS.JOBS.DETAIL(id));
+        return response.data;
+    },
+
+    getWorkersPerDay: async (id: string): Promise<ApiResponse<{ date: string; acceptedWorkerCount: number }[]>> => {
+        const response = await axiosInstance.get(API_ENDPOINTS.JOBS.WORKERS_PER_DAY(id));
         return response.data;
     },
 
@@ -78,6 +86,21 @@ export const jobService = {
      */
     updateJob: async (id: string, data: UpdateJobRequest): Promise<ApiResponse<Job>> => {
         const response = await axiosInstance.put(API_ENDPOINTS.JOBS.UPDATE(id), data);
+        return response.data;
+    },
+
+    cancelJob: async (id: string): Promise<ApiResponse<Job>> => {
+        const response = await axiosInstance.post(API_ENDPOINTS.JOBS.CANCEL(id));
+        return response.data;
+    },
+
+    updateStatus: async (id: string, status: JobPostStatus): Promise<ApiResponse<Job>> => {
+        const response = await axiosInstance.put(API_ENDPOINTS.JOBS.UPDATE_STATUS(id), null, { params: { status } });
+        return response.data;
+    },
+
+    updateUrgency: async (id: string, isUrgent: boolean): Promise<ApiResponse<Job>> => {
+        const response = await axiosInstance.put(API_ENDPOINTS.JOBS.UPDATE_URGENCY(id), null, { params: { isUrgent } });
         return response.data;
     },
 

@@ -26,27 +26,45 @@ export const API_ENDPOINTS = {
   // Farmer
   FARMER: {
     PROFILE: '/farmer',
+    PROFILE_BY_ID: (id: string) => `/farmer/${id}`,
     UPDATEPROFILE: '/farmer',
     UPDATEAVATAR: '/farmer/upload-avatar',
-    DASHBOARD: '/dashboard/farmer',
+    DASHBOARD: '/farmer/dashboard',
+  },
+
+  WORKER: {
+    PROFILE: '/worker',
+    PROFILE_BY_ID: (id: string) => `/worker/${id}`,
+    UPDATEPROFILE: '/worker',
+    UPDATEAVATAR: '/worker/upload-avatar',
   },
 
   JOBS: {
     GET: '/job/post',
-    MY_JOB_POSTS: '/job/post/farmer/history',
-    GET_BY_FARMER: (farmerId: string) => `/job/post/farmer/${farmerId}`,
+    GET_BY_FARMER_HISTORY: '/job/post/farmer/history',
+    GET_BY_FARMER: `/job/post/farmer`,
     DETAIL: (id: string) => `/job/post/${id}`,
     FILTERED_JOBS: '/job/post/filter',
     FILTERED_JOBS_BY_FARMER: '/job/post/filter/farmer',
     CREATE: '/job/post',
     UPDATE: (id: string) => `/job/post/${id}`,
+    CANCEL: (id: string) => `/job/post/cancel/${id}`,
+    UPDATE_STATUS: (id: string) => `/job/post/update-status/${id}`,
+    UPDATE_URGENCY: (id: string) => `/job/post/update-urgency/${id}`,
     DELETE: (id: string) => `/job/post/${id}`,
     JOB_APPLICATIONS: '/job/application',
     JOB_APPLICATIONS_BY_POST: (jobPostId: string) => `/job/application/post/${jobPostId}`,
+    JOB_APPLICATIONS_BY_FARMER: `/job/application/farmer`,
+    WORKERS_PER_DAY: (id: string) => `/job/post/${id}/workers-per-day`,
     APPLICATION_DETAIL: (id: string) => `/job/application/${id}`,
     RESPOND_APPLICANT: (id: string) => `/job/application/respond/${id}`,
+    CANCEL_APPLICATION: (id: string) => `/job/application/cancel/farmer/${id}`,
     SAVE_DRAFT: '/job/post/draft',
-    GET_DRAFTS: '/job/post/drafts'
+    GET_DRAFTS: '/job/post/drafts',
+    JOB_DETAILS: '/job/detail',
+    JOB_DETAIL: (id: string) => `/job/detail/${id}`,
+    JOB_DETAILS_BY_POST: (id: string) => `/job/detail/post/${id}`,
+    APPROVE_JOB_DETAILS: (id: string) => `/job/detail/approve/${id}`,
   },
 
   // Farm
@@ -79,6 +97,8 @@ export const API_ENDPOINTS = {
     UPDATE_PROFILE: '/profile/update',
     CHANGE_PASSWORD: '/profile/change-password',
     UPLOAD_AVATAR: '/profile/upload-avatar',
+    FARMER_ID: (id: string) => `/profile/farmer/${id}`,
+    WORKER_ID: (id: string) => `/profile/worker/${id}`
   },
 
   // Common
@@ -149,7 +169,30 @@ export const API_ENDPOINTS = {
   MESSAGES: {
     GET: '/messages',
     SEND: '/messages',
-    READ: '/messages/read'
+    READ: '/messages/read',
+    CONVERSATIONS: '/messages/conversations'
+  },
+
+  RATINGS: {
+    CREATE: `/ratings`,
+    SPECIFIC: (userId: string) => `/ratings/${userId}`,
+    BY_USER: (userId: string) => `/ratings/user/${userId}/all`,
+    GIVEN: `/ratings/user/given`,
+    RECEIVED_BY_POST: (postId: string) => `/ratings/user/received/post/${postId}`,
+    AVERAGE: (userId: string) => `/ratings/user/${userId}/average`
+  },
+
+  DISPUTES: {
+    GET_ALL: '/disputes',
+    GET_MINE: '/disputes/mine',
+    GET_BY_ID: (id: string) => `/disputes/${id}`,
+    CREATE: '/disputes',
+    UPDATE: (id: string) => `/disputes/${id}`,
+    DELETE: (id: string) => `/disputes/${id}`,
+    REVIEW: (id: string) => `/disputes/${id}/review`,
+    RESOLVE: (id: string) => `/disputes/${id}/resolve`,
+    GET_COMMENTS: (id: string) => `/disputes/${id}/comments`,
+    ADD_COMMENT: (id: string) => `/disputes/${id}/comments`,
   },
 
   UPLOAD: '/upload',

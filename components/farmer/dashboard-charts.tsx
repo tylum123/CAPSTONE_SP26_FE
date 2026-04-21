@@ -3,17 +3,19 @@
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 
-const data = [
-  { name: "T2", ung_tuyen: 4, cong_viec: 2 },
-  { name: "T3", ung_tuyen: 3, cong_viec: 1 },
-  { name: "T4", ung_tuyen: 7, cong_viec: 3 },
-  { name: "T5", ung_tuyen: 5, cong_viec: 2 },
-  { name: "T6", ung_tuyen: 8, cong_viec: 4 },
-  { name: "T7", ung_tuyen: 12, cong_viec: 5 },
-  { name: "CN", ung_tuyen: 10, cong_viec: 4 },
-]
+interface ActivityData {
+  name: string;
+  applicationsCount: number;
+  jobPostsCount: number;
+}
 
-export function ActivityChart() {
+export function ActivityChart({ data = [] }: { data?: ActivityData[] }) {
+  const chartData = data.map(item => ({
+    name: item.name,
+    ung_tuyen: item.applicationsCount,
+    cong_viec: item.jobPostsCount
+  }));
+
   return (
     <Card className="col-span-1 lg:col-span-2 shadow-sm border-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm">
       <CardHeader>
@@ -23,7 +25,7 @@ export function ActivityChart() {
       <CardContent className="pl-0">
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data}>
+            <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted/20" vertical={false} />
               <XAxis 
                 dataKey="name" 
@@ -90,14 +92,37 @@ export function ActivityChart() {
   )
 }
 
-const jobStatusData = [
-  { name: "Đang tuyển", value: 5, color: "#10b981" }, // emerald-500
-  { name: "Đang thực hiện", value: 3, color: "#f97316" }, // orange-500
-  { name: "Đã hoàn thành", value: 8, color: "#2563eb" }, // blue-600
-  { name: "Đã hủy", value: 1, color: "#ef4444" }, // red-500
-]
+interface JobStatusData {
+  statusId: number;
+  statusName: string;
+  count: number;
+}
 
-export function JobStatusChart() {
+const statusColors: Record<number, string> = {
+  1: "#94a3b8", // Draft - slate-400
+  2: "#2563eb", // Published - blue-600
+  3: "#f59e0b", // Closed - amber-500
+  4: "#f97316", // InProgress - orange-500
+  5: "#10b981", // Completed - emerald-500
+  6: "#ef4444", // Cancelled - red-500
+};
+
+const statusLabels: Record<number, string> = {
+  1: "Nháp",
+  2: "Đang tuyển",
+  3: "Đã đóng",
+  4: "Đang thực hiện",
+  5: "Hoàn thành",
+  6: "Đã hủy",
+};
+
+export function JobStatusChart({ data = [] }: { data?: JobStatusData[] }) {
+  const chartData = data.map(item => ({
+    name: statusLabels[item.statusId] || item.statusName,
+    value: item.count,
+    color: statusColors[item.statusId] || "#cccccc"
+  }));
+
   return (
     <Card className="col-span-1 shadow-sm border-0 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm">
       <CardHeader>
@@ -109,7 +134,7 @@ export function JobStatusChart() {
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                data={jobStatusData}
+                data={chartData}
                 cx="50%"
                 cy="50%"
                 innerRadius={60}
@@ -117,7 +142,7 @@ export function JobStatusChart() {
                 paddingAngle={5}
                 dataKey="value"
               >
-                {jobStatusData.map((entry, index) => (
+                {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
@@ -126,7 +151,7 @@ export function JobStatusChart() {
           </ResponsiveContainer>
         </div>
         <div className="flex justify-center gap-4 text-xs text-muted-foreground mt-4 flex-wrap">
-          {jobStatusData.map((item, index) => (
+          {chartData.map((item, index) => (
             <div key={index} className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
               <span>{item.name}</span>

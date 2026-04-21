@@ -186,7 +186,7 @@ export default function LoginPage() {
 
         // Create user object for auth context
         const user = {
-          id: userData.id || '',
+          userId: userData.userId || userData.id || '',
           email: userData.email || farmerEmail,
           fullName: userData.fullName || userData.email || '',
           role,

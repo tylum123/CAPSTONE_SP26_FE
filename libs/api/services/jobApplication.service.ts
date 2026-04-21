@@ -12,17 +12,35 @@ export const jobApplicationService = {
     },
 
 
-    getJobApplicationsByPost: async (params?: {
-        jobId?: string;
+    getJobApplicationsByPost: async (jobPostId: string, params?: {
         includeAll?: boolean;
         statusId?: number;
-    }): Promise<ApiResponse<PaginatedResponse<ApplicationDTO> | ApplicationDTO[]>> => {
-        const jobId = params?.jobId || '';
+        page?: number;
+        limit?: number;
+    }): Promise<ApiResponse<PaginatedResponse<ApplicationDTO>>> => {
         const queryParams = {
             includeAll: params?.includeAll,
             statusId: params?.statusId,
+            page: params?.page,
+            limit: params?.limit,
         };
-        const response = await axiosInstance.get(API_ENDPOINTS.JOBS.JOB_APPLICATIONS_BY_POST(jobId), { params: queryParams });
+        const response = await axiosInstance.get(API_ENDPOINTS.JOBS.JOB_APPLICATIONS_BY_POST(jobPostId), { params: queryParams });
+        return response.data;
+    },
+
+    getJobApplicationsByFarmer: async (params?: {
+        includeAll?: boolean;
+        statusId?: number;
+        page?: number;
+        limit?: number;
+    }): Promise<ApiResponse<PaginatedResponse<ApplicationDTO>>> => {
+        const queryParams = {
+            includeAll: params?.includeAll,
+            statusId: params?.statusId,
+            page: params?.page,
+            limit: params?.limit,
+        };
+        const response = await axiosInstance.get(API_ENDPOINTS.JOBS.JOB_APPLICATIONS_BY_FARMER, { params: queryParams });
         return response.data;
     },
 
@@ -54,6 +72,11 @@ export const jobApplicationService = {
             respondedAt: new Date().toISOString(),
             responseMessage,
         });
+        return response.data;
+    },
+
+    cancelApplication: async (id: string): Promise<ApiResponse<ApplicationDTO>> => {
+        const response = await axiosInstance.put(API_ENDPOINTS.JOBS.CANCEL_APPLICATION(id));
         return response.data;
     },
 
