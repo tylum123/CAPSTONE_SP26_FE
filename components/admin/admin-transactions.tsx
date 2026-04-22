@@ -16,17 +16,26 @@ export function AdminTransactions() {
   };
 
   type Stats = {
-    todayTotal?: number;
-    averageBalance?: number;
-    pendingTotal?: number;
-    pendingCount?: number;
+    systemBalance?: {
+      total: number;
+      locked: number;
+      available: number;
+      changeToday: number;
+    };
+    payosToday?: {
+      depositAmount: number;
+      withdrawAmount: number;
+      depositCount: number;
+      withdrawCount: number;
+      totalTransactions: number;
+      netFlow: number;
+    };
   };
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("All");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [loading, setLoading] = useState(false);
@@ -64,8 +73,10 @@ export function AdminTransactions() {
   const fetchStats = async () => {
     try {
       const res = await adminService.getWalletStats();
-      if (res && res.data) setStats(res.data);
-      else setStats(null);
+      if (res) {
+        // Expecting res.data to follow { systemBalance, payosToday }
+        setStats(res as any as Stats);
+      } else setStats(null);
     } catch (err: any) {
       console.error(err);
       setError(err?.message ?? "Failed to load stats");
@@ -82,18 +93,14 @@ export function AdminTransactions() {
       if (searchTerm) params.set("search", searchTerm);
       if (typeFilter && typeFilter !== "All")
         params.set("type", typeFilter.toUpperCase());
-      if (statusFilter && statusFilter !== "All")
-        params.set("status", statusFilter.toUpperCase());
 
       const queryParams: any = { page, limit };
       if (searchTerm) queryParams.search = searchTerm;
       if (typeFilter && typeFilter !== "All")
         queryParams.type = typeFilter.toUpperCase();
-      if (statusFilter && statusFilter !== "All")
-        queryParams.status = statusFilter.toUpperCase();
 
       const res = await adminService.getWalletTransactions(queryParams as any);
-      const items = res?.data ?? res?.items ?? [];
+      const items = (res as any)?.data ?? (res as any)?.items ?? [];
       setTransactions(Array.isArray(items) ? items : (items.items ?? []));
     } catch (err: any) {
       console.error(err);
@@ -129,7 +136,7 @@ export function AdminTransactions() {
   useEffect(() => {
     fetchTransactions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, limit, searchTerm, typeFilter, statusFilter]);
+  }, [page, limit, searchTerm, typeFilter]);
 
   const formatCurrency = (v: any) => {
     const n = Number(v);
@@ -141,17 +148,16 @@ export function AdminTransactions() {
     return new Intl.NumberFormat("vi-VN").format(n);
   };
 
-  const totalSystem = Number(stats?.totalSystem ?? stats?.todayTotal ?? 0);
-  const lockedAmount = Number(stats?.lockedAmount ?? stats?.pendingTotal ?? 0);
-  const availableAmount = Number(
-    stats?.availableAmount ?? totalSystem - lockedAmount ?? 0,
-  );
-  const depositToday = Number(stats?.depositToday ?? stats?.todayTotal ?? 0);
-  const withdrawalToday = Number(stats?.withdrawalToday ?? 0);
-  const depositCount = Number(stats?.depositCount ?? 0);
-  const withdrawalCount = Number(stats?.withdrawalCount ?? 0);
+  const totalSystem = Number(stats?.systemBalance?.total ?? 0);
+  const lockedAmount = Number(stats?.systemBalance?.locked ?? 0);
+  const availableAmount =
+    Number(stats?.systemBalance?.available ?? totalSystem - lockedAmount) || 0;
+  const depositToday = Number(stats?.payosToday?.depositAmount ?? 0);
+  const withdrawalToday = Number(stats?.payosToday?.withdrawAmount ?? 0);
+  const depositCount = Number(stats?.payosToday?.depositCount ?? 0);
+  const withdrawalCount = Number(stats?.payosToday?.withdrawCount ?? 0);
   const totalTransactions = Number(
-    stats?.totalCount ?? depositCount + withdrawalCount,
+    stats?.payosToday?.totalTransactions ?? depositCount + withdrawalCount,
   );
 
   return (
@@ -176,17 +182,6 @@ export function AdminTransactions() {
               <p className="text-3xl font-bold text-foreground mt-2">
                 {formatMoney(totalSystem)} VND
               </p>
-              <p className="text-sm text-green-600 mt-2">
-                So với hôm qua:{" "}
-                {stats?.totalChange ? (
-                  <span className="inline-flex items-center gap-2">
-                    <ArrowUpRight size={14} className="text-green-600" />{" "}
-                    {formatMoney(stats.totalChange)}
-                  </span>
-                ) : (
-                  "—"
-                )}
-              </p>
             </div>
             <div className="bg-primary/20 p-3 rounded-lg">
               <DollarSign size={24} className="text-primary" />
@@ -201,7 +196,6 @@ export function AdminTransactions() {
               <p className="text-3xl font-bold text-foreground mt-2">
                 {formatMoney(lockedAmount)} VND
               </p>
-              <p className="text-sm text-[#D28228] mt-2">—</p>
             </div>
             <div className="bg-[#D28228]/20 p-3 rounded-lg">
               <DollarSign size={24} className="text-[#D28228]" />
@@ -216,7 +210,6 @@ export function AdminTransactions() {
               <p className="text-3xl font-bold text-foreground mt-2">
                 {formatMoney(availableAmount)} VND
               </p>
-              <p className="text-sm text-green-600 mt-2">—</p>
             </div>
             <div className="bg-[#10B981]/20 p-3 rounded-lg">
               <DollarSign size={24} className="text-[#10B981]" />
@@ -298,15 +291,6 @@ export function AdminTransactions() {
           <option value={2}>Rút tiền</option>
           <option value={5}>Khóa tiền</option>
         </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2 border border-border rounded-lg bg-card text-foreground"
-        >
-          <option>Tất cả</option>
-          <option>Thành công</option>
-          <option>Đang chờ</option>
-        </select>
       </div>
 
       {/* Transactions Table */}
@@ -363,17 +347,28 @@ export function AdminTransactions() {
               ) : (
                 transactions.map((tx) => {
                   const amountStr = String(tx.amount ?? "");
-                  const displayType = tx.type
-                    ? `${tx.type[0].toUpperCase()}${tx.type.slice(1).toLowerCase()}`
-                    : tx.type;
-                  const displayStatus = tx.status
-                    ? tx.status.toLowerCase() === "success"
-                      ? "Thành công"
-                      : tx.status.toLowerCase() === "pending"
-                        ? "Đang chờ"
-                        : tx.status
-                    : tx.status;
-
+                  const typeKey = (tx.type ?? "").toLowerCase();
+                  const typeLabels: Record<string, string> = {
+                    deposit: "Nạp tiền",
+                    job_payment: "Thanh toán",
+                    refund: "Hoàn tiền",
+                    withdraw: "Rút tiền",
+                    job_lock: "Khóa tiền",
+                  };
+                  const displayType =
+                    typeLabels[typeKey] ??
+                    (tx.type
+                      ? `${tx.type[0].toUpperCase()}${tx.type.slice(1).toLowerCase()}`
+                      : tx.type);
+                  // Format amount to vi-VN thousands separators, keep sign if present
+                  const sign = amountStr.startsWith("+")
+                    ? "+"
+                    : amountStr.startsWith("-")
+                      ? "-"
+                      : "";
+                  const numericPart = amountStr.replace(/[^0-9.-]/g, "");
+                  const absNum = Number(numericPart) || 0;
+                  const formattedAmount = `${sign}${new Intl.NumberFormat("vi-VN").format(Math.abs(absNum))}`;
                   return (
                     <tr
                       key={tx.id}
@@ -396,9 +391,9 @@ export function AdminTransactions() {
                       </td>
                       <td className="px-6 py-4">
                         <p
-                          className={`font-bold ${amountStr.startsWith("+") ? "text-green-600" : "text-destructive"}`}
+                          className={`font-bold ${sign === "+" ? "text-green-600" : "text-destructive"}`}
                         >
-                          {amountStr}
+                          {formattedAmount}
                         </p>
                       </td>
                       <td className="px-6 py-4">
@@ -410,7 +405,7 @@ export function AdminTransactions() {
                       <td className="px-6 py-4">
                         <p className="font-semibold text-foreground">
                           {tx.balanceAfter != null
-                            ? `${formatCurrency(tx.balanceAfter)} VND`
+                            ? `${formatMoney(tx.balanceAfter)} VND`
                             : "—"}
                         </p>
                       </td>

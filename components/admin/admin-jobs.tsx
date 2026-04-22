@@ -2,7 +2,7 @@
 
 import { Search, Eye, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
-import { adminJobService } from "@/libs/api/services/admin-job.service";
+import { adminService } from "@/libs/api/services/admin.service";
 import type {
   AdminJob,
   AdminJobListResponse,
@@ -36,7 +36,7 @@ export function AdminJobs() {
         const params: any = { page, limit };
         if (searchTerm) params.search = searchTerm;
         if (statusFilter !== "All") params.status = statusFilter;
-        const res: AdminJobListResponse = await adminJobService.getJobs(params);
+        const res: AdminJobListResponse = await adminService.getJobs(params);
         if (!ignore) {
           setJobs(res.data);
           setSummary(res.summary);
@@ -59,6 +59,13 @@ export function AdminJobs() {
     InProgress: "bg-[#10B981]/20 text-[#10B981]",
     Pending: "bg-[#D28228]/20 text-[#D28228]",
     Cancelled: "bg-destructive/20 text-destructive",
+  };
+
+  const STATUS_LABEL: Record<string, string> = {
+    Completed: "Hoàn thành",
+    InProgress: "Đang tiến hành",
+    Pending: "Đang chờ",
+    Cancelled: "Đã hủy",
   };
 
   return (
@@ -104,11 +111,11 @@ export function AdminJobs() {
           }}
           className="px-4 py-2 border border-border rounded-lg bg-card text-foreground"
         >
-          <option value="All">All</option>
-          <option value="Completed">Completed</option>
-          <option value="InProgress">In Progress</option>
-          <option value="Pending">Pending</option>
-          <option value="Cancelled">Cancelled</option>
+          <option value="All">Tất cả</option>
+          <option value="Completed">Hoàn thành</option>
+          <option value="InProgress">Đang tiến hành</option>
+          <option value="Pending">Đang chờ</option>
+          <option value="Cancelled">Đã hủy</option>
         </select>
       </div>
 
@@ -174,7 +181,7 @@ export function AdminJobs() {
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColors[job.status] ?? "bg-muted text-muted-foreground"}`}
                     >
-                      {job.status}
+                      {STATUS_LABEL[job.status] ?? job.status}
                     </span>
                   </td>
                   <td className="px-6 py-4">
