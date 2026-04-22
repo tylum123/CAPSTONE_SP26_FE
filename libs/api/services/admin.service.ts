@@ -27,6 +27,18 @@ const roleToId = (role: string): number => {
 
 export const adminService = {
   /**
+   * Get jobs (admin)
+   */
+  getJobs: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    search?: string;
+  }): Promise<any> => {
+    const response = await axiosInstance.get("/admin/jobpost", { params });
+    return response.data;
+  },
+  /**
    * Get admin dashboard data
    */
   getDashboard: async (): Promise<ApiResponse<any>> => {
@@ -83,7 +95,7 @@ export const adminService = {
     user: GetUserResponse,
     isActive: boolean,
   ): Promise<ApiResponse<GetUserResponse>> => {
-    return adminService.updateUser(user.id, {
+    return adminService.updateUser(user.userId, {
       email: user.email,
       phoneNumber: user.phoneNumber,
       address: user.address,
@@ -97,7 +109,7 @@ export const adminService = {
     user: GetUserResponse,
     isVerified: boolean,
   ): Promise<ApiResponse<GetUserResponse>> => {
-    return adminService.updateUser(user.id, {
+    return adminService.updateUser(user.userId, {
       email: user.email,
       phoneNumber: user.phoneNumber,
       address: user.address,
@@ -188,21 +200,86 @@ export const adminService = {
       const response = await axiosInstance.get(
         API_ENDPOINTS.ADMIN.WALLET_STATS,
       );
-      return response.data;
-    } catch (err) {
-      // Fallback sample data when backend isn't available yet
-      console.warn(
-        "adminService.getWalletStats failed, returning fallback sample",
-        err,
-      );
+
+      const raw = response.data ?? {};
+
+      // If backend already returns the desired shape, return as-is
+      if (raw.systemBalance || raw.payosToday) {
+        return response.data;
+      }
+
+      // Otherwise normalize common backend shapes into requested shape
+      const dataSource = raw.data ?? raw;
+
+      const systemTotal =
+        Number(
+          dataSource.systemTotal ??
+            dataSource.total ??
+            dataSource.todayTotal ??
+            0,
+        ) || 0;
+      const locked =
+        Number(dataSource.locked ?? dataSource.pendingTotal ?? 0) || 0;
+      const available =
+        Number(dataSource.available ?? systemTotal - locked) || 0;
+      const changeToday =
+        Number(dataSource.changeToday ?? dataSource.totalChange) || 0;
+
+      const depositAmount =
+        Number(dataSource.depositAmount ?? dataSource.todayDeposit ?? 0) || 0;
+      const withdrawAmount =
+        Number(dataSource.withdrawAmount ?? dataSource.todayWithdraw ?? 0) || 0;
+      const depositCount =
+        Number(dataSource.depositCount ?? dataSource.depositCountToday ?? 0) ||
+        0;
+      const withdrawCount =
+        Number(
+          dataSource.withdrawCount ?? dataSource.withdrawCountToday ?? 0,
+        ) || 0;
+      const totalTransactions =
+        Number(dataSource.totalTransactions ?? dataSource.totalCount ?? 0) || 0;
+      const netFlow =
+        Number(dataSource.netFlow ?? depositAmount - withdrawAmount) || 0;
+
       return {
         data: {
-          todayTotal: 1250.0,
-          averageBalance: 1342.0,
-          pendingTotal: 300.0,
-          pendingCount: 1,
+          systemBalance: {
+            total: systemTotal,
+            locked,
+            available,
+            changeToday,
+          },
+          payosToday: {
+            depositAmount,
+            withdrawAmount,
+            depositCount,
+            withdrawCount,
+            totalTransactions,
+            netFlow,
+          },
         },
         success: true,
+      } as any;
+    } catch (err) {
+      console.warn("adminService.getWalletStats failed", err);
+      return {
+        data: {
+          systemBalance: {
+            total: 0,
+            locked: 0,
+            available: 0,
+            changeToday: 0,
+          },
+          payosToday: {
+            depositAmount: 0,
+            withdrawAmount: 0,
+            depositCount: 0,
+            withdrawCount: 0,
+            totalTransactions: 0,
+            netFlow: 0,
+          },
+        },
+        success: false,
       } as any;
     }
   },

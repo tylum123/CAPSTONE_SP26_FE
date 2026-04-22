@@ -16,9 +16,15 @@ import type { GetUserResponse } from "@/libs/types";
 const LIMIT = 10;
 
 const ROLE_LABEL: Record<string, string> = {
-  farmer: "Farmer",
-  worker: "Worker",
-  admin: "Admin",
+  farmer: "Nông dân",
+  worker: "Người làm",
+  admin: "Quản trị viên",
+};
+
+const ROLE_COLOR: Record<string, string> = {
+  farmer: "bg-yellow-100 text-yellow-700",
+  worker: "bg-[#10B981]/20 text-[#10B981]",
+  admin: "bg-[#6366F1]/20 text-[#6366F1]",
 };
 
 export function AdminUsers() {
@@ -153,8 +159,8 @@ export function AdminUsers() {
           className="px-4 py-2 border border-border rounded-lg bg-card text-foreground"
         >
           <option value="">Tất cả vai trò</option>
-          <option value="farmer">Farmer</option>
-          <option value="worker">Worker</option>
+          <option value="farmer">Nông dân</option>
+          <option value="worker">Người làm</option>
         </select>
         <select
           value={statusFilter}
@@ -246,9 +252,8 @@ export function AdminUsers() {
                     <td className="px-6 py-4">
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          user.role === "farmer"
-                            ? "bg-primary/20 text-primary"
-                            : "bg-[#10B981]/20 text-[#10B981]"
+                          ROLE_COLOR[user.role] ??
+                          "bg-muted text-muted-foreground"
                         }`}
                       >
                         {ROLE_LABEL[user.role] ?? user.role}
