@@ -1,76 +1,100 @@
 ﻿"use client";
 
-import { Search, AlertCircle, MessageSquare, CheckCircle } from "lucide-react";
-import { useState } from "react";
+import {
+  Search,
+  AlertCircle,
+  MessageSquare,
+  CheckCircle,
+  Edit,
+  UserX,
+  Trash2,
+} from "lucide-react";
+import { useState, useEffect } from "react";
+import { disputeService, adminService } from "@/libs/api/services";
+import { de } from "date-fns/locale";
+import { User } from "@/libs/types";
+type UserMap = Record<string, { fullName: string; email: string }>;
 
 export function AdminDisputes() {
-  const [disputes] = useState([
-    {
-      id: 1,
-      complaint: "Cong viec khong hoan thanh day du",
-      farmer: "Nguyen Van A",
-      worker: "Tran Thi B",
-      amount: "$150",
-      status: "Pending",
-      date: "2024-03-15",
-      severity: "High",
-    },
-    {
-      id: 2,
-      complaint: "Thanh toan khong dung gio",
-      farmer: "Le Van C",
-      worker: "Pham Thi D",
-      amount: "$200",
-      status: "Resolved",
-      date: "2024-03-10",
-      severity: "Medium",
-    },
-    {
-      id: 3,
-      complaint: "Nguoi dung vi pham thoa thuan",
-      farmer: "Do Minh E",
-      worker: "Vo Van G",
-      amount: "$100",
-      status: "Investigating",
-      date: "2024-03-14",
-      severity: "High",
-    },
-    {
-      id: 4,
-      complaint: "Chat luong cong viec thap",
-      farmer: "Hoang Thi F",
-      worker: "Dinh Thi I",
-      amount: "$80",
-      status: "Resolved",
-      date: "2024-02-28",
-      severity: "Low",
-    },
-    {
-      id: 5,
-      complaint: "Tranh chap ve so tien luong",
-      farmer: "Bui Van H",
-      worker: "Ngo Thi K",
-      amount: "$120",
-      status: "Pending",
-      date: "2024-03-13",
-      severity: "High",
-    },
-  ]);
+  const [disputes, setDisputes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [userMap, setUserMap] = useState<UserMap>({});
+
+  useEffect(() => {
+    let ignore = false;
+    async function fetchDisputesAndUsers() {
+      setLoading(true);
+      setError(null);
+      try {
+        // Fetch disputes
+        const res = await disputeService.getAllDisputes();
+        let disputesData = Array.isArray(res.data) ? res.data : [];
+        // Collect all user IDs (reporter, accused)
+        const userIds = new Set<string>();
+        disputesData.forEach((d: any) => {
+          if (d.reporterUserId) userIds.add(d.reporterUserId);
+          if (d.accusedUserId) userIds.add(d.accusedUserId);
+        });
+        // Fetch all users (adminService.getUsers returns paginated)
+        // let users: any[] = [];
+        let page = 1;
+        let hasMore = true;
+        // while (hasMore) {
+        //   const userRes = await adminService.getUsers({ page, limit: 100 });
+        //   let pageData = Array.isArray(userRes.data?.data)
+        //     ? userRes.data.data
+        //     : userRes.data;
+        //   if (Array.isArray(pageData)) users.push(...pageData);
+        //   hasMore = pageData && pageData.length === 100;
+        //   page++;
+        // }
+        // Map userId to user info
+        const map: UserMap = {};
+        // users.forEach((u: any) => {
+        //   map[u.userId] = { fullName: u.fullName, email: u.email };
+        // });
+        debugger;
+
+        if (!ignore) {
+          setDisputes(res.data.disputeReports);
+          const userMap: UserMap = {};
+          res.data.users.forEach((user: User) => {
+            userMap[user.userId] = {
+              fullName: user.fullName,
+              email: user.email,
+            };
+          });
+          setUserMap(userMap);
+        }
+      } catch (e: any) {
+        setError(e?.message || "Lỗi khi gọi API");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchDisputesAndUsers();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [severityFilter, setSeverityFilter] = useState("All");
 
   const filteredDisputes = disputes.filter((dispute) => {
+    // Tùy chỉnh lại các trường filter cho phù hợp với API trả về
     const matchSearch =
-      dispute.farmer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      dispute.worker.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      dispute.complaint.toLowerCase().includes(searchTerm.toLowerCase());
+      (dispute.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        dispute.description
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase())) ??
+      false;
     const matchStatus =
       statusFilter === "All" || dispute.status === statusFilter;
-    const matchSeverity =
-      severityFilter === "All" || dispute.severity === severityFilter;
-    return matchSearch && matchStatus && matchSeverity;
+    // severity có thể không có trong API, tạm bỏ filter này nếu không có
+    return matchSearch && matchStatus;
   });
 
   const getSeverityColor = (severity: string) => {
@@ -102,25 +126,15 @@ export function AdminDisputes() {
   };
 
   const stats = [
-    {
-      label: "Tranh chap dang cho",
-      value: "2",
-      color: "bg-destructive/20 text-destructive",
-    },
-    {
-      label: "Dang dieu tra",
-      value: "1",
-      color: "bg-[#D28228]/20 text-[#D28228]",
-    },
-    {
-      label: "Da giai quyet",
-      value: "2",
-      color: "bg-green-100 text-green-700",
-    },
+    { label: "Tranh chấp đang chờ", value: "2", textColor: "text-destructive" },
+    { label: "Đang điều tra", value: "1", textColor: "text-[#D28228]" },
+    { label: "Đã giải quyết", value: "2", textColor: "text-green-700" },
   ];
 
   return (
     <div className="p-8 space-y-6">
+      {loading && <div>Đang tải danh sách khiếu nại...</div>}
+      {error && <div className="text-destructive">{error}</div>}
       <div>
         <h1 className="text-3xl font-bold text-foreground">
           Quản lý tranh chấp
@@ -134,10 +148,10 @@ export function AdminDisputes() {
         {stats.map((stat, index) => (
           <div
             key={index}
-            className="bg-card rounded-lg border border-border p-6"
+            className="bg-card rounded-lg border border-border p-4 h-28 flex flex-col items-center justify-center"
           >
-            <p className="text-muted-foreground text-sm">{stat.label}</p>
-            <p className={`text-3xl font-bold mt-2 ${stat.color}`}>
+            <p className="text-muted-foreground text-sm mb-1">{stat.label}</p>
+            <p className={`text-3xl font-bold ${stat.textColor} text-center`}>
               {stat.value}
             </p>
           </div>
@@ -152,7 +166,7 @@ export function AdminDisputes() {
           />
           <input
             type="text"
-            placeholder="Tim kiem theo ten hoac khieu nai..."
+            placeholder="Tìm kiếm theo tên hoặc khiếu nại..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-card text-foreground placeholder-muted-foreground"
@@ -186,28 +200,40 @@ export function AdminDisputes() {
             <thead className="bg-muted border-b border-border">
               <tr>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                  Khieu nai
+                  Người tố cáo
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                  Farmer
+                  Người bị tố cáo
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                  Worker
+                  Công việc
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                  So tien
+                  Lý do
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                  Muc do
+                  Mô tả
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                  Trang thai
+                  Bằng chứng
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                  Ngay
+                  Loại
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                  Hanh dong
+                  Trạng thái
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                  Bên chịu phạt
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                  Ngày tạo
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                  Ngày xử lý
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                  Hành động
                 </th>
               </tr>
             </thead>
@@ -217,50 +243,136 @@ export function AdminDisputes() {
                   key={dispute.id}
                   className="border-b border-border hover:bg-muted/50 transition-colors"
                 >
-                  <td className="px-6 py-4">
-                    <p className="font-semibold text-foreground max-w-xs">
-                      {dispute.complaint}
-                    </p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-muted-foreground">{dispute.farmer}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-muted-foreground">{dispute.worker}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="font-semibold text-foreground">
-                      {dispute.amount}
-                    </p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${getSeverityColor(dispute.severity)}`}
-                    >
-                      {dispute.severity}
+                  {/* Người tố cáo */}
+                  <td className="px-6 py-4 max-w-xs">
+                    <span title={dispute.reporterUserId}>
+                      {userMap[dispute.reporterUserId]?.fullName ||
+                        dispute.reporterUserId ||
+                        "-"}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(dispute.status)}
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(dispute.status)}`}
-                      >
-                        {dispute.status}
-                      </span>
-                    </div>
+                  {/* Người bị tố cáo */}
+                  <td className="px-6 py-4 max-w-xs">
+                    <span title={dispute.accusedUserId}>
+                      {userMap[dispute.accusedUserId]?.fullName ||
+                        dispute.accusedUserId ||
+                        "-"}
+                    </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <p className="text-muted-foreground text-sm">
-                      {dispute.date}
+                  {/* Công việc */}
+                  <td className="px-6 py-4 max-w-xs">
+                    {dispute.jobPostId || "-"}
+                  </td>
+                  {/* Lý do */}
+                  <td className="px-6 py-4 max-w-xs">
+                    <p
+                      className="font-semibold text-foreground truncate"
+                      title={dispute.reason}
+                    >
+                      {dispute.reason}
                     </p>
                   </td>
+                  {/* Mô tả */}
+                  <td className="px-6 py-4 max-w-xs">
+                    <p
+                      className="text-muted-foreground truncate"
+                      title={dispute.description}
+                    >
+                      {dispute.description}
+                    </p>
+                  </td>
+                  {/* Bằng chứng */}
                   <td className="px-6 py-4">
+                    {dispute.evidenceUrl ? (
+                      <a
+                        href={dispute.evidenceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline"
+                      >
+                        Xem
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">Không có</span>
+                    )}
+                  </td>
+                  {/* Loại */}
+                  <td className="px-6 py-4">
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground">
+                      {dispute.disputeType === 1
+                        ? "Chất lượng công việc"
+                        : dispute.disputeType === 2
+                          ? "Thanh toán"
+                          : "Khác"}
+                    </span>
+                  </td>
+                  {/* Trạng thái */}
+                  <td className="px-6 py-4">
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground">
+                      {dispute.status === 1
+                        ? "Đang chờ"
+                        : dispute.status === 2
+                          ? "Đang xử lý"
+                          : dispute.status === 3
+                            ? "Đã giải quyết"
+                            : dispute.status === 4
+                              ? "Từ chối"
+                              : "-"}
+                    </span>
+                  </td>
+                  {/* Bên chịu phạt */}
+                  <td className="px-6 py-4">
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground">
+                      {dispute.penaltyTarget === 0
+                        ? "Không có"
+                        : dispute.penaltyTarget === 1
+                          ? "Người tố cáo"
+                          : dispute.penaltyTarget === 2
+                            ? "Người bị tố cáo"
+                            : "-"}
+                    </span>
+                  </td>
+                  {/* Ngày tạo */}
+                  <td className="px-6 py-4">
+                    <p className="text-muted-foreground text-sm">
+                      {dispute.createdAt
+                        ? new Date(dispute.createdAt).toLocaleString()
+                        : ""}
+                    </p>
+                  </td>
+                  {/* Ngày xử lý */}
+                  <td className="px-6 py-4">
+                    <p className="text-muted-foreground text-sm">
+                      {dispute.resolvedAt
+                        ? new Date(dispute.resolvedAt).toLocaleString()
+                        : "-"}
+                    </p>
+                  </td>
+                  {/* Hành động */}
+                  <td className="px-6 py-4 flex gap-2">
                     <button
                       className="p-2 hover:bg-muted rounded-lg transition-colors"
-                      title="Xem chi tiet"
+                      title="Bình luận"
                     >
                       <MessageSquare size={18} className="text-primary" />
+                    </button>
+                    <button
+                      className="p-2 hover:bg-muted rounded-lg transition-colors"
+                      title="Cập nhật"
+                    >
+                      <Edit size={18} className="text-blue-500" />
+                    </button>
+                    <button
+                      className="p-2 hover:bg-muted rounded-lg transition-colors"
+                      title="Ban tài khoản"
+                    >
+                      <UserX size={18} className="text-destructive" />
+                    </button>
+                    <button
+                      className="p-2 hover:bg-muted rounded-lg transition-colors"
+                      title="Xóa"
+                    >
+                      <Trash2 size={18} className="text-destructive" />
                     </button>
                   </td>
                 </tr>

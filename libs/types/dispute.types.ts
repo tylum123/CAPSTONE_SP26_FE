@@ -1,3 +1,6 @@
+import { FarmerProfileDTO, WorkerProfileDTO } from "./farmer.types";
+import { User } from "./user.types";
+
 export enum DisputeStatus {
   Pending = 1,
   UnderReview = 2,
@@ -23,6 +26,11 @@ export enum DisputeUserRole {
   Worker = 3,
 }
 
+export interface CustomDisputeReportDTO {
+  disputeReports: DisputeReportDTO[];
+  users: WorkerProfileDTO[];
+  users: FarmerProfileDTO[];
+}
 export interface DisputeReportDTO {
   id: string;
   farmerId?: string | null;
