@@ -95,7 +95,7 @@ export const adminService = {
     user: GetUserResponse,
     isActive: boolean,
   ): Promise<ApiResponse<GetUserResponse>> => {
-    return adminService.updateUser(user.userId, {
+    return adminService.updateUser(user.id, {
       email: user.email,
       phoneNumber: user.phoneNumber,
       address: user.address,
@@ -109,7 +109,7 @@ export const adminService = {
     user: GetUserResponse,
     isVerified: boolean,
   ): Promise<ApiResponse<GetUserResponse>> => {
-    return adminService.updateUser(user.userId, {
+    return adminService.updateUser(user.id, {
       email: user.email,
       phoneNumber: user.phoneNumber,
       address: user.address,

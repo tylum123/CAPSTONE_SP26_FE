@@ -1,5 +1,6 @@
 export interface User {
-  userId: string;
+  id: string;
+  userId?: string; // alias used in auth responses
   email: string;
   fullName: string;
   role: "farmer" | "worker" | "admin";
