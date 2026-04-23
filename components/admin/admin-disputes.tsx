@@ -12,7 +12,16 @@ import {
 import { useState, useEffect } from "react";
 import { disputeService, adminService } from "@/libs/api/services";
 import { de } from "date-fns/locale";
-import { User } from "@/libs/types";
+import { FarmerProfileDTO, User, WorkerProfileDTO } from "@/libs/types";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 type UserMap = Record<string, { fullName: string; email: string }>;
 
 export function AdminDisputes() {
@@ -59,13 +68,31 @@ export function AdminDisputes() {
         if (!ignore) {
           setDisputes(res.data.disputeReports);
           const userMap: UserMap = {};
-          res.data.users.forEach((user: User) => {
-            userMap[user.userId] = {
-              fullName: user.fullName,
-              email: user.email,
+          res.data.farmers.forEach((farmer: FarmerProfileDTO) => {
+            userMap[farmer.userId] = {
+              fullName: farmer.contactName,
+              email: farmer.user.email,
+            };
+          });
+          res.data.workers.forEach((worker: WorkerProfileDTO) => {
+            userMap[worker.userId] = {
+              fullName: worker.fullName,
+              email: worker.email,
             };
           });
           setUserMap(userMap);
+          // Fetch summary counts for stats (best-effort)
+          try {
+            const sumRes = await disputeService.getSummary();
+            const data = Array.isArray(sumRes)
+              ? sumRes
+              : Array.isArray(sumRes?.data)
+              ? sumRes.data
+              : sumRes?.data?.data ?? [];
+            if (!ignore) setSummaryStats(data as any[]);
+          } catch (err) {
+            console.error("Failed to fetch dispute summary", err);
+          }
         }
       } catch (e: any) {
         setError(e?.message || "Lỗi khi gọi API");
@@ -82,6 +109,11 @@ export function AdminDisputes() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [severityFilter, setSeverityFilter] = useState("All");
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
+  const [selectedDispute, setSelectedDispute] = useState<any | null>(null);
+  const [selectedStatusId, setSelectedStatusId] = useState<number | null>(null);
+  const [statusSubmitting, setStatusSubmitting] = useState(false);
+  const [summaryStats, setSummaryStats] = useState<Array<{statusId:number;statusName:string;count:number}>>([]);
 
   const filteredDisputes = disputes.filter((dispute) => {
     // Tùy chỉnh lại các trường filter cho phù hợp với API trả về
@@ -125,11 +157,64 @@ export function AdminDisputes() {
     return colors[status] ?? "bg-muted text-muted-foreground";
   };
 
-  const stats = [
-    { label: "Tranh chấp đang chờ", value: "2", textColor: "text-destructive" },
-    { label: "Đang điều tra", value: "1", textColor: "text-[#D28228]" },
-    { label: "Đã giải quyết", value: "2", textColor: "text-green-700" },
-  ];
+  
+
+  // Build stats from API summary (fallback to defaults)
+  const statusLabelMap: Record<number, { label: string; color: string }> = {
+    1: { label: "Tranh chấp đang chờ", color: "text-destructive" },
+    2: { label: "Đang xử lý", color: "text-[#D28228]" },
+    3: { label: "Đã giải quyết", color: "text-green-700" },
+    4: { label: "Từ chối", color: "text-destructive" },
+  };
+
+  const statsSource = summaryStats && summaryStats.length
+    ? summaryStats
+    : [
+        { statusId: 1, statusName: "Pending", count: 0 },
+        { statusId: 2, statusName: "UnderReview", count: 0 },
+        { statusId: 3, statusName: "Resolved", count: 0 },
+        { statusId: 4, statusName: "Rejected", count: 0 },
+      ];
+
+  const stats = statsSource.map((s: any) => {
+    const meta = statusLabelMap[s.statusId] ?? { label: s.statusName ?? String(s.statusId), color: "text-muted-foreground" };
+    return { label: meta.label, value: String(s.count ?? 0), textColor: meta.color };
+  });
+
+  // Determine responsive grid columns for stats (max 4 columns)
+  const statsCols = Math.min(stats.length, 4);
+  let mdGridColsClass = "md:grid-cols-1";
+  if (statsCols === 2) mdGridColsClass = "md:grid-cols-2";
+  else if (statsCols === 3) mdGridColsClass = "md:grid-cols-3";
+  else if (statsCols >= 4) mdGridColsClass = "md:grid-cols-4";
+
+  const openStatusDialog = (dispute: any) => {
+    setSelectedDispute(dispute);
+    setSelectedStatusId(dispute?.status ?? 1);
+    setIsStatusDialogOpen(true);
+  };
+
+  const submitStatusChange = async () => {
+    if (!selectedDispute || selectedStatusId == null) return;
+    setStatusSubmitting(true);
+    try {
+      await disputeService.updateStatus(selectedDispute.id, Number(selectedStatusId));
+      setDisputes((prev) =>
+        prev.map((d) =>
+          d.id === selectedDispute.id ? { ...d, status: Number(selectedStatusId) } : d,
+        ),
+      );
+      setIsStatusDialogOpen(false);
+      setSelectedDispute(null);
+      setSelectedStatusId(null);
+      alert("Cập nhật trạng thái thành công");
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "Lỗi khi cập nhật trạng thái");
+    } finally {
+      setStatusSubmitting(false);
+    }
+  };
 
   return (
     <div className="p-8 space-y-6">
@@ -144,7 +229,42 @@ export function AdminDisputes() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cập nhật trạng thái</DialogTitle>
+            <DialogDescription>Chọn trạng thái cho tranh chấp</DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-2 space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Tranh chấp: {selectedDispute?.reason ?? "-"}
+            </p>
+
+            <select
+              value={selectedStatusId ?? ""}
+              onChange={(e) => setSelectedStatusId(Number(e.target.value))}
+              className="w-full border border-border rounded px-3 py-2 bg-card text-foreground"
+            >
+              <option value={1} disabled>Đang chờ</option>
+              <option value={2}>Đang xử lý</option>
+              <option value={3}>Đã giải quyết</option>
+              <option value={4}>Từ chối</option>
+            </select>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsStatusDialogOpen(false)} className="mr-2">
+              Hủy
+            </Button>
+            <Button onClick={submitStatusChange} disabled={statusSubmitting || selectedStatusId == null}>
+              {statusSubmitting ? "Đang gửi..." : "Cập nhật"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <div className={`grid grid-cols-1 ${mdGridColsClass} gap-6`}>
         {stats.map((stat, index) => (
           <div
             key={index}
@@ -224,9 +344,6 @@ export function AdminDisputes() {
                   Trạng thái
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                  Bên chịu phạt
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
                   Ngày tạo
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
@@ -261,7 +378,7 @@ export function AdminDisputes() {
                   </td>
                   {/* Công việc */}
                   <td className="px-6 py-4 max-w-xs">
-                    {dispute.jobPostId || "-"}
+                    {dispute.jobPost?.title || "-"}
                   </td>
                   {/* Lý do */}
                   <td className="px-6 py-4 max-w-xs">
@@ -320,18 +437,7 @@ export function AdminDisputes() {
                               : "-"}
                     </span>
                   </td>
-                  {/* Bên chịu phạt */}
-                  <td className="px-6 py-4">
-                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground">
-                      {dispute.penaltyTarget === 0
-                        ? "Không có"
-                        : dispute.penaltyTarget === 1
-                          ? "Người tố cáo"
-                          : dispute.penaltyTarget === 2
-                            ? "Người bị tố cáo"
-                            : "-"}
-                    </span>
-                  </td>
+                 
                   {/* Ngày tạo */}
                   <td className="px-6 py-4">
                     <p className="text-muted-foreground text-sm">
@@ -350,74 +456,28 @@ export function AdminDisputes() {
                   </td>
                   {/* Hành động */}
                   <td className="px-6 py-4 flex gap-2">
-                    <button
-                      className="p-2 hover:bg-muted rounded-lg transition-colors"
-                      title="Bình luận"
-                    >
-                      <MessageSquare size={18} className="text-primary" />
-                    </button>
-                    <button
-                      className="p-2 hover:bg-muted rounded-lg transition-colors"
-                      title="Cập nhật"
-                    >
-                      <Edit size={18} className="text-blue-500" />
-                    </button>
-                    <button
-                      className="p-2 hover:bg-muted rounded-lg transition-colors"
-                      title="Ban tài khoản"
-                    >
-                      <UserX size={18} className="text-destructive" />
-                    </button>
-                    <button
-                      className="p-2 hover:bg-muted rounded-lg transition-colors"
-                      title="Xóa"
-                    >
-                      <Trash2 size={18} className="text-destructive" />
-                    </button>
+                    {dispute.status === 2 && (
+                      <button
+                        className="p-2 hover:bg-muted rounded-lg transition-colors"
+                        title="Bình luận"
+                      >
+                        <MessageSquare size={18} className="text-primary" />
+                      </button>
+                    )}
+                    {dispute.status !== 3 && dispute.status !== 4 && (
+                      <button
+                        className="p-2 hover:bg-muted rounded-lg transition-colors"
+                        title="Cập nhật"
+                        onClick={() => openStatusDialog(dispute)}
+                      >
+                        <Edit size={18} className="text-blue-500" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      <div className="bg-card rounded-lg border border-border p-6">
-        <h2 className="text-lg font-bold text-foreground mb-4">
-          Cac tuy chon giai quyet tranh chap
-        </h2>
-        <div className="space-y-3">
-          <button className="w-full flex items-center gap-3 p-4 border-2 border-border rounded-lg hover:bg-muted transition-colors">
-            <CheckCircle size={20} className="text-green-600" />
-            <div className="text-left">
-              <p className="font-semibold text-foreground">
-                Hoan tien toan bo cho Farmer
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Huy bo giao dich hoan toan
-              </p>
-            </div>
-          </button>
-          <button className="w-full flex items-center gap-3 p-4 border-2 border-border rounded-lg hover:bg-muted transition-colors">
-            <CheckCircle size={20} className="text-[#D28228]" />
-            <div className="text-left">
-              <p className="font-semibold text-foreground">
-                Thanh toan mot phan
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Chia se tai chinh giua hai ben
-              </p>
-            </div>
-          </button>
-          <button className="w-full flex items-center gap-3 p-4 border-2 border-border rounded-lg hover:bg-muted transition-colors">
-            <CheckCircle size={20} className="text-primary" />
-            <div className="text-left">
-              <p className="font-semibold text-foreground">Tu choi yeu cau</p>
-              <p className="text-sm text-muted-foreground">
-                Giu nguyen giao dich hien tai
-              </p>
-            </div>
-          </button>
         </div>
       </div>
     </div>

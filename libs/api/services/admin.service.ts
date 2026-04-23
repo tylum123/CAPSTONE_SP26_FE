@@ -192,6 +192,14 @@ export const adminService = {
     );
     return response.data;
   },
+
+  /**
+   * Warn (ban) a user by id
+   */
+  warnUser: async (id: string): Promise<ApiResponse<void>> => {
+    const response = await axiosInstance.post(`/user/${id}/warn`);
+    return response.data;
+  },
   /**
    * Get wallet statistics (admin)
    */
@@ -214,9 +222,9 @@ export const adminService = {
       const systemTotal =
         Number(
           dataSource.systemTotal ??
-            dataSource.total ??
-            dataSource.todayTotal ??
-            0,
+          dataSource.total ??
+          dataSource.todayTotal ??
+          0,
         ) || 0;
       const locked =
         Number(dataSource.locked ?? dataSource.pendingTotal ?? 0) || 0;
@@ -300,4 +308,5 @@ export const adminService = {
     );
     return response.data;
   },
+
 };

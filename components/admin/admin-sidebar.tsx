@@ -7,7 +7,11 @@ import {
   AlertCircle,
   Settings,
   Home,
+  LogOut,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/libs/stores/auth.store";
+import { authService } from "@/libs/api";
 
 interface AdminSidebarProps {
   currentPage: string;
@@ -15,6 +19,19 @@ interface AdminSidebarProps {
 }
 
 export function AdminSidebar({ currentPage, onPageChange }: AdminSidebarProps) {
+  const { logout } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } catch (err) {
+      console.error("Logout API error", err);
+    } finally {
+      logout();
+      router.push("/auth/login");
+    }
+  };
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: Home },
     { id: "users", label: "Quản lý người dùng", icon: Users },
@@ -59,6 +76,15 @@ export function AdminSidebar({ currentPage, onPageChange }: AdminSidebarProps) {
           );
         })}
       </nav>
+      <div className="p-4 border-t border-[#2D6641]">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-4 py-2 text-sm font-medium rounded-lg hover:bg-white/10"
+        >
+          <LogOut size={18} />
+          <span>Đăng xuất</span>
+        </button>
+      </div>
     </aside>
   );
 }

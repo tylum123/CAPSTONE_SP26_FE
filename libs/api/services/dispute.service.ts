@@ -84,6 +84,19 @@ export const disputeService = {
     return response.data;
   },
 
+  /**
+   * Update dispute status
+   */
+  updateStatus: async (
+    id: string,
+    statusId: number,
+  ): Promise<ApiResponse<DisputeReportDTO>> => {
+    const response = await axiosInstance.put(`/disputes/${id}/status`, {
+      statusId,
+    });
+    return response.data;
+  },
+
   getComments: async (
     id: string,
   ): Promise<ApiResponse<DisputeReportCommentDTO[]>> => {
@@ -125,5 +138,12 @@ export const disputeService = {
       );
       return fallbackResponse.data;
     }
+  },
+  /**
+   * Get dispute summary counts by status
+   */
+  getSummary: async (): Promise<ApiResponse<any>> => {
+    const response = await axiosInstance.get(`/disputes/summary`);
+    return response.data;
   },
 };
