@@ -867,6 +867,18 @@ export default function FarmerJobDetailPage() {
   const isApprovalSectionDisabled = Boolean(
     job?.statusId === JOB_POST_STATUS.Completed || isPerPlotLastDay
   )
+  const workersNeededPerDay = useMemo(() => {
+    if (!job) {
+      return 0
+    }
+
+    const selectedDaysCount = Array.isArray(job.selectedDays) ? job.selectedDays.length : 0
+    if (selectedDaysCount <= 0) {
+      return job.workersNeeded
+    }
+
+    return Math.ceil(job.workersNeeded / selectedDaysCount)
+  }, [job])
 
   return (
     <div className="flex flex-col gap-8">
@@ -1067,8 +1079,8 @@ export default function FarmerJobDetailPage() {
                             </span>
                             <div className="flex items-center gap-1.5 min-w-0">
                               <Users className="h-4 w-4 text-emerald-500 shrink-0" />
-                              <span className={`text-lg font-bold ${dayData.acceptedWorkerCount >= job.workersNeeded ? "text-emerald-600" : "text-amber-600"}`}>
-                                {dayData.acceptedWorkerCount}/{job.workersNeeded}
+                              <span className={`text-lg font-bold ${dayData.acceptedWorkerCount >= workersNeededPerDay ? "text-emerald-600" : "text-amber-600"}`}>
+                                {dayData.acceptedWorkerCount}/{workersNeededPerDay}
                               </span>
                             </div>
                           </div>
