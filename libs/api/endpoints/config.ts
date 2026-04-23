@@ -53,7 +53,8 @@ export const API_ENDPOINTS = {
     UPDATE_URGENCY: (id: string) => `/job/post/update-urgency/${id}`,
     DELETE: (id: string) => `/job/post/${id}`,
     JOB_APPLICATIONS: "/job/application",
-    JOB_APPLICATIONS_BY_POST: (jobPostId: string) => `/job/application/post/${jobPostId}`,
+    JOB_APPLICATIONS_BY_POST: (jobPostId: string) =>
+      `/job/application/post/${jobPostId}`,
     JOB_APPLICATIONS_BY_FARMER: "/job/application/farmer",
     WORKERS_PER_DAY: (id: string) => `/job/post/${id}/workers-per-day`,
     APPLICATION_DETAIL: (id: string) => `/job/application/${id}`,
@@ -149,7 +150,8 @@ export const API_ENDPOINTS = {
   WALLET_TRANSACTION: {
     GET_ALL: "/wallet-transaction", // ADMIN
     GET_DETAIL: (id: string) => `/wallet-transaction/${id}`,
-    GET_BY_WALLET: (walletId: string) => `/wallet-transaction/wallet/${walletId}`,
+    GET_BY_WALLET: (walletId: string) =>
+      `/wallet-transaction/wallet/${walletId}`,
   },
 
   WITHDRAWAL: {
@@ -178,6 +180,13 @@ export const API_ENDPOINTS = {
     RESOLVE: (id: string) => `/disputes/${id}/resolve`,
     GET_COMMENTS: (id: string) => `/disputes/${id}/comments`,
     ADD_COMMENT: (id: string) => `/disputes/${id}/comments`,
+  },
+  
+  MESSAGES: {
+    GET: '/messages',
+    SEND: '/messages',
+    READ: '/messages/read',
+    CONVERSATIONS: '/messages/conversations'
   },
 
   UPLOAD: "/upload",

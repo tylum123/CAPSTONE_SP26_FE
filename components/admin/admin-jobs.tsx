@@ -1,8 +1,9 @@
 "use client";
 
 import { Search, Eye, X, ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useState } from "react";
-import { adminJobService } from "@/libs/api/services/admin-job.service";
+import React, { useEffect, useState } from "react";
+import { adminService } from "@/libs/api/services/admin.service";
+import { jobService } from "@/libs/api/services/jobs.service";
 import type {
   AdminJob,
   AdminJobListResponse,
@@ -23,6 +24,8 @@ export function AdminJobs() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Tính tổng số trang
   const totalPages = Math.max(1, Math.ceil(total / limit));
@@ -36,7 +39,7 @@ export function AdminJobs() {
         const params: any = { page, limit };
         if (searchTerm) params.search = searchTerm;
         if (statusFilter !== "All") params.status = statusFilter;
-        const res: AdminJobListResponse = await adminJobService.getJobs(params);
+        const res: AdminJobListResponse = await adminService.getJobs(params);
         if (!ignore) {
           setJobs(res.data);
           setSummary(res.summary);
@@ -54,11 +57,60 @@ export function AdminJobs() {
     };
   }, [page, limit, searchTerm, statusFilter]);
 
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+
+  const handleViewDetails = async (jobId: string) => {
+    setIsModalOpen(true);
+    setSelectedJob(null);
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
+      const res = await jobService.getJobDetail(jobId);
+      setSelectedJob(res?.data ?? res);
+    } catch (e: any) {
+      setDetailError(e?.message || "Không thể tải chi tiết công việc");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeDetail = () => {
+    setIsModalOpen(false);
+    setSelectedJob(null);
+  };
+
+  const STATUS_ID_LABEL: Record<number, string> = {
+    1: "Bản nháp",
+    2: "Đã đăng",
+    3: "Đã đóng",
+    4: "Đang tiến hành",
+    5: "Hoàn thành",
+    6: "Đã hủy",
+  };
+
+  const STATUS_ID_COLORS: Record<number, string> = {
+    1: "bg-muted text-muted-foreground",
+    2: "bg-blue-100 text-blue-700",
+    3: "bg-muted text-muted-foreground",
+    4: "bg-[#10B981]/20 text-[#10B981]",
+    5: "bg-green-100 text-green-700",
+    6: "bg-destructive/20 text-destructive",
+  };
+
   const statusColors: Record<string, string> = {
     Completed: "bg-green-100 text-green-700",
     InProgress: "bg-[#10B981]/20 text-[#10B981]",
     Pending: "bg-[#D28228]/20 text-[#D28228]",
     Cancelled: "bg-destructive/20 text-destructive",
+  };
+
+  const STATUS_LABEL: Record<string, string> = {
+    Completed: "Hoàn thành",
+    InProgress: "Đang tiến hành",
+    Pending: "Đang chờ",
+    Cancelled: "Đã hủy",
+    Draft: "Nháp",
   };
 
   return (
@@ -104,11 +156,11 @@ export function AdminJobs() {
           }}
           className="px-4 py-2 border border-border rounded-lg bg-card text-foreground"
         >
-          <option value="All">All</option>
-          <option value="Completed">Completed</option>
-          <option value="InProgress">In Progress</option>
-          <option value="Pending">Pending</option>
-          <option value="Cancelled">Cancelled</option>
+          <option value="All">Tất cả</option>
+          <option value="Completed">Hoàn thành</option>
+          <option value="InProgress">Đang tiến hành</option>
+          <option value="Pending">Đang chờ</option>
+          <option value="Cancelled">Đã hủy</option>
         </select>
       </div>
 
@@ -174,7 +226,7 @@ export function AdminJobs() {
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColors[job.status] ?? "bg-muted text-muted-foreground"}`}
                     >
-                      {job.status}
+                      {STATUS_LABEL[job.status] ?? job.status}
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -190,6 +242,7 @@ export function AdminJobs() {
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
                       <button
+                        onClick={() => handleViewDetails(job.id)}
                         className="p-2 hover:bg-muted rounded-lg transition-colors"
                         title="Xem chi tiết"
                       >
@@ -216,11 +269,6 @@ export function AdminJobs() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between border-t border-border px-6 py-4 bg-card rounded-b-lg">
           <p className="text-sm text-muted-foreground">
-            {/* Tổng{" "}
-            <span className="font-semibold text-foreground">
-              {total.toLocaleString()}
-            </span>{" "}
-            công việc */}
           </p>
           <div className="flex items-center gap-2">
             <button
@@ -284,7 +332,6 @@ export function AdminJobs() {
         </div>
       </div>
 
-      {/* Pagination */}
       {/* <div className="flex justify-end items-center gap-2 mt-4">
         <button
           className="px-3 py-1 rounded border border-border bg-card text-foreground disabled:opacity-50"
@@ -304,6 +351,202 @@ export function AdminJobs() {
           Trang sau
         </button>
       </div> */}
+
+      {/* ── Job Detail Centered Modal ── */}
+      {isModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={closeDetail}
+        >
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div
+            className="relative z-10 w-full max-w-xl max-h-[90vh] bg-card shadow-2xl flex flex-col overflow-hidden rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+            style={{ animation: "fadeScaleIn 0.2s ease-out" }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-border bg-muted/50">
+              <h2 className="text-lg font-bold text-foreground">Chi tiết công việc</h2>
+              <button
+                onClick={closeDetail}
+                className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
+              {detailLoading && (
+                <div className="flex items-center justify-center h-40">
+                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+              {detailError && (
+                <div className="text-center text-destructive py-10">{detailError}</div>
+              )}
+              {selectedJob && (
+                <>
+                  {/* Title + Status */}
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-foreground leading-tight">
+                        {selectedJob.title}
+                      </h3>
+                      {selectedJob.isUrgent && (
+                        <span className="inline-block mt-1 text-xs font-semibold bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">
+                          🔥 Khẩn cấp
+                        </span>
+                      )}
+                    </div>
+                    <span
+                      className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${
+                        STATUS_ID_COLORS[selectedJob.statusId] ?? "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {STATUS_ID_LABEL[selectedJob.statusId] ?? selectedJob.statusId}
+                    </span>
+                  </div>
+
+                  {/* Description */}
+                  {selectedJob.description && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Mô tả</p>
+                      <p className="text-sm text-foreground leading-relaxed bg-muted/30 rounded-lg p-3">
+                        {selectedJob.description}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Info grid */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <JobInfoCard label="Người đăng" value={selectedJob.contactName || "-"} />
+                    <JobInfoCard label="Danh mục" value={selectedJob.jobCategory?.name || "-"} />
+                    <JobInfoCard
+                      label="Mức lương"
+                      value={selectedJob.wageAmount != null ? `${Number(selectedJob.wageAmount).toLocaleString()} VNĐ` : "-"}
+                    />
+                    <JobInfoCard label="Số lượng cần" value={selectedJob.workersNeeded ?? "-"} />
+                    <JobInfoCard label="Đã nhận" value={selectedJob.workersAccepted ?? "-"} />
+                    <JobInfoCard
+                      label="Loại hình"
+                      value={
+                        selectedJob.jobTypeId === 1
+                          ? "Toàn thời gian"
+                          : selectedJob.jobTypeId === 2
+                          ? "Bán thời gian"
+                          : selectedJob.jobTypeId || "-"
+                      }
+                    />
+                  </div>
+
+                  {/* Schedule */}
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Lịch làm việc</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <JobInfoCard label="Ngày bắt đầu" value={selectedJob.startDate || "-"} />
+                      <JobInfoCard label="Ngày kết thúc" value={selectedJob.endDate || "-"} />
+                      <JobInfoCard label="Giờ bắt đầu" value={selectedJob.startTime || "-"} />
+                      <JobInfoCard label="Giờ kết thúc" value={selectedJob.endTime || "-"} />
+                    </div>
+                    {Array.isArray(selectedJob.selectedDays) && selectedJob.selectedDays.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {selectedJob.selectedDays.map((d: string) => (
+                          <span key={d} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full font-medium">
+                            {d}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Location */}
+                  {(selectedJob.address || selectedJob.farm?.name) && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Địa điểm</p>
+                      <div className="bg-muted/30 rounded-lg p-3 text-sm text-foreground space-y-1">
+                        {selectedJob.farm?.name && <p className="font-medium">{selectedJob.farm.name}</p>}
+                        {selectedJob.address && <p className="text-muted-foreground">{selectedJob.address}</p>}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Skills */}
+                  {Array.isArray(selectedJob.jobSkillRequirements) && selectedJob.jobSkillRequirements.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Kỹ năng yêu cầu</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedJob.jobSkillRequirements.map((s: any) => (
+                          <span key={s.id} className="px-3 py-1 bg-primary/10 text-primary text-xs rounded-full font-medium">
+                            {s.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Requirements */}
+                  {Array.isArray(selectedJob.requirements) && selectedJob.requirements.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Yêu cầu</p>
+                      <ul className="space-y-1">
+                        {selectedJob.requirements.map((r: string, i: number) => (
+                          <li key={i} className="text-sm text-foreground flex gap-2">
+                            <span className="text-primary">•</span> {r}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Privileges */}
+                  {Array.isArray(selectedJob.privileges) && selectedJob.privileges.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Quyền lợi</p>
+                      <ul className="space-y-1">
+                        {selectedJob.privileges.map((p: string, i: number) => (
+                          <li key={i} className="text-sm text-foreground flex gap-2">
+                            <span className="text-green-500">✓</span> {p}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Timestamps */}
+                  <div className="border-t border-border pt-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Thời gian</p>
+                    <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
+                      {selectedJob.createdAt && (
+                        <span>Tạo lúc: {new Date(selectedJob.createdAt).toLocaleString("vi-VN")}</span>
+                      )}
+                      {selectedJob.publishedAt && (
+                        <span>Đăng lúc: {new Date(selectedJob.publishedAt).toLocaleString("vi-VN")}</span>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes fadeScaleIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function JobInfoCard({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="bg-muted/40 rounded-lg p-3">
+      <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
+      <p className="text-sm font-semibold text-foreground">{value}</p>
     </div>
   );
 }
