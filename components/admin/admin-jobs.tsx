@@ -110,6 +110,7 @@ export function AdminJobs() {
     InProgress: "Đang tiến hành",
     Pending: "Đang chờ",
     Cancelled: "Đã hủy",
+    Draft: "Nháp",
   };
 
   return (

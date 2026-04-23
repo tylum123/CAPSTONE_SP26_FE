@@ -4,6 +4,7 @@ import type {
   ApiResponse,
   CreateDisputeReportCommentRequest,
   CreateDisputeReportRequest,
+  CustomDisputeReportDTO,
   DisputeReportCommentDTO,
   DisputeReportDTO,
   ResolveDisputeRequest,
@@ -14,7 +15,7 @@ import type {
 const LEGACY_DISPUTE_COMMENTS_ENDPOINT = (id: string) => `/${id}/comments`;
 
 export const disputeService = {
-  getAllDisputes: async (): Promise<ApiResponse<DisputeReportDTO[]>> => {
+  getAllDisputes: async (): Promise<ApiResponse<CustomDisputeReportDTO>> => {
     const response = await axiosInstance.get(API_ENDPOINTS.DISPUTES.GET_ALL);
     return response.data;
   },
@@ -24,75 +25,125 @@ export const disputeService = {
     return response.data;
   },
 
-  getDisputeById: async (id: string): Promise<ApiResponse<DisputeReportDTO>> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.DISPUTES.GET_BY_ID(id));
+  getDisputeById: async (
+    id: string,
+  ): Promise<ApiResponse<DisputeReportDTO>> => {
+    const response = await axiosInstance.get(
+      API_ENDPOINTS.DISPUTES.GET_BY_ID(id),
+    );
     return response.data;
   },
 
   createDispute: async (
-    payload: CreateDisputeReportRequest
+    payload: CreateDisputeReportRequest,
   ): Promise<ApiResponse<DisputeReportDTO>> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.DISPUTES.CREATE, payload);
+    const response = await axiosInstance.post(
+      API_ENDPOINTS.DISPUTES.CREATE,
+      payload,
+    );
     return response.data;
   },
 
   updateDispute: async (
     id: string,
-    payload: UpdateDisputeReportRequest
+    payload: UpdateDisputeReportRequest,
   ): Promise<ApiResponse<DisputeReportDTO>> => {
-    const response = await axiosInstance.put(API_ENDPOINTS.DISPUTES.UPDATE(id), payload);
+    const response = await axiosInstance.put(
+      API_ENDPOINTS.DISPUTES.UPDATE(id),
+      payload,
+    );
     return response.data;
   },
 
   deleteDispute: async (id: string): Promise<ApiResponse<object>> => {
-    const response = await axiosInstance.delete(API_ENDPOINTS.DISPUTES.DELETE(id));
+    const response = await axiosInstance.delete(
+      API_ENDPOINTS.DISPUTES.DELETE(id),
+    );
     return response.data;
   },
 
   reviewDispute: async (
     id: string,
-    payload: ReviewDisputeReportRequest
+    payload: ReviewDisputeReportRequest,
   ): Promise<ApiResponse<DisputeReportDTO>> => {
-    const response = await axiosInstance.put(API_ENDPOINTS.DISPUTES.REVIEW(id), payload);
+    const response = await axiosInstance.put(
+      API_ENDPOINTS.DISPUTES.REVIEW(id),
+      payload,
+    );
     return response.data;
   },
 
   resolveDispute: async (
     id: string,
-    payload: ResolveDisputeRequest
+    payload: ResolveDisputeRequest,
   ): Promise<ApiResponse<DisputeReportDTO>> => {
-    const response = await axiosInstance.put(API_ENDPOINTS.DISPUTES.RESOLVE(id), payload);
+    const response = await axiosInstance.put(
+      API_ENDPOINTS.DISPUTES.RESOLVE(id),
+      payload,
+    );
     return response.data;
   },
 
-  getComments: async (id: string): Promise<ApiResponse<DisputeReportCommentDTO[]>> => {
+  /**
+   * Update dispute status
+   */
+  updateStatus: async (
+    id: string,
+    statusId: number,
+  ): Promise<ApiResponse<DisputeReportDTO>> => {
+    const response = await axiosInstance.put(`/disputes/${id}/status`, {
+      statusId,
+    });
+    return response.data;
+  },
+
+  getComments: async (
+    id: string,
+  ): Promise<ApiResponse<DisputeReportCommentDTO[]>> => {
     try {
-      const response = await axiosInstance.get(API_ENDPOINTS.DISPUTES.GET_COMMENTS(id));
+      const response = await axiosInstance.get(
+        API_ENDPOINTS.DISPUTES.GET_COMMENTS(id),
+      );
       return response.data;
     } catch (error: any) {
       if (error?.response?.status !== 404) {
         throw error;
       }
 
-      const fallbackResponse = await axiosInstance.get(LEGACY_DISPUTE_COMMENTS_ENDPOINT(id));
+      const fallbackResponse = await axiosInstance.get(
+        LEGACY_DISPUTE_COMMENTS_ENDPOINT(id),
+      );
       return fallbackResponse.data;
     }
   },
 
   addComment: async (
     id: string,
-    payload: CreateDisputeReportCommentRequest
+    payload: CreateDisputeReportCommentRequest,
   ): Promise<ApiResponse<DisputeReportCommentDTO>> => {
     try {
-      const response = await axiosInstance.post(API_ENDPOINTS.DISPUTES.ADD_COMMENT(id), payload);
+      const response = await axiosInstance.post(
+        API_ENDPOINTS.DISPUTES.ADD_COMMENT(id),
+        payload,
+      );
       return response.data;
     } catch (error: any) {
       if (error?.response?.status !== 404) {
         throw error;
       }
 
-      const fallbackResponse = await axiosInstance.post(LEGACY_DISPUTE_COMMENTS_ENDPOINT(id), payload);
+      const fallbackResponse = await axiosInstance.post(
+        LEGACY_DISPUTE_COMMENTS_ENDPOINT(id),
+        payload,
+      );
       return fallbackResponse.data;
     }
+  },
+  /**
+   * Get dispute summary counts by status
+   */
+  getSummary: async (): Promise<ApiResponse<any>> => {
+    const response = await axiosInstance.get(`/disputes/summary`);
+    return response.data;
   },
 };

@@ -181,6 +181,14 @@ export const API_ENDPOINTS = {
     GET_COMMENTS: (id: string) => `/disputes/${id}/comments`,
     ADD_COMMENT: (id: string) => `/disputes/${id}/comments`,
   },
+  
+  MESSAGES: {
+    GET: '/messages',
+    SEND: '/messages',
+    READ: '/messages/read',
+    CONVERSATIONS: '/messages/conversations'
+  },
+
   UPLOAD: "/upload",
 };
 
