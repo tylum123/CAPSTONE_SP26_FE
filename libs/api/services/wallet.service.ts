@@ -10,6 +10,23 @@ import type {
 } from "@/libs/types/wallet.types";
 
 export const WalletService = {
+
+  // Wallet
+  getMyWallet: async (): Promise<ApiResponse<WalletDTO>> => {
+    const response = await axiosInstance.get(API_ENDPOINTS.WALLET.CURRENT);
+    return response.data;
+  },
+
+  getAllWallets: async (): Promise<PaginatedResponse<WalletDTO>> => {
+    const response = await axiosInstance.get(API_ENDPOINTS.WALLET.GET_ALL);
+    return response.data;
+  },
+
+  getWalletDetail: async (id: string): Promise<ApiResponse<WalletDTO>> => {
+    const response = await axiosInstance.get(API_ENDPOINTS.WALLET.GET_DETAIL(id));
+    return response.data;
+  },
+
   getTransactionsByWallet: async (
     walletId: string,
     params?: { page?: number; limit?: number },
