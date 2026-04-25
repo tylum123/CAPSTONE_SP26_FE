@@ -226,9 +226,9 @@ export default function FarmerLayout({
       {/* Top Header */}
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-border shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 lg:px-6 xl:px-8">
-          <div className="grid h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 lg:gap-3 xl:gap-6">
+          <div className="relative flex h-16 items-center">
             {/* Logo */}
-            <Link href="/farmer/dashboard" className="flex items-center gap-2 justify-self-start">
+            <Link href="/farmer/dashboard" className="flex items-center gap-2">
               <div className="w-10 h-10 rounded-full flex items-center justify-center">
                 <img
                   src="/logo.png"
@@ -239,14 +239,14 @@ export default function FarmerLayout({
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden xl:flex justify-center">
-              <nav className="flex items-center gap-4 rounded-full border border-border/70 bg-background/70 p-1 shadow-sm">
+            <div className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 xl:flex">
+              <nav className="flex items-center gap-2 rounded-full border border-border/70 bg-background/70 p-1 shadow-sm">
                 {navItems.map((item) => {
                   const isActive = item.href === "/farmer"
                     ? pathname === "/farmer"
                     : pathname === item.href || pathname.startsWith(item.href + "/");
                   return (
-                    <Link key={item.href} href={item.href}>
+                    <Link key={item.href} href={item.href} className="pointer-events-auto">
                       <Button
                         variant={isActive ? "default" : "ghost"}
                         className={`h-9 rounded-full px-3 gap-2 ${isActive
@@ -263,9 +263,9 @@ export default function FarmerLayout({
               </nav>
             </div>
             {/* Right Side - Notifications & Profile */}
-            <div className="flex items-center justify-self-end gap-2 lg:gap-3">
+            <div className="ml-auto flex items-center justify-end gap-2 lg:gap-3">
               {/* Notification Bell */}
-              <div className="relative" ref={notifRef}>
+              <div className="relative ml-10" ref={notifRef}>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -379,14 +379,14 @@ export default function FarmerLayout({
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="gap-2 hidden xl:flex">
-                    <Avatar className="h-10 w-10 border-2 border-agro-white relative flex items-center justify-center">
+                  <Button variant="ghost" className="hidden max-w-55 gap-2 xl:flex">
+                    <Avatar className="h-8 w-8 border-2 border-agro-white relative flex items-center justify-center">
                       <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} className="object-cover" />
                       <AvatarFallback className="bg-agro-green text-white">
                         {profile?.contactName?.charAt(0).toUpperCase() || "NA"}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="font-medium">{profile?.contactName || 'Nông dân'}</span>
+                    <span className="truncate font-medium">{profile?.contactName || 'Nông dân'}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
