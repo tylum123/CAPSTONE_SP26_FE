@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { GoogleLoginButton } from "@/components/auth/google-login-button";
 import { handleAuthError } from "@/libs/utils/error-handler";
 import { useAuth } from "@/libs/stores/auth.store";
+import { mapAuthUser, normalizeAuthRole, resolveTokenExpiresAt } from "@/libs/utils/auth-user";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -102,16 +103,6 @@ export default function LoginPage() {
     }
   };
 
-  const normalizeRole = (role: string | undefined): "admin" | "farmer" | "worker" | null => {
-    const normalized = String(role || "").trim().toLowerCase();
-
-    if (normalized === "admin") return "admin";
-    if (normalized === "farmer") return "farmer";
-    if (normalized === "worker") return "worker";
-
-    return null;
-  };
-
   const handleFarmerLogin = async (e: React.FormEvent, isAutoLogin = false) => {
     e?.preventDefault?.();
     setIsLoading(true);
@@ -126,12 +117,15 @@ export default function LoginPage() {
         // Extract user data and tokens from response
         const userData = response.data as typeof response.data & {
           id?: string;
+          userId?: string;
+          user_id?: string;
+          name?: string;
           fullName?: string;
           refresh_token?: string;
         };
         const accessToken = userData.token || '';
         const refreshToken = userData.refresh_token || '';
-        const role = normalizeRole(userData.role);
+        const role = normalizeAuthRole(userData.role);
 
         if (userData.isVerified === false) {
           localStorage.removeItem("access_token");
@@ -185,18 +179,14 @@ export default function LoginPage() {
         }
 
         // Create user object for auth context
+        const baseUser = mapAuthUser(userData, farmerEmail);
         const user = {
-          userId: userData.userId || userData.id || '',
-          email: userData.email || farmerEmail,
-          fullName: userData.fullName || userData.email || '',
+          ...baseUser,
           role,
         };
 
         // Update auth context
-        const tokenExpiresAt =
-          (userData as any).expiresAt ||
-          (userData as any).expires_at ||
-          (userData as any).expiration;
+        const tokenExpiresAt = resolveTokenExpiresAt(userData);
         login(user, accessToken, refreshToken, tokenExpiresAt);
 
         toast({
