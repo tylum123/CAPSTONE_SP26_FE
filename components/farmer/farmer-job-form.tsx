@@ -181,6 +181,17 @@ const getSelectionSpanInDays = (sortedDates: Date[]) => {
   return Math.floor((last.getTime() - first.getTime()) / millisecondsPerDay) + 1
 }
 
+const toDailyWorkersPerDay = (totalWorkers: number | undefined, selectedDaysCount: number) => {
+  const safeTotalWorkers = Number.isFinite(totalWorkers) ? Math.max(0, Number(totalWorkers)) : 0
+  const safeSelectedDaysCount = Math.max(1, selectedDaysCount)
+
+  if (!safeTotalWorkers) {
+    return 1
+  }
+
+  return Math.max(1, Math.ceil(safeTotalWorkers / safeSelectedDaysCount))
+}
+
 const extractEditableDescription = (rawDescription: string) => {
   return rawDescription
     .split("\n")
@@ -573,7 +584,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
         setTitle(existingJob.title ?? "")
         setDescription(extractEditableDescription(existingJob.description ?? ""))
         setIncome(formatThousandsWithDots(String(existingJob.wageAmount ?? "")))
-        setWorkersNeeded(String(existingJob.workersNeeded ?? 1))
+        setWorkersNeeded(String(Math.max(1, existingJob.workersNeeded ?? 1)))
         setLocation(existingJob.address ?? "")
         setLocationLat(existingJob.farm?.latitude)
         setLocationLng(existingJob.farm?.longitude)
@@ -606,9 +617,11 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
             .filter((item): item is Date => item instanceof Date)
 
           setSelectedDailyDates(selectedDates)
+          setWorkersNeeded(String(toDailyWorkersPerDay(existingJob.workersNeeded, selectedDates.length)))
         } else {
           setScheduleType("contract")
           setSelectedDailyDates([])
+          setWorkersNeeded(String(Math.max(1, existingJob.workersNeeded ?? 1)))
 
           const startDate = existingJob.startDate ? formatDateDDMMYYYY(existingJob.startDate) : ""
           const endDate = existingJob.endDate ? formatDateDDMMYYYY(existingJob.endDate) : ""
@@ -975,7 +988,9 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       scheduleType === "daily"
         ? normalizedSelectedDailyDates.map((date) => toDateOnlyFromDate(date))
         : []
-    const workersNeededForPayload = scheduleType === "daily" ? workersNeededNumber : 0
+    const workersNeededForPayload = scheduleType === "daily"
+      ? Math.max(1, workersNeededNumber)
+      : Math.max(1, workersNeededNumber || 1)
 
     const payload: UpdateJobRequest = {
       skillIds: selectedSkillIds,
@@ -1013,14 +1028,14 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       const savedJob = response.data
 
       const savedJobUnitIncome = savedJob.wageAmount ?? incomeNumber
-      const savedJobWorkersNeeded =
-        scheduleType === "daily"
-          ? (savedJob.workersNeeded && savedJob.workersNeeded > 0 ? savedJob.workersNeeded : workersNeededNumber)
-          : 1
       const savedJobDailyDaysCount =
         scheduleType === "daily"
           ? ((savedJob.selectedDays?.length ?? 0) > 0 ? savedJob.selectedDays.length : selectedDailyDaysCount)
           : 1
+      const savedJobWorkersNeeded =
+        scheduleType === "daily"
+          ? toDailyWorkersPerDay(savedJob.workersNeeded, savedJobDailyDaysCount)
+          : Math.max(1, savedJob.workersNeeded ?? workersNeededNumber ?? 1)
       const postedIncome =
         scheduleType === "daily"
           ? savedJobUnitIncome * savedJobWorkersNeeded * savedJobDailyDaysCount
@@ -1031,8 +1046,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
         createdAt: savedJob.createdAt ?? nowISO,
         title: savedJob.title ?? title.trim(),
         income: postedIncome,
-        workersNeeded:
-          savedJob.workersNeeded ?? (scheduleType === "daily" ? workersNeededNumber : 1),
+        workersNeeded: savedJobWorkersNeeded,
         location: savedJob.address ?? location.trim(),
         locationLat,
         locationLng,
@@ -1057,9 +1071,22 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       if (typeof apiMessage === "string") {
         if (apiMessage.includes("Insufficient wallet balance to create job post. Please top up your wallet.")) {
           errorMessage = "Số dư ví không đủ để đăng tin. Vui lòng nạp thêm tiền vào ví."
+
+          let isDraftSaved = false
+          try {
+            await jobService.saveDraft(buildDraftPayload())
+            setIsDirty(false)
+            isDirtyRef.current = false
+            isDraftSaved = true
+          } catch (saveDraftError) {
+            console.error(saveDraftError)
+          }
+
           toast({
             title: "Số dư không đủ",
-            description: "Ví của bạn không đủ số dư để đăng tin. Hệ thống đang chuyển hướng đến trang nạp tiền...",
+            description: isDraftSaved
+              ? "Bản nháp đã được lưu. Hệ thống đang chuyển hướng đến trang nạp tiền..."
+              : "Không đủ số dư và chưa lưu được bản nháp. Hệ thống đang chuyển hướng đến trang nạp tiền...",
             variant: "destructive",
           })
           router.push("/farmer/payments")
@@ -1145,7 +1172,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       requirements,
       privileges: benefits,
       wageAmount: incomeNumber,
-      workersNeeded: scheduleType === "daily" ? workersNeededNumber || 1 : 0,
+      workersNeeded: Math.max(1, workersNeededNumber || 1),
       workersAccepted: 0,
       isUrgent,
       statusId: 1, // Draft status
@@ -1188,7 +1215,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
     setTitle(draft.title ?? "")
     setDescription(extractEditableDescription(draft.description ?? ""))
     setIncome(formatThousandsWithDots(String(draft.wageAmount ?? "")))
-    setWorkersNeeded(String(draft.workersNeeded ?? 1))
+    setWorkersNeeded(String(Math.max(1, draft.workersNeeded ?? 1)))
     setLocation(draft.address ?? "")
     setRequirements(draft.requirements?.length ? draft.requirements : ["Có sức khỏe tốt"])
     setBenefits(draft.privileges?.length ? draft.privileges : ["Bao ăn"])
@@ -1208,9 +1235,11 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
         .map((d) => { const dd = new Date(d); return Number.isNaN(dd.getTime()) ? null : startOfDay(dd) })
         .filter((d): d is Date => d !== null)
       setSelectedDailyDates(dates)
+      setWorkersNeeded(String(toDailyWorkersPerDay(draft.workersNeeded, dates.length)))
     } else {
       setScheduleType("contract")
       setSelectedDailyDates([])
+      setWorkersNeeded(String(Math.max(1, draft.workersNeeded ?? 1)))
       setContractStartDate(draft.startDate ? formatDateDDMMYYYY(draft.startDate) : "")
       setContractEndDate(draft.endDate ? formatDateDDMMYYYY(draft.endDate) : "")
     }
