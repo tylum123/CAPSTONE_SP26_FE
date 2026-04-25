@@ -28,6 +28,78 @@ interface ChatInterfaceProps {
   };
 }
 
+function normalizeId(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function normalizeMessage(raw: any): Message | null {
+  const payload = raw?.data ?? raw?.message ?? raw;
+
+  const id = String(
+    payload?.id ?? payload?.Id ?? payload?.messageId ?? payload?.MessageId ?? ""
+  );
+  const senderId = String(
+    payload?.senderId ??
+      payload?.SenderId ??
+      payload?.senderID ??
+      payload?.SenderID ??
+      payload?.fromUserId ??
+      payload?.FromUserId ??
+      payload?.sender?.id ??
+      payload?.Sender?.Id ??
+      ""
+  );
+  const receiverId = String(
+    payload?.receiverId ??
+      payload?.ReceiverId ??
+      payload?.receiverID ??
+      payload?.ReceiverID ??
+      payload?.recipientId ??
+      payload?.RecipientId ??
+      payload?.toUserId ??
+      payload?.ToUserId ??
+      payload?.receiver?.id ??
+      payload?.Receiver?.Id ??
+      payload?.recipient?.id ??
+      payload?.Recipient?.Id ??
+      ""
+  );
+
+  const content = String(
+    payload?.content ??
+      payload?.Content ??
+      payload?.messageContent ??
+      payload?.MessageContent ??
+      ""
+  );
+  const read =
+    payload?.read !== undefined
+      ? !!payload.read
+      : payload?.Read !== undefined
+      ? !!payload.Read
+      : false;
+  const createdAt =
+    payload?.createdAt ??
+    payload?.CreatedAt ??
+    payload?.sentAt ??
+    payload?.SentAt ??
+    new Date().toISOString();
+
+  if (!id || !senderId || !receiverId) {
+    console.warn("[Chat] Dropped malformed message:", raw);
+    return null;
+  }
+
+  return {
+    id,
+    senderId,
+    receiverId,
+    content,
+    read,
+    createdAt,
+  };
+}
+
 export function ChatInterface({ receiver }: ChatInterfaceProps) {
   const [messageInput, setMessageInput] = useState("");
   const { user } = useAuth();
@@ -85,10 +157,13 @@ export function ChatInterface({ receiver }: ChatInterfaceProps) {
       const otherIdNow = otherUserIdRef.current;
       if (!myIdNow || !otherIdNow) return;
 
-      const sId = msg.senderId.toLowerCase();
-      const rId = msg.receiverId.toLowerCase();
-      const myId = myIdNow.toLowerCase();
-      const otherId = otherIdNow.toLowerCase();
+      const normalized = normalizeMessage(msg);
+      if (!normalized) return;
+
+      const sId = normalizeId(normalized.senderId);
+      const rId = normalizeId(normalized.receiverId);
+      const myId = normalizeId(myIdNow);
+      const otherId = normalizeId(otherIdNow);
 
       // Only update messages that belong to the currently-open conversation
       const isBetweenCurrentUsers =
@@ -98,9 +173,9 @@ export function ChatInterface({ receiver }: ChatInterfaceProps) {
       if (!isBetweenCurrentUsers) return;
 
       setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev; // deduplicate
+        if (prev.some((m) => m.id === normalized.id)) return prev; // deduplicate
         shouldScrollRef.current = true;
-        return [...prev, msg].sort(
+        return [...prev, normalized].sort(
           (a, b) =>
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
@@ -113,6 +188,15 @@ export function ChatInterface({ receiver }: ChatInterfaceProps) {
     const unsubscribe = onMessage(handleIncomingMessage);
     return unsubscribe;
   }, [onMessage, handleIncomingMessage]);
+
+  useEffect(() => {
+    if (!myUserId) return;
+    if (connectionStatus === "connected") {
+      console.log(`[Chat] SignalR connected for user ${myUserId}`);
+      return;
+    }
+    console.log(`[Chat] SignalR status for user ${myUserId}: ${connectionStatus}`);
+  }, [connectionStatus, myUserId]);
 
   /* ─── Load history when receiver changes ──────────────────── */
   const loadMessages = useCallback(async (receiverId: string, replace = true) => {
@@ -128,14 +212,8 @@ export function ChatInterface({ receiver }: ChatInterfaceProps) {
       const apiMessages: any[] = res.data?.data ?? [];
 
       const sorted = apiMessages
-        .map((m) => ({
-          id: String(m.id || m.Id),
-          senderId: String(m.senderId || m.SenderId),
-          receiverId: String(m.receiverId || m.ReceiverId),
-          content: String(m.content || m.Content),
-          read: !!m.read,
-          createdAt: m.createdAt || m.CreatedAt,
-        }))
+        .map((m) => normalizeMessage(m))
+        .filter((m): m is Message => !!m)
         .sort(
           (a, b) =>
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -202,18 +280,14 @@ export function ChatInterface({ receiver }: ChatInterfaceProps) {
       const res = await commonService.sendMessage(receiver.id, content);
 
       if (res.data) {
+        const normalized = normalizeMessage(res.data);
+        if (!normalized) return;
+
         setMessages((prev) => {
-          const id = res.data.id;
+          const id = normalized.id;
           if (prev.some((m) => m.id === id)) return prev;
           shouldScrollRef.current = true;
-          const msg: Message = {
-            id,
-            senderId: res.data.senderId,
-            receiverId: res.data.receiverId,
-            content: res.data.content,
-            read: !!res.data.read,
-            createdAt: res.data.createdAt,
-          };
+          const msg: Message = normalized;
           return [...prev, msg].sort(
             (a, b) =>
               new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -263,7 +337,7 @@ export function ChatInterface({ receiver }: ChatInterfaceProps) {
         {messages.map((message, index) => {
           const isMine =
             !!myUserId &&
-            message.senderId.toLowerCase() === myUserId.toLowerCase();
+            normalizeId(message.senderId) === normalizeId(myUserId);
           const prevMessage = messages[index - 1];
           const showDateBar =
             !prevMessage ||
@@ -288,7 +362,7 @@ export function ChatInterface({ receiver }: ChatInterfaceProps) {
                     isMine ? "bg-agro-green text-white" : "bg-gray-100 text-foreground"
                   )}
                 >
-                  <p className="text-sm break-words whitespace-pre-wrap">
+                  <p className="text-sm wrap-break-word whitespace-pre-wrap">
                     {message.content}
                   </p>
                   <span
