@@ -106,24 +106,37 @@ export default function SetupProfilePage() {
       return;
     }
 
+    if (!formData.dateOfBirth) {
+      toast({
+        title: "Thiếu thông tin",
+        description: "Vui lòng chọn ngày sinh.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setSaving(true);
 
-      let finalData = { ...formData, address: fullAddress };
-      if (finalData.dateOfBirth) {
-        // Optionally format if needed for API compliance
-      } else {
-        delete finalData.dateOfBirth;
-      }
+      const finalData: UpdateFarmerRequest = {
+        contactName: formData.contactName.trim(),
+        address: fullAddress.trim(),
+        dateOfBirth: format(new Date(formData.dateOfBirth), "yyyy-MM-dd"),
+        avatarUrl: (formData.avatarUrl || "").trim(),
+      };
 
       await farmerService.updateProfile(finalData);
+
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("profile_setup_completed", "1");
+      }
 
       toast({
         title: "Thành công",
         description: "Hồ sơ của bạn đã được thiết lập.",
       });
 
-      router.push("/farmer/dashboard");
+      router.replace("/farmer/dashboard");
     } catch (error: any) {
       console.error("Setup profile error:", error);
       toast({

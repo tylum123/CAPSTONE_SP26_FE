@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { API_CONFIG } from './endpoints/config';
+import { API_ENDPOINTS } from './endpoints/config';
 
 // Create axios instance
 export const axiosInstance = axios.create({
@@ -51,11 +52,19 @@ axiosInstance.interceptors.response.use(
         const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
 
         if (refreshToken) {
-          const response = await axios.post(`${API_CONFIG.BASE_URL}/auth/refresh-token`, {
+          const response = await axios.post(`${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH.REFRESH_TOKEN}`, {
             refreshToken,
           });
 
-          const { accessToken } = response.data;
+          const accessToken =
+            (response.data as any)?.data?.accessToken ||
+            (response.data as any)?.data?.token ||
+            (response.data as any)?.accessToken ||
+            (response.data as any)?.token;
+
+          if (!accessToken) {
+            return Promise.reject(error);
+          }
 
           if (typeof window !== 'undefined') {
             localStorage.setItem('access_token', accessToken);
@@ -68,15 +77,11 @@ axiosInstance.interceptors.response.use(
           return axiosInstance(originalRequest);
         }
       } catch (refreshError) {
-        // Refresh token failed, logout user
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          localStorage.removeItem('token_expires_at');
-          window.location.href = '/auth/login';
-        }
+        // Do not hard-redirect here. Let page-level auth handling decide what to do.
         return Promise.reject(refreshError);
       }
+
+      return Promise.reject(error);
     }
 
     return Promise.reject(error);

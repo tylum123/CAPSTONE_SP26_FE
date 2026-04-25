@@ -6,18 +6,43 @@ import { STORAGE_KEYS } from "@/constants";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function parseJwtExpiryMs(token: string | null): number | null {
+  if (!token) return null;
+
+  try {
+    const payloadPart = token.split(".")[1];
+    if (!payloadPart) return null;
+
+    const base64 = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    const payload = JSON.parse(atob(padded));
+
+    if (typeof payload?.exp !== "number") return null;
+    return payload.exp * 1000;
+  } catch {
+    return null;
+  }
+}
+
+function resolveExpiryTimeMs(): number | null {
+  const expiresAt = localStorage.getItem(STORAGE_KEYS.TOKEN_EXPIRES_AT);
+  if (expiresAt) {
+    const parsed = new Date(expiresAt).getTime();
+    if (!isNaN(parsed)) return parsed;
+  }
+
+  const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+  return parseJwtExpiryMs(token);
+}
+
 /**
  * Check whether the stored token has expired.
  * Returns `true` when the token is still valid, `false` when it has expired
  * or when no expiry timestamp is stored.
  */
 function isTokenValid(): boolean {
-  const expiresAt = localStorage.getItem(STORAGE_KEYS.TOKEN_EXPIRES_AT);
-  if (!expiresAt) return false;
-
-  // expiresAt is an ISO-8601 date string from the backend
-  const expiryTime = new Date(expiresAt).getTime();
-  if (isNaN(expiryTime)) return false;
+  const expiryTime = resolveExpiryTimeMs();
+  if (!expiryTime) return true;
 
   // Add a small buffer (5 seconds) to account for clock drift
   return Date.now() < expiryTime - 5000;
@@ -28,11 +53,8 @@ function isTokenValid(): boolean {
  * Returns 0 if the token is already expired or no expiry is stored.
  */
 function msUntilExpiry(): number {
-  const expiresAt = localStorage.getItem(STORAGE_KEYS.TOKEN_EXPIRES_AT);
-  if (!expiresAt) return 0;
-
-  const expiryTime = new Date(expiresAt).getTime();
-  if (isNaN(expiryTime)) return 0;
+  const expiryTime = resolveExpiryTimeMs();
+  if (!expiryTime) return Number.POSITIVE_INFINITY;
 
   // Subtract a 5-second buffer so we log out just before the server rejects us
   const remaining = expiryTime - Date.now() - 5000;
@@ -155,6 +177,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (expiresAt) {
       localStorage.setItem(STORAGE_KEYS.TOKEN_EXPIRES_AT, expiresAt);
+    } else {
+      const jwtExpiryMs = parseJwtExpiryMs(accessToken);
+      if (jwtExpiryMs) {
+        localStorage.setItem(STORAGE_KEYS.TOKEN_EXPIRES_AT, new Date(jwtExpiryMs).toISOString());
+      }
     }
 
     setUser(user);

@@ -169,6 +169,7 @@ export default function FarmerLayout({
           setIsProfileMissing(true);
           setProfile(null);
         } else {
+          setIsProfileMissing(false);
           console.error("Failed to fetch farmer profile:", error);
         }
       } finally {
@@ -178,13 +179,19 @@ export default function FarmerLayout({
 
     fetchProfile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated]);
+  }, [isAuthenticated, pathname]);
 
   useEffect(() => {
-    if (isAuthenticated && isProfileMissing && !pathname.startsWith("/farmer/setup-profile")) {
+    const justCompletedSetup = typeof window !== "undefined" && sessionStorage.getItem("profile_setup_completed") === "1";
+    if (justCompletedSetup) {
+      sessionStorage.removeItem("profile_setup_completed");
+      return;
+    }
+
+    if (!checkingProfile && isAuthenticated && isProfileMissing && !pathname.startsWith("/farmer/setup-profile")) {
       router.replace("/farmer/setup-profile");
     }
-  }, [isAuthenticated, isProfileMissing, pathname, router]);
+  }, [checkingProfile, isAuthenticated, isProfileMissing, pathname, router]);
 
   const handleLogout = async () => {
     try {

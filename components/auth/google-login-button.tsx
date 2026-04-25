@@ -113,7 +113,11 @@ export function GoogleLoginButton({ roleId, showDivider = false, onSuccess, onEr
         };
 
         // Update auth context
-        login(user, accessToken, refreshToken, (userData as any).expiresAt);
+        const tokenExpiresAt =
+          (userData as any).expiresAt ||
+          (userData as any).expires_at ||
+          (userData as any).expiration;
+        login(user, accessToken, refreshToken, tokenExpiresAt);
 
         toast({
           title: "Thành công",
