@@ -104,11 +104,10 @@ export function GoogleLoginButton({ roleId, showDivider = false, onSuccess, onEr
 
         // Create user object for auth context
         const user = {
-          // @ts-ignore
-          id: userData.id || '',
+          id: userData.userId || '',
+          userId: userData.userId || '',
           email: userData.email || '',
-          // @ts-ignore
-          fullName: userData.fullName || '',
+          fullName: userData.email || '',
           role,
         };
 
