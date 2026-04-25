@@ -45,8 +45,13 @@ export function AdminSidebar({ currentPage, onPageChange }: AdminSidebarProps) {
     <aside className="relative w-64 bg-[#3A8250] text-white border-r border-[#2D6641] flex flex-col">
       <div className="p-6 border-b border-[#2D6641]">
         <div className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-lg bg-[#28683C] flex items-center justify-center">
-            <span className="text-white font-bold text-lg">A</span>
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+            <img
+              src="/logo.png"
+              alt="AgroTemp Logo"
+              className="h-7 w-7 object-contain"
+            />
+            {/* <span className="text-white font-bold text-lg">A</span> */}
           </div>
           <div>
             <h1 className="font-bold text-lg">AgroTemp</h1>
@@ -64,11 +69,10 @@ export function AdminSidebar({ currentPage, onPageChange }: AdminSidebarProps) {
             <button
               key={item.id}
               onClick={() => onPageChange(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-[#28683C] text-white"
-                  : "text-white hover:bg-white/10"
-              }`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive
+                ? "bg-[#28683C] text-white"
+                : "text-white hover:bg-white/10"
+                }`}
             >
               <Icon size={20} />
               <span>{item.label}</span>

@@ -10,6 +10,14 @@ import {
   Trash2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { ChatInterface } from "@/components/chat/chat-interface";
+import { SignalRProvider } from "@/contexts/signalr-context";
 import { disputeService, adminService } from "@/libs/api/services";
 import { de } from "date-fns/locale";
 import { FarmerProfileDTO, User, WorkerProfileDTO } from "@/libs/types";
@@ -22,6 +30,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ChatSidebar } from "../chat/chat-sidebar";
 type UserMap = Record<string, { fullName: string; email: string }>;
 
 export function AdminDisputes() {
@@ -87,8 +96,8 @@ export function AdminDisputes() {
             const data = Array.isArray(sumRes)
               ? sumRes
               : Array.isArray(sumRes?.data)
-              ? sumRes.data
-              : sumRes?.data?.data ?? [];
+                ? sumRes.data
+                : sumRes?.data?.data ?? [];
             if (!ignore) setSummaryStats(data as any[]);
           } catch (err) {
             console.error("Failed to fetch dispute summary", err);
@@ -113,7 +122,23 @@ export function AdminDisputes() {
   const [selectedDispute, setSelectedDispute] = useState<any | null>(null);
   const [selectedStatusId, setSelectedStatusId] = useState<number | null>(null);
   const [statusSubmitting, setStatusSubmitting] = useState(false);
-  const [summaryStats, setSummaryStats] = useState<Array<{statusId:number;statusName:string;count:number}>>([]);
+  const [summaryStats, setSummaryStats] = useState<Array<{ statusId: number; statusName: string; count: number }>>([]);
+
+  const [isChatDialogOpen, setIsChatDialogOpen] = useState(false);
+  const [chatReceiver, setChatReceiver] = useState<{ id: string; name: string; avatarUrl?: string } | null>(null);
+
+  const openChat = (userId?: string | null, displayName?: string, avatarUrl?: string) => {
+    if (!userId) {
+      alert("Người dùng không tồn tại");
+      return;
+    }
+    setChatReceiver({
+      id: userId,
+      name: displayName || (userId.length > 8 ? `Người dùng ${userId.substring(0, 8).toUpperCase()}` : userId),
+      avatarUrl: avatarUrl || "/placeholder.svg",
+    });
+    setIsChatDialogOpen(true);
+  };
 
   const filteredDisputes = disputes.filter((dispute) => {
     // Tùy chỉnh lại các trường filter cho phù hợp với API trả về
@@ -157,7 +182,7 @@ export function AdminDisputes() {
     return colors[status] ?? "bg-muted text-muted-foreground";
   };
 
-  
+
 
   // Build stats from API summary (fallback to defaults)
   const statusLabelMap: Record<number, { label: string; color: string }> = {
@@ -170,11 +195,11 @@ export function AdminDisputes() {
   const statsSource = summaryStats && summaryStats.length
     ? summaryStats
     : [
-        { statusId: 1, statusName: "Pending", count: 0 },
-        { statusId: 2, statusName: "UnderReview", count: 0 },
-        { statusId: 3, statusName: "Resolved", count: 0 },
-        { statusId: 4, statusName: "Rejected", count: 0 },
-      ];
+      { statusId: 1, statusName: "Pending", count: 0 },
+      { statusId: 2, statusName: "UnderReview", count: 0 },
+      { statusId: 3, statusName: "Resolved", count: 0 },
+      { statusId: 4, statusName: "Rejected", count: 0 },
+    ];
 
   const stats = statsSource.map((s: any) => {
     const meta = statusLabelMap[s.statusId] ?? { label: s.statusName ?? String(s.statusId), color: "text-muted-foreground" };
@@ -262,6 +287,44 @@ export function AdminDisputes() {
             </Button>
           </DialogFooter>
         </DialogContent>
+      </Dialog>
+
+      <Dialog open={isChatDialogOpen} onOpenChange={setIsChatDialogOpen}>
+        <DialogContent className="sm:max-w-[1200px] w-[95vw] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{chatReceiver ? `Chat với ${chatReceiver.name}` : 'Cuộc trò chuyện'}</DialogTitle>
+            <DialogDescription></DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 min-h-[70vh] flex gap-4">
+            <SignalRProvider>
+              {/* <div className="w-80 shrink-0 bg-white border rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                <ChatSidebar
+                  onConversationSelect={(conv) => {
+                    const query = new URLSearchParams();
+                    if (conv.userName) query.set("name", conv.userName);
+                    if (conv.userAvatar) query.set("avatarUrl", conv.userAvatar);
+                    // router.push(`/farmer/messages/${conv.id}?${query.toString()}`);
+                  }}
+                />
+              </div> */}
+              {chatReceiver && (
+                <div className="flex-1 bg-white border rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                  <ChatInterface
+                    receiver={{
+                      id: chatReceiver.id,
+                      name: chatReceiver.name,
+                      avatarUrl: chatReceiver.avatarUrl || "/placeholder.svg",
+                    }}
+                  />
+                </div>
+              )}
+            </SignalRProvider>
+
+          </div>
+
+        </DialogContent>
+
       </Dialog>
 
       <div className={`grid grid-cols-1 ${mdGridColsClass} gap-6`}>
@@ -437,7 +500,7 @@ export function AdminDisputes() {
                               : "-"}
                     </span>
                   </td>
-                 
+
                   {/* Ngày tạo */}
                   <td className="px-6 py-4">
                     <p className="text-muted-foreground text-sm">
@@ -457,12 +520,38 @@ export function AdminDisputes() {
                   {/* Hành động */}
                   <td className="px-6 py-4 flex gap-2">
                     {dispute.status === 2 && (
-                      <button
-                        className="p-2 hover:bg-muted rounded-lg transition-colors"
-                        title="Bình luận"
-                      >
-                        <MessageSquare size={18} className="text-primary" />
-                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className="p-2 hover:bg-muted rounded-lg transition-colors"
+                            title="Bình luận"
+                          >
+                            <MessageSquare size={18} className="text-primary" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              openChat(
+                                dispute.reporterUserId,
+                                userMap[dispute.reporterUserId]?.fullName
+                              )
+                            }
+                          >
+                            Chat với người tố cáo
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              openChat(
+                                dispute.accusedUserId,
+                                userMap[dispute.accusedUserId]?.fullName
+                              )
+                            }
+                          >
+                            Chat với người bị tố cáo
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                     {dispute.status !== 3 && dispute.status !== 4 && (
                       <button

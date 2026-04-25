@@ -13,7 +13,7 @@ export function Footer() {
           <div className="absolute top-0 right-0 p-8 opacity-20 transition-transform group-hover:scale-150 duration-1000 rotate-12">
             <Leaf className="h-32 w-32" />
           </div>
-          <div className="relative z-10 flex flex-col items-center justify-between gap-8 md:flex-row">
+          <div className="relative z-5 flex flex-col items-center justify-between gap-8 md:flex-row">
             <div className="text-center md:text-left">
               <h3 className="mb-2 text-2xl font-black md:text-3xl">Bắt đầu hành trình số hóa cùng AgroTemp</h3>
               <p className="text-agro-white font-light text-lg">Đăng ký và tìm kiếm lao động ngay bây giờ!</p>

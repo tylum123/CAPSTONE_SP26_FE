@@ -169,6 +169,7 @@ export default function FarmerLayout({
           setIsProfileMissing(true);
           setProfile(null);
         } else {
+          setIsProfileMissing(false);
           console.error("Failed to fetch farmer profile:", error);
         }
       } finally {
@@ -178,13 +179,19 @@ export default function FarmerLayout({
 
     fetchProfile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated]);
+  }, [isAuthenticated, pathname]);
 
   useEffect(() => {
-    if (isAuthenticated && isProfileMissing && !pathname.startsWith("/farmer/setup-profile")) {
+    const justCompletedSetup = typeof window !== "undefined" && sessionStorage.getItem("profile_setup_completed") === "1";
+    if (justCompletedSetup) {
+      sessionStorage.removeItem("profile_setup_completed");
+      return;
+    }
+
+    if (!checkingProfile && isAuthenticated && isProfileMissing && !pathname.startsWith("/farmer/setup-profile")) {
       router.replace("/farmer/setup-profile");
     }
-  }, [isAuthenticated, isProfileMissing, pathname, router]);
+  }, [checkingProfile, isAuthenticated, isProfileMissing, pathname, router]);
 
   const handleLogout = async () => {
     try {
@@ -218,11 +225,11 @@ export default function FarmerLayout({
       <AnimatedBubbles />
       {/* Top Header */}
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-border shadow-sm">
-        <div className="container mx-auto px-4 lg:px-8">
-          <div className="grid h-16 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 md:gap-6">
+        <div className="container mx-auto px-3 sm:px-4 lg:px-6 xl:px-8">
+          <div className="grid h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 lg:gap-3 xl:gap-6">
             {/* Logo */}
             <Link href="/farmer/dashboard" className="flex items-center gap-2 justify-self-start">
-              <div className="ml-20 w-10 h-10 rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center">
                 <img
                   src="/logo.png"
                   alt="AgroTemp Logo"
@@ -232,7 +239,7 @@ export default function FarmerLayout({
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex justify-self-center">
+            <div className="hidden xl:flex justify-center">
               <nav className="flex items-center gap-4 rounded-full border border-border/70 bg-background/70 p-1 shadow-sm">
                 {navItems.map((item) => {
                   const isActive = item.href === "/farmer"
@@ -256,7 +263,7 @@ export default function FarmerLayout({
               </nav>
             </div>
             {/* Right Side - Notifications & Profile */}
-            <div className="flex items-center justify-self-end gap-2 md:gap-3 mr-20">
+            <div className="flex items-center justify-self-end gap-2 lg:gap-3">
               {/* Notification Bell */}
               <div className="relative" ref={notifRef}>
                 <Button
@@ -372,7 +379,7 @@ export default function FarmerLayout({
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="gap-2 hidden md:flex">
+                  <Button variant="ghost" className="gap-2 hidden xl:flex">
                     <Avatar className="h-10 w-10 border-2 border-agro-white relative flex items-center justify-center">
                       <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} className="object-cover" />
                       <AvatarFallback className="bg-agro-green text-white">
@@ -414,64 +421,84 @@ export default function FarmerLayout({
 
               {/* Mobile Menu */}
               <Sheet>
-                <SheetTrigger asChild className="md:hidden">
+                <SheetTrigger asChild className="xl:hidden">
                   <Button variant="ghost" size="icon">
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-72">
-                  <div className="flex flex-col gap-4 mt-8">
-                    <div className="flex items-center gap-3 pb-4 border-b">
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} className="object-cover" />
-                        <AvatarFallback className="bg-agro-green text-white">
-                          {profile?.contactName?.charAt(0).toUpperCase() || "NA"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-semibold">{profile?.contactName || 'Null'}</p>
-                        <p className="text-sm text-muted-foreground">Nông dân</p>
+                <SheetContent side="right" className="w-[88vw] max-w-sm p-0">
+                  <div className="flex h-full flex-col">
+                    <div className="px-5 pt-8 pb-5 border-b bg-linear-to-b from-muted/30 to-transparent">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-14 w-14 ring-2 ring-agro-green/10">
+                          <AvatarImage src={profile?.avatarUrl || "/placeholder.svg"} className="object-cover" />
+                          <AvatarFallback className="bg-agro-green text-white text-base font-semibold">
+                            {profile?.contactName?.charAt(0).toUpperCase() || "ND"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-xl truncate">{profile?.contactName || "Nông dân"}</p>
+                          <p className="text-sm text-muted-foreground">Nông dân</p>
+                        </div>
                       </div>
                     </div>
-                    <nav className="flex flex-col gap-1">
-                      {navItems.map((item) => {
-                        const isActive = pathname === item.href;
-                        return (
-                          <Link key={item.href} href={item.href}>
-                            <Button
-                              variant={isActive ? "default" : "ghost"}
-                              className={`w-full justify-start gap-3 ${isActive ? "bg-agro-green text-white" : ""
+
+                    <div className="flex-1 overflow-y-auto px-4 py-4">
+                      <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Điều hướng
+                      </p>
+                      <nav className="flex flex-col gap-1.5">
+                        {navItems.map((item) => {
+                          const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                          return (
+                            <Link key={item.href} href={item.href}>
+                              <Button
+                                variant="ghost"
+                                className={`h-12 w-full justify-start rounded-xl px-3 gap-3 text-base ${
+                                  isActive
+                                    ? "bg-agro-green text-white hover:bg-agro-green-dark hover:text-white"
+                                    : "hover:bg-muted"
                                 }`}
-                            >
-                              <item.icon className="h-5 w-5" />
-                              {item.label}
+                              >
+                                <item.icon className="h-5 w-5" />
+                                {item.label}
+                              </Button>
+                            </Link>
+                          );
+                        })}
+                      </nav>
+
+                      <div className="mt-5 border-t pt-4">
+                        <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Tài khoản
+                        </p>
+                        <div className="flex flex-col gap-1.5">
+                          <Link href="/farmer/settings">
+                            <Button variant="ghost" className="h-12 w-full justify-start rounded-xl px-3 gap-3 text-base hover:bg-muted">
+                              <Settings className="h-5 w-5" />
+                              Cài đặt
                             </Button>
                           </Link>
-                        );
-                      })}
-                    </nav>
-                    <div className="mt-auto pt-4 border-t">
-                      <Link href="/farmer/settings">
-                        <Button variant="ghost" className="w-full justify-start gap-3">
-                          <Settings className="h-5 w-5" />
-                          Cài đặt
-                        </Button>
-                      </Link>
-                      <Link href="/farmer/profile">
-                        <Button variant="ghost" className="w-full justify-start gap-3">
-                          <UserCircle className="h-5 w-5" />
-                          Hồ sơ
-                        </Button>
-                      </Link>
-                      <Link href="/">
-                        <Button variant="ghost" className="w-full justify-start gap-3">
-                          <Leaf className="h-5 w-5" />
-                          Về trang chủ
-                        </Button>
-                      </Link>
+                          <Link href="/farmer/profile">
+                            <Button variant="ghost" className="h-12 w-full justify-start rounded-xl px-3 gap-3 text-base hover:bg-muted">
+                              <UserCircle className="h-5 w-5" />
+                              Hồ sơ
+                            </Button>
+                          </Link>
+                          <Link href="/">
+                            <Button variant="ghost" className="h-12 w-full justify-start rounded-xl px-3 gap-3 text-base hover:bg-muted">
+                              <Leaf className="h-5 w-5" />
+                              Về trang chủ
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t p-4 bg-background/90 backdrop-blur supports-backdrop-filter:bg-background/70">
                       <Button
                         variant="ghost"
-                        className="w-full justify-start gap-3 text-destructive"
+                        className="h-12 w-full justify-start rounded-xl px-3 gap-3 text-base text-destructive hover:text-destructive hover:bg-destructive/10"
                         onClick={handleLogout}
                       >
                         <LogOut className="h-5 w-5" />

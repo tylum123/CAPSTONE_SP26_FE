@@ -64,9 +64,9 @@ export function Header() {
 
   return (
     <header 
-      className={`fixed top-0 z-[60] w-full transition-all duration-500 ${
+      className={`fixed top-0 z-60 w-full transition-all duration-500 ${
         isScrolled 
-          ? "bg-white/80 backdrop-blur-lg shadow-sm py-2 border-b border-agro-green/10" 
+          ? "bg-white/80 backdrop-blur-lg z-1200 shadow-sm py-2 border-b border-agro-green/10" 
           : "bg-transparent py-4"
       }`}
     >

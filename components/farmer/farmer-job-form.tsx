@@ -4,7 +4,7 @@ import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState }
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import { ArrowLeft, Banknote, Check, CheckCheck, ChevronsUpDown, MapPin, Plus, X, Calendar as CalendarIcon, Briefcase, FileText, CalendarRange, CheckSquare, Award, Gift, AlignLeft, Layout, Clock, Info, DollarSign, DollarSignIcon, ChevronLeft, ChevronRight, User, Users } from "lucide-react"
+import { ArrowLeft, ArrowUpRight, Banknote, Check, CheckCheck, ChevronsUpDown, MapPin, Plus, X, Calendar as CalendarIcon, Briefcase, FileText, CalendarRange, CheckSquare, Award, Gift, AlignLeft, Layout, Clock, Info, DollarSign, DollarSignIcon, ChevronLeft, ChevronRight, User, Users } from "lucide-react"
 import { eachDayOfInterval, format, isSameDay, startOfDay } from "date-fns"
 import type { DateRange } from "react-day-picker"
 import { Badge } from "@/components/ui/badge"
@@ -1465,9 +1465,9 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       {postedJob ? (
         <div className="max-w-3xl mx-auto animate-in zoom-in-95 duration-500">
           <Card className="border-emerald-100 shadow-2xl shadow-emerald-500/10 overflow-hidden bg-white dark:bg-zinc-900">
-            <div className="h-2 bg-gradient-to-r from-agro-green to-emerald-400 w-full" />
+            <div className="h-2 w-full bg-linear-to-r from-agro-green to-emerald-400" />
             <div className="p-8 md:p-12 text-center space-y-6">
-              <div className="inline-flex items-center justify-center h-20 w-20 r ounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 mb-2 relative">
+              <div className="inline-flex items-center justify-center h-20 w-20 rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 mb-2 relative">
                 <div className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-20" />
                 <CheckCheck className="h-10 w-10 relative z-10" />
               </div>
@@ -1484,15 +1484,14 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
               </div>
 
               <div className="grid gap-4 py-8">
-                <div className="rounded-2xl border bg-muted/30 p-6 flex flex-col md:flex-row items-center justify-between gap-6">
-                  <div className="text-left space-y-1 w-full md:w-auto">
-                    <p className="text-sm font-medium text-muted-foreground">{postedJob.title}</p>
-                    <p className="text-2xl font-bold text-agro-green">{formatCurrency(postedJob.income)}</p>
+                <div className="rounded-2xl border bg-muted/30 p-6 grid gap-4 md:grid-cols-2 text-left">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tiêu đề</p>
+                    <p className="font-semibold text-foreground wrap-break-word">{postedJob.title}</p>
                   </div>
-                  <div className="h-px w-full md:h-12 md:w-px bg-border sm:hidden md:block" />
-                  <div className="text-left space-y-1 w-full md:w-auto">
-                    <p className="text-sm font-medium text-muted-foreground">Địa điểm</p>
-                    <p className="font-semibold text-foreground truncate max-w-[200px]">{postedJob.location}</p>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Địa điểm</p>
+                    <p className="font-semibold text-foreground wrap-break-word">{postedJob.location}</p>
                   </div>
                 </div>
               </div>
@@ -1501,8 +1500,14 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                 <Button size="lg" variant="outline" asChild className="h-12 px-8 font-semibold hover:bg-muted transition-all">
                   <Link href="/farmer/jobs">Quản lý bài đăng</Link>
                 </Button>
-                <Button size="lg" className="h-12 px-8 font-semibold bg-agro-green hover:bg-agro-green-dark text-white shadow-lg shadow-agro-green/20 transition-all transform hover:scale-105" onClick={() => (isEditMode ? setPostedJob(null) : resetAll())}>
+                <Button size="lg" className="h-12 px-8 font-semibold transition-all cursor-pointer hover:bg-agro-green-dark" onClick={() => (isEditMode ? setPostedJob(null) : resetAll())}>
                   {isEditMode ? "Chỉnh sửa thêm" : "Tiếp tục đăng tin"}
+                </Button>
+                <Button size="lg" asChild className="h-12 px-8 font-semibold bg-agro-green hover:bg-agro-green-dark text-white shadow-lg shadow-agro-green/20">
+                  <Link href={`/farmer/jobs/${postedJob.id}`}>
+                    Xem bài đăng
+                    <ArrowUpRight className="-ml-1 h-4 w-4" />
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -2163,7 +2168,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                   {/* Key Stats Grid */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-6 bg-muted/20 p-8 rounded-3xl border border-muted-foreground/10">
                     <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Mức lương</p>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Đơn giá</p>
                       <div className="flex items-center text-xl font-extrabold text-agro-green"><Banknote className="mr-2 h-5 w-5" /> {formatCurrency(incomeNumber)}</div>
                     </div>
                     <div className="space-y-1">
