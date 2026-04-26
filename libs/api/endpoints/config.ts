@@ -181,6 +181,15 @@ export const API_ENDPOINTS = {
     GET_COMMENTS: (id: string) => `/disputes/${id}/comments`,
     ADD_COMMENT: (id: string) => `/disputes/${id}/comments`,
   },
+
+  RATINGS: {
+    CREATE: "/ratings",
+    SPECIFIC: (userId: string) => `/ratings/user/${userId}`,
+    BY_USER: (userId: string) => `/ratings/user/${userId}/all`,
+    GIVEN: "/ratings/given",
+    RECEIVED_BY_POST: (postId: string) => `/ratings/user/received/post/${postId}`,
+    AVERAGE: (userId: string) => `/ratings/user/${userId}/average`,
+  },
   
   MESSAGES: {
     GET: '/messages',

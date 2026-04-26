@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState } from 'react';
 import { handleAuthError } from '@/libs/utils/error-handler';
 import { useAuth } from '@/libs/stores/auth.store';
+import { mapAuthUser, normalizeAuthRole, resolveTokenExpiresAt } from '@/libs/utils/auth-user';
 
 interface GoogleLoginButtonProps {
   roleId: number;
@@ -33,16 +34,6 @@ export function GoogleLoginButton({ roleId, showDivider = false, onSuccess, onEr
     return null;
   }
 
-  const normalizeRole = (role: string | undefined): "admin" | "farmer" | "worker" | null => {
-    const normalized = String(role || '').trim().toLowerCase();
-
-    if (normalized === 'admin') return 'admin';
-    if (normalized === 'farmer') return 'farmer';
-    if (normalized === 'worker') return 'worker';
-
-    return null;
-  };
-
   const handleGoogleLogin = async (credentialResponse: any) => {
     try {
       if (!credentialResponse.credential) {
@@ -60,7 +51,7 @@ export function GoogleLoginButton({ roleId, showDivider = false, onSuccess, onEr
         const accessToken = userData.token || '';
         // @ts-ignore
         const refreshToken = userData.refresh_token || '';
-        const role = normalizeRole(userData.role);
+        const role = normalizeAuthRole(userData.role);
 
         if (userData.isVerified === false) {
           toast({
@@ -103,20 +94,14 @@ export function GoogleLoginButton({ roleId, showDivider = false, onSuccess, onEr
         }
 
         // Create user object for auth context
+        const baseUser = mapAuthUser(userData);
         const user = {
-          // @ts-ignore
-          id: userData.id || '',
-          email: userData.email || '',
-          // @ts-ignore
-          fullName: userData.fullName || '',
+          ...baseUser,
           role,
         };
 
         // Update auth context
-        const tokenExpiresAt =
-          (userData as any).expiresAt ||
-          (userData as any).expires_at ||
-          (userData as any).expiration;
+        const tokenExpiresAt = resolveTokenExpiresAt(userData);
         login(user, accessToken, refreshToken, tokenExpiresAt);
 
         toast({

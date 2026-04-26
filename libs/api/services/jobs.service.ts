@@ -6,6 +6,7 @@ import type {
     CreateJobRequest,
     UpdateJobRequest,
     JobPostStatus,
+    WorkersPerDayDTO,
 } from '@/libs/types';
 
 // Removed local JOB_POST_STATUS as it is now centrally managed in libs/types/job.types.ts
@@ -36,7 +37,7 @@ export const jobService = {
         return response.data;
     },
 
-    getWorkersPerDay: async (id: string): Promise<ApiResponse<{ date: string; acceptedWorkerCount: number }[]>> => {
+    getWorkersPerDay: async (id: string): Promise<ApiResponse<WorkersPerDayDTO[]>> => {
         const response = await axiosInstance.get(API_ENDPOINTS.JOBS.WORKERS_PER_DAY(id));
         return response.data;
     },

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Banknote, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText, InfoIcon, MailIcon, MapPin, MessageSquare, Play, RotateCw, Star, Users, XCircle, Paperclip, MessageCircleIcon } from "lucide-react"
+import { ArrowLeft, Banknote, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, Clock, FileText, InfoIcon, MailIcon, MapPin, MessageSquare, Play, RotateCw, Star, Users, XCircle, Paperclip, MessageCircleIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -44,6 +44,7 @@ import { JobStatusChart } from "@/components/farmer/dashboard-charts"
 import { useAuth } from "@/libs/stores/auth.store"
 import { RatingType, type RatingCreateDTO, type RatingDTO } from "@/libs/types/rating.types"
 import { WorkerProfilePreviewDialog } from "@/components/farmer/worker-profile-preview-dialog"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 function JobReviews({ jobId }: { jobId: string }) {
   const { user } = useAuth();
@@ -124,7 +125,7 @@ function JobReviews({ jobId }: { jobId: string }) {
               <div className="mt-1 flex flex-col gap-2">
                 {(() => {
                   if (!review.reviewText) return <p className="text-sm text-foreground leading-relaxed">Không có nội dung đánh giá.</p>;
-                  
+
                   // Extract format: [Tag 1, Tag 2] Review text
                   const match = review.reviewText.match(/^\[([\s\S]*?)\]\s*([\s\S]*)$/);
                   if (match) {
@@ -147,7 +148,7 @@ function JobReviews({ jobId }: { jobId: string }) {
                       </>
                     );
                   }
-                  
+
                   return <p className="text-sm text-foreground leading-relaxed">{review.reviewText}</p>;
                 })()}
               </div>
@@ -884,7 +885,7 @@ export default function FarmerJobDetailPage() {
     <div className="flex flex-col gap-8">
       {/* breadcrumb-ish header */}
       <div className="flex items-center justify-between">
-        <Button 
+        <Button
           variant="ghost"
           asChild
           className="w-auto flex-none justify-start gap-2 bg-agro-green text-white hover:bg-agro-green/90 hover:text-white">
@@ -1071,19 +1072,52 @@ export default function FarmerJobDetailPage() {
                         <div className="h-4 w-1/4 rounded bg-slate-200"></div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
                         {workersPerDay.map((dayData, index) => (
-                          <div key={index} className="flex flex-col items-center justify-center p-3 border rounded-lg bg-slate-50 dark:bg-slate-900/50">
-                            <span className="text-sm font-medium text-foreground mb-1">
-                              {formatDate(dayData.date)}
-                            </span>
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <Users className="h-4 w-4 text-emerald-500 shrink-0" />
-                              <span className={`text-lg font-bold ${dayData.acceptedWorkerCount >= workersNeededPerDay ? "text-emerald-600" : "text-amber-600"}`}>
-                                {dayData.acceptedWorkerCount}/{workersNeededPerDay}
+                          <Collapsible key={index} className="border rounded-lg bg-slate-50 dark:bg-slate-900/50 overflow-hidden group">
+                            <CollapsibleTrigger className="flex flex-row items-center justify-between w-full p-3 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors">
+                              <span className="text-sm font-medium text-foreground">
+                                {formatDate(dayData.date)}
                               </span>
-                            </div>
-                          </div>
+                              <div className="flex items-center gap-2">
+                                <Users className="h-4 w-4 text-emerald-500 shrink-0" />
+                                <span className={`text-sm font-bold ${dayData.acceptedWorkerCount >= workersNeededPerDay ? "text-emerald-600" : "text-amber-600"}`}>
+                                  {dayData.acceptedWorkerCount}/{workersNeededPerDay}
+                                </span>
+                                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                              </div>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <div className="p-3 pt-0 border-t bg-white dark:bg-zinc-900">
+                                {dayData.workers && dayData.workers.length > 0 ? (
+                                  <div className="flex flex-wrap gap-2 mt-3">
+                                    {dayData.workers.map((worker) => {
+                                      const matchedApp = applications.find(a => a.worker?.id === worker.workerId || a.worker?.userId === worker.workerId);
+                                      const workerUserId = (worker as any).userId || matchedApp?.worker?.userId;
+                                      
+                                      return (
+                                        <WorkerProfilePreviewDialog
+                                          key={worker.workerId}
+                                          workerId={worker.workerId}
+                                          workerUserId={workerUserId}
+                                          workerName={worker.fullName}
+                                        >
+                                          <Avatar className="h-8 w-8 border cursor-pointer hover:scale-105 transition-transform" title={worker.fullName}>
+                                            <AvatarImage src={worker.avatarUrl || "/placeholder.svg"} className="object-cover" />
+                                            <AvatarFallback className="text-xs bg-agro-green/10 text-agro-green font-medium">{worker.fullName.substring(0, 2).toUpperCase()}</AvatarFallback>
+                                          </Avatar>
+                                        </WorkerProfilePreviewDialog>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-muted-foreground text-center py-2 mt-2">
+                                    Chưa có nhân công
+                                  </div>
+                                )}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
                         ))}
                       </div>
                     )}
@@ -1232,22 +1266,22 @@ export default function FarmerJobDetailPage() {
                     </button>
                   </div>
 
-                  <div className="space-y-4 max-h-150 overflow-y-auto pr-1 custom-scrollbar">
+                  <div className="grid grid-cols-1 gap-4 max-h-150 overflow-y-auto pr-1 custom-scrollbar md:grid-cols-2">
                     {isLoadingApplications ? (
-                      <div className="flex flex-col items-center justify-center py-12 gap-3">
+                      <div className="flex flex-col items-center justify-center gap-3 py-12 md:col-span-2">
                         <div className="h-8 w-8 animate-spin rounded-full border-2 border-agro-green border-r-transparent" />
                         <p className="text-xs text-muted-foreground tracking-wide">Đang tải hồ sơ...</p>
                       </div>
                     ) : null}
 
                     {!isLoadingApplications && applicationsError ? (
-                      <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+                      <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-4 md:col-span-2">
                         <p className="text-sm text-destructive text-center">{applicationsError}</p>
                       </div>
                     ) : null}
 
                     {!isLoadingApplications && !applicationsError && applications.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-center space-y-3 opacity-60">
+                      <div className="flex flex-col items-center justify-center space-y-3 py-12 text-center opacity-60 md:col-span-2">
                         <div className="p-4 rounded-full bg-muted">
                           <Users className="h-10 w-10 text-muted-foreground" />
                         </div>
@@ -1264,7 +1298,7 @@ export default function FarmerJobDetailPage() {
                       .map((application) => (
                         <div
                           key={application.id}
-                          className="group relative flex flex-col gap-3 rounded-xl border border-muted bg-muted/30 p-4 hover:border-agro-green/30 hover:bg-muted/50 transition-all duration-300"
+                          className="group relative flex h-full flex-col gap-3 rounded-xl border border-muted bg-muted/30 p-4 transition-all duration-300 hover:border-agro-green/30 hover:bg-muted/50"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-3 min-w-0">
@@ -1284,21 +1318,18 @@ export default function FarmerJobDetailPage() {
                                 <p className="font-bold text-foreground truncate">{application.worker?.fullName || "Ứng viên"}</p>
                                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
                                   <WorkerAverageRating userId={application.worker?.userId} fallback={application.worker?.averageRating} />
-                                  <span className="opacity-40">•</span>
-                                  <span>{application.worker?.primaryLocation || "Không có địa chỉ"}</span>
                                 </div>
                               </div>
                             </div>
-                            <div className="shrink-0">
-                              {statusBadge(application.statusId)}
-                            </div>
                           </div>
-
-                          <div className="mt-1 flex items-center justify-between gap-2 border-t border-muted/50 pt-3">
-                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-tight">
-                              <Clock className="h-3 w-3" />
-                              {formatDistanceToNow(new Date(application.appliedAt), { addSuffix: true, locale: vi })}
-                            </div>
+                          <div className="shrink-0">
+                            {statusBadge(application.statusId)}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-tight">
+                            <Clock className="h-3 w-3" />
+                            {formatDistanceToNow(new Date(application.appliedAt), { addSuffix: true, locale: vi })}
+                          </div>
+                          <div className="mt-auto flex flex-row items-center justify-between gap-2 border-t border-muted/50 pt-3">
                             <div className="flex gap-1.5">
                               <Button
                                 type="button"
@@ -1351,7 +1382,7 @@ export default function FarmerJobDetailPage() {
                                     }}
                                   >
                                     <MessageSquare className="h-3.5 w-3.5" />
-                                  </Button> 
+                                  </Button>
                                   {job.statusId != JOB_POST_STATUS.Completed && (
                                     <Button
                                       type="button"
@@ -1394,7 +1425,7 @@ export default function FarmerJobDetailPage() {
                       ))}
 
                     {applicationsTotalPages > 1 && (
-                      <div className="flex items-center justify-between pt-4 border-t mt-4">
+                      <div className="mt-4 flex items-center justify-between border-t pt-4 md:col-span-2">
                         <Button
                           variant="outline"
                           size="sm"
@@ -1471,17 +1502,19 @@ export default function FarmerJobDetailPage() {
                       <p className="text-sm">Chưa có báo cáo công việc nào được gửi.</p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       {jobDetails.map((detail) => (
                         <div key={detail.id} className="p-4 rounded-xl border bg-muted/30 hover:bg-muted/50 transition-colors">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="flex flex-col justify-between gap-4 h-full">
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
                                 <p className="font-semibold">{formatDate(detail.workDate)}</p>
+                              </div>
+                              <div>
                                 {jobDetailStatusBadge(detail.statusId)}
                               </div>
                               <p className="text-sm text-muted-foreground line-clamp-2">
-                                {detail.workerDescription || "Không có mô tả từ người làm."}
+                                Chi tiết: {detail.workerDescription || "Không có mô tả từ người làm."}
                               </p>
                               {detail.attachments && detail.attachments.length > 0 && (
                                 <div className="flex items-center gap-1.5 pt-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
@@ -1489,8 +1522,13 @@ export default function FarmerJobDetailPage() {
                                   {detail.attachments.length} tệp đính kèm
                                 </div>
                               )}
+                              {detail.farmerFeedback && (
+                                <div className="pt-1 border-t border-muted italic text-xs text-muted-foreground">
+                                  Phản hồi từ bạn: {detail.farmerFeedback}
+                                </div>
+                              )}
                             </div>
-                            <div className="flex flex-col items-end gap-2">
+                            <div className="mt-auto flex flex-col items-start gap-2">
                               <div className="flex items-center gap-1 text-emerald-600 font-bold">
                                 <Banknote className="h-4 w-4" />
                                 {formatCurrency(detail.jobPrice)}
@@ -1512,16 +1550,11 @@ export default function FarmerJobDetailPage() {
                               </div>
                             </div>
                           </div>
-                          {detail.farmerFeedback && (
-                            <div className="mt-3 pt-3 border-t border-muted italic text-xs text-muted-foreground">
-                              Phản hồi từ bạn: {detail.farmerFeedback}
-                            </div>
-                          )}
                         </div>
                       ))}
 
                       {jobDetailsTotalPages > 1 && (
-                        <div className="flex items-center justify-center gap-4 pt-6 border-t mt-4">
+                        <div className="mt-4 flex items-center justify-center gap-4 border-t pt-6 md:col-span-2">
                           <Button
                             variant="outline"
                             size="sm"
@@ -1644,9 +1677,9 @@ export default function FarmerJobDetailPage() {
                   <div className="rounded-lg border p-4">
                     <p className="text-xs text-muted-foreground">Trình độ</p>
                     <p className="mt-2 font-medium">
-                      {selectedApplication.worker?.experienceLevel === "Experienced" ? "Nhiều kinh nghiệm" : 
-                       selectedApplication.worker?.experienceLevel === "Intermediate" ? "Có kinh nghiệm" :
-                       selectedApplication.worker?.experienceLevel === "Beginner" ? "Mới bắt đầu" : "-"}
+                      {selectedApplication.worker?.experienceLevel === "Experienced" ? "Nhiều kinh nghiệm" :
+                        selectedApplication.worker?.experienceLevel === "Intermediate" ? "Có kinh nghiệm" :
+                          selectedApplication.worker?.experienceLevel === "Beginner" ? "Mới bắt đầu" : "-"}
                     </p>
                   </div>
                   <div className="rounded-lg border p-4">
@@ -1668,8 +1701,8 @@ export default function FarmerJobDetailPage() {
                     {selectedApplication.workDates?.length ? (
                       <div className="grid gap-3 sm:grid-cols-2">
                         {selectedApplication.workDates.map((workDate, index) => (
-                          <div 
-                            key={`${workDate}-${index}`} 
+                          <div
+                            key={`${workDate}-${index}`}
                             className="flex items-center gap-3 rounded-xl border border-agro-green/20 bg-gradient-to-br from-agro-green/5 to-transparent p-3 shadow-sm transition-all hover:border-agro-green/40 hover:shadow-md"
                           >
                             <div className="flex flex-shrink-0 h-10 w-10 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-agro-green/10 text-agro-green">

@@ -88,3 +88,14 @@ export interface CreateJobRequest {
 export interface UpdateJobRequest extends Partial<CreateJobRequest> {
   id?: string;
 }
+
+export interface WorkersPerDayDTO {
+  date: string;
+  acceptedWorkerCount: number;
+  workers: {
+    workerId: string;
+    fullName: string;
+    phoneNumber: string;
+    avatarUrl: string;
+  }[]
+}
