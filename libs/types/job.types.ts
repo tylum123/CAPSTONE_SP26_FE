@@ -32,6 +32,12 @@ export interface Job {
   endTime: string;
   workersNeeded: number;
   workersAccepted: number;
+  workers: {
+    workerId: string;
+    fullName: string;
+    phoneNumber: string;
+    avatarUrl: string;
+  }[];
   jobTypeId: number;
   wageAmount: number;
   requiredSkills?: string[];

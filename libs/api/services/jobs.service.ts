@@ -2,6 +2,7 @@ import axiosInstance from "../axios-instance";
 import { API_ENDPOINTS } from "../endpoints/config";
 import type {
     ApiResponse,
+    PaginatedResponse,
     Job,
     CreateJobRequest,
     UpdateJobRequest,
@@ -68,8 +69,10 @@ export const jobService = {
         category?: string;
         address?: string;
         skill?: string[];
+        page?: number;
+        limit?: number;
         sortByDatesDescending: boolean;
-    }): Promise<ApiResponse<Job[]>> => {
+    }): Promise<ApiResponse<PaginatedResponse<Job>>> => {
         const response = await axiosInstance.get(API_ENDPOINTS.JOBS.FILTERED_JOBS_BY_FARMER, { params });
         return response.data;
     },

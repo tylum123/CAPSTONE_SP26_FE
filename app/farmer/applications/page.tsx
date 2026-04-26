@@ -120,17 +120,9 @@ export default function ApplicationsPage() {
     try {
       setIsLoadingJobs(true)
       const response = await jobService.getFilteredJobsByFarmer()
-      const payload = response.data as Job[] | { data?: Job[]; items?: Job[] }
+      const payload = response.data.data as Job[] | undefined
 
-      if (Array.isArray(payload)) {
-        setJobs(payload)
-      } else if (Array.isArray(payload?.data)) {
-        setJobs(payload.data)
-      } else if (Array.isArray(payload?.items)) {
-        setJobs(payload.items)
-      } else {
-        setJobs([])
-      }
+      setJobs(Array.isArray(payload) ? payload : [])
     } catch (jobsError) {
       console.error(jobsError)
       setError("Không thể tải danh sách công việc.")
