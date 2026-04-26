@@ -11,9 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Settings, MapPin, CalendarDays, UserCircle, MessageCircle, AlertTriangle, ChevronDown, Eye, RefreshCw, Plus } from "lucide-react";
+import { Settings, MapPin, CalendarDays, UserCircle, MessageCircle, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Eye, RefreshCw, Plus } from "lucide-react";
 import { farmerService } from "@/libs/api/services/farmer.service";
-import { DisputeStatus, DisputeType } from "@/libs/types";
+import { DisputeStatus, DisputeType, JobPostStatus } from "@/libs/types";
 import type { DisputeReportCommentDTO, DisputeReportDTO, FarmerProfile, GetFarmResponse, Job } from "@/libs/types";
 import { format } from "date-fns";
 import { disputeService, FarmService, jobService } from "@/libs/api";
@@ -34,8 +34,18 @@ export default function FarmerProfilePage() {
     const [jobSearchKeyword, setJobSearchKeyword] = useState("");
     const [jobSearchResults, setJobSearchResults] = useState<Job[]>([]);
     const [isSearchingJobs, setIsSearchingJobs] = useState(false);
+    const [jobSearchPage, setJobSearchPage] = useState(1);
+    const [jobSearchTotalPages, setJobSearchTotalPages] = useState(1);
+    const [selectedJobWorkers, setSelectedJobWorkers] = useState<{
+        workerId: string;
+        fullName: string;
+        phoneNumber: string;
+        avatarUrl: string;
+    }[]>([]);
     const [newDisputeForm, setNewDisputeForm] = useState({
         jobPostId: "",
+        jobPostTitle: "",
+        workerId: "",
         disputeTypeId: DisputeType.JobQuality,
         reason: "",
         description: "",
@@ -61,14 +71,19 @@ export default function FarmerProfilePage() {
     const resetCreateDisputeForm = () => {
         setNewDisputeForm({
             jobPostId: "",
+            jobPostTitle: "",
+            workerId: "",
             disputeTypeId: DisputeType.JobQuality,
             reason: "",
             description: "",
             evidenceUrl: "",
         });
+        setSelectedJobWorkers([]);
         setJobSearchKeyword("");
         setJobSearchResults([]);
         setIsSearchingJobs(false);
+        setJobSearchPage(1);
+        setJobSearchTotalPages(1);
     };
 
     const getDisputeTypeLabel = (disputeTypeId: number) => {
@@ -150,13 +165,23 @@ export default function FarmerProfilePage() {
 
         setIsCreatingDispute(true);
         try {
-            await disputeService.createDispute({
+            const payload: any = {
                 jobPostId: newDisputeForm.jobPostId.trim(),
                 disputeTypeId: Number(newDisputeForm.disputeTypeId),
                 reason: newDisputeForm.reason.trim(),
-                description: newDisputeForm.description.trim() || undefined,
-                evidenceUrl: newDisputeForm.evidenceUrl.trim() || undefined,
-            });
+            };
+
+            if (newDisputeForm.workerId.trim()) {
+                payload.workerId = newDisputeForm.workerId.trim();
+            }
+            if (newDisputeForm.description.trim()) {
+                payload.description = newDisputeForm.description.trim();
+            }
+            if (newDisputeForm.evidenceUrl.trim()) {
+                payload.evidenceUrl = newDisputeForm.evidenceUrl.trim();
+            }
+
+            await disputeService.createDispute(payload);
 
             toast.success("Đã tạo khiếu nại thành công.");
             setIsCreateDisputeDialogOpen(false);
@@ -176,32 +201,34 @@ export default function FarmerProfilePage() {
         }
 
         const keyword = jobSearchKeyword.trim();
-        if (keyword.length < 2) {
-            setJobSearchResults([]);
-            setIsSearchingJobs(false);
-            return;
-        }
 
         const timeout = setTimeout(async () => {
             setIsSearchingJobs(true);
             try {
                 const response = await jobService.getFilteredJobsByFarmer({
-                    title: keyword,
+                    title: keyword.length >= 2 ? keyword : undefined,
+                    page: jobSearchPage,
+                    limit: 10,
                     sortByDatesDescending: true,
                 });
 
-                const jobs = Array.isArray(response.data) ? response.data : [];
-                setJobSearchResults(jobs.slice(0, 8));
+                const jobs = Array.isArray(response.data.data) ? response.data.data : [];
+                const filteredJobs = jobs.filter(
+                    (job) => job.statusId === JobPostStatus.InProgress || job.statusId === JobPostStatus.Completed
+                );
+                setJobSearchResults(filteredJobs);
+                setJobSearchTotalPages(response.data.pagination?.totalPages ?? 1);
             } catch (error) {
                 console.error("Failed to search farmer jobs:", error);
                 setJobSearchResults([]);
+                setJobSearchTotalPages(1);
             } finally {
                 setIsSearchingJobs(false);
             }
         }, 300);
 
         return () => clearTimeout(timeout);
-    }, [jobSearchKeyword, isCreateDisputeDialogOpen]);
+    }, [jobSearchKeyword, isCreateDisputeDialogOpen, jobSearchPage]);
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -623,18 +650,20 @@ export default function FarmerProfilePage() {
                                     {
                                         const value = event.target.value;
                                         setJobSearchKeyword(value);
-                                        setNewDisputeForm((prev) => ({ ...prev, jobPostId: "" }));
+                                        setJobSearchPage(1);
+                                        setNewDisputeForm((prev) => ({ ...prev, jobPostId: "", jobPostTitle: "", workerId: "" }));
+                                        setSelectedJobWorkers([]);
                                     }
                                 }
                             />
 
                             {newDisputeForm.jobPostId && (
                                 <p className="text-xs text-emerald-700">
-                                    Đã chọn bài đăng ID: {newDisputeForm.jobPostId}
+                                    Đã chọn bài đăng: {newDisputeForm.jobPostTitle || newDisputeForm.jobPostId}
                                 </p>
                             )}
 
-                            {(isSearchingJobs || jobSearchResults.length > 0 || jobSearchKeyword.trim().length >= 2) && (
+                            {(isSearchingJobs || jobSearchResults.length > 0 || isCreateDisputeDialogOpen) && (
                                 <div className="max-h-48 overflow-y-auto rounded-md border bg-background">
                                     {isSearchingJobs ? (
                                         <p className="p-3 text-sm text-muted-foreground">Đang tìm bài đăng...</p>
@@ -646,20 +675,83 @@ export default function FarmerProfilePage() {
                                                 type="button"
                                                 key={job.id}
                                                 className="w-full text-left p-3 border-b last:border-b-0 hover:bg-muted/50 transition-colors"
-                                                onClick={() => {
-                                                    setNewDisputeForm((prev) => ({ ...prev, jobPostId: job.id }));
+                                                onClick={async () => {
+                                                    setNewDisputeForm((prev) => ({ ...prev, jobPostId: job.id, jobPostTitle: job.title || "", workerId: "" }));
                                                     setJobSearchKeyword(job.title || "");
                                                     setJobSearchResults([]);
+                                                    
+                                                    try {
+                                                        const response = await jobService.getJobDetail(job.id);
+                                                        setSelectedJobWorkers(response.data.workers || []);
+                                                    } catch (error) {
+                                                        console.error("Failed to fetch job details:", error);
+                                                        setSelectedJobWorkers([]);
+                                                    }
                                                 }}
                                             >
                                                 <p className="text-sm font-medium text-slate-800 line-clamp-1">{job.title || "(Không có tiêu đề)"}</p>
-                                                <p className="text-xs text-muted-foreground line-clamp-1">{job.id}</p>
                                             </button>
                                         ))
                                     )}
                                 </div>
                             )}
+
+                            <div className="flex items-center justify-between gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setJobSearchPage((prev) => Math.max(1, prev - 1))}
+                                    disabled={jobSearchPage <= 1 || isSearchingJobs}
+                                >
+                                    <ChevronLeft className="mr-1 h-4 w-4" />
+                                    Sau
+                                </Button>
+                                <span className="text-xs text-muted-foreground">
+                                    Trang {jobSearchPage}/{jobSearchTotalPages}
+                                </span>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setJobSearchPage((prev) => Math.min(jobSearchTotalPages, prev + 1))}
+                                    disabled={jobSearchPage >= jobSearchTotalPages || isSearchingJobs}
+                                >
+                                    Trước
+                                    <ChevronRight className="ml-1 h-4 w-4" />
+                                </Button>
+                            </div>
                         </div>
+
+                        {newDisputeForm.jobPostId && (
+                            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
+                                <p className="text-sm font-medium text-slate-700">Người lao động liên quan (tuỳ chọn)</p>
+                                <select
+                                    value={newDisputeForm.workerId}
+                                    onChange={(event) =>
+                                        setNewDisputeForm((prev) => ({
+                                            ...prev,
+                                            workerId: event.target.value,
+                                        }))
+                                    }
+                                    disabled={selectedJobWorkers.length === 0}
+                                    className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
+                                >
+                                    <option value="">-- Báo cáo chung (không chọn người lao động) --</option>
+                                    {selectedJobWorkers.map((worker) => {
+                                        const wId = worker.workerId || (worker as any).id || (worker as any).userId || (worker as any).workerProfileId || "";
+                                        return (
+                                            <option key={wId || worker.phoneNumber || Math.random()} value={wId}>
+                                                {worker.fullName} - {worker.phoneNumber}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                                {selectedJobWorkers.length === 0 && (
+                                    <p className="text-xs text-muted-foreground mt-1">Bài đăng này chưa có người lao động nào.</p>
+                                )}
+                            </div>
+                        )}
 
                         <div className="space-y-1.5">
                             <p className="text-sm font-medium text-slate-700">Loại khiếu nại</p>

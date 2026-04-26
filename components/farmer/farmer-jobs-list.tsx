@@ -50,6 +50,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 import { jobService } from "@/libs/api/services/jobs.service"
 import { jobApplicationService } from "@/libs/api/services/jobApplication.service"
 
@@ -79,6 +86,10 @@ export function FarmerJobsList() {
   const [jobPendingCancel, setJobPendingCancel] = useState<Job | null>(null)
   const [sortByDatesDescending, setSortByDatesDescending] = useState(true)
   const [updatingUrgencyJobId, setUpdatingUrgencyJobId] = useState<string | null>(null)
+  const [jobsPage, setJobsPage] = useState(1)
+  const [jobsPageSize] = useState(9)
+  const [jobsTotalPages, setJobsTotalPages] = useState(1)
+  const [jobsTotalCount, setJobsTotalCount] = useState(0)
 
   // For combo boxes
   const [categories, setCategories] = useState<JobCategory[]>([])
@@ -220,6 +231,10 @@ export function FarmerJobsList() {
     }
   }, [filterCategory, categories, skillPage])
 
+  useEffect(() => {
+    setJobsPage(1)
+  }, [searchQuery, filterCategory, filterAddress, filterSkills, sortByDatesDescending])
+
   const loadJobs = useCallback(async () => {
     try {
       setIsLoading(true)
@@ -235,38 +250,54 @@ export function FarmerJobsList() {
           category: (filterCategory && filterCategory !== "all-categories") ? filterCategory : undefined,
           address: (filterAddress && filterAddress !== "all-provinces") ? filterAddress : undefined,
           skill: filterSkills.length > 0 ? filterSkills : undefined,
+          page: jobsPage,
+          limit: jobsPageSize,
           sortByDatesDescending,
         })
       } else {
-        response = await jobService.getFilteredJobsByFarmer()
+        response = await jobService.getFilteredJobsByFarmer({
+          page: jobsPage,
+          limit: jobsPageSize,
+          sortByDatesDescending,
+        })
       }
 
-      const payload = response.data as Job[] | { data?: Job[]; items?: Job[] }
+      const payload = response.data as PaginatedResponse<Job> | Job[] | { data?: Job[]; items?: Job[] }
 
       if (Array.isArray(payload)) {
         setJobs(payload)
+        setJobsTotalPages(1)
+        setJobsTotalCount(payload.length)
         return
       }
 
       if (Array.isArray(payload?.data)) {
         setJobs(payload.data)
+        setJobsTotalPages(payload.pagination?.totalPages ?? 1)
+        setJobsTotalCount(payload.pagination?.total ?? payload.data.length)
         return
       }
 
       if (Array.isArray(payload?.items)) {
         setJobs(payload.items)
+        setJobsTotalPages(1)
+        setJobsTotalCount(payload.items.length)
         return
       }
 
       setJobs([])
+      setJobsTotalPages(1)
+      setJobsTotalCount(0)
     } catch (fetchError) {
       console.error(fetchError)
       setError("Không thể tải danh sách công việc. Vui lòng thử lại.")
       setJobs([])
+      setJobsTotalPages(1)
+      setJobsTotalCount(0)
     } finally {
       setIsLoading(false)
     }
-  }, [searchQuery, filterCategory, filterAddress, filterSkills, sortByDatesDescending])
+  }, [searchQuery, filterCategory, filterAddress, filterSkills, sortByDatesDescending, jobsPage, jobsPageSize])
 
   useEffect(() => {
     void loadJobs()
@@ -438,7 +469,10 @@ export function FarmerJobsList() {
           <Input
             placeholder="Tìm kiếm theo tiêu đề..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              setJobsPage(1)
+            }}
             className="pl-9 h-10 w-full"
           />
         </div>
@@ -471,7 +505,10 @@ export function FarmerJobsList() {
           {/* Sort Button */}
           <Button
             variant="outline"
-            onClick={() => setSortByDatesDescending(prev => !prev)}
+              onClick={() => {
+                setSortByDatesDescending((prev) => !prev)
+                setJobsPage(1)
+              }}
             className="h-10 shrink-0 gap-2 font-medium bg-white dark:bg-slate-900 border-slate-200"
           >
             <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
@@ -530,6 +567,7 @@ export function FarmerJobsList() {
                   setFilterCategory(val)
                   setFilterSkills([]) // Reset skills when category changes
                   setSkillPage(1) // Reset skill page when category changes
+                  setJobsPage(1)
                 }}
                 disabled={categoriesLoading}
               >
@@ -605,6 +643,7 @@ export function FarmerJobsList() {
                           } else {
                             setFilterSkills(filterSkills.filter(s => s !== (skill.name || skill.id)))
                           }
+                          setJobsPage(1)
                         }}
                         className="mt-0.5"
                       />
@@ -619,7 +658,7 @@ export function FarmerJobsList() {
 
             <div className="space-y-2">
               <Label>Khu vực</Label>
-              <Select value={filterAddress} onValueChange={setFilterAddress} disabled={provincesLoading}>
+              <Select value={filterAddress} onValueChange={(value) => { setFilterAddress(value); setJobsPage(1) }} disabled={provincesLoading}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder={provincesLoading ? "Đang tải..." : "Chọn khu vực"} />
                 </SelectTrigger>
@@ -931,6 +970,43 @@ export function FarmerJobsList() {
                         </AvatarFallback>
                       </Avatar>
                       <div>
+
+                      {jobsTotalPages > 1 && (
+                        <div className="flex flex-col items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm sm:flex-row sm:justify-between">
+                          <p className="text-sm text-muted-foreground">
+                            Hiển thị trang {jobsPage} trên {jobsTotalPages} với {jobsTotalCount} tin đăng
+                          </p>
+                          <Pagination className="mx-0 w-auto">
+                            <PaginationContent>
+                              <PaginationItem>
+                                <PaginationPrevious
+                                  href="#"
+                                  onClick={(event) => {
+                                    event.preventDefault()
+                                    setJobsPage((prev) => Math.max(1, prev - 1))
+                                  }}
+                                  className={jobsPage === 1 ? "pointer-events-none opacity-50" : undefined}
+                                />
+                              </PaginationItem>
+                              <PaginationItem>
+                                <div className="flex h-9 items-center rounded-md border px-3 text-sm font-medium">
+                                  {jobsPage} / {jobsTotalPages}
+                                </div>
+                              </PaginationItem>
+                              <PaginationItem>
+                                <PaginationNext
+                                  href="#"
+                                  onClick={(event) => {
+                                    event.preventDefault()
+                                    setJobsPage((prev) => Math.min(jobsTotalPages, prev + 1))
+                                  }}
+                                  className={jobsPage === jobsTotalPages ? "pointer-events-none opacity-50" : undefined}
+                                />
+                              </PaginationItem>
+                            </PaginationContent>
+                          </Pagination>
+                        </div>
+                      )}
                         <p className="font-semibold text-sm">{app.worker?.fullName || "Ứng viên"}</p>
                         <p className="text-xs text-muted-foreground">{app.worker?.phoneNumber || "Không có SĐT"}</p>
                       </div>
