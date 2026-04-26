@@ -19,7 +19,8 @@ export interface Job {
   farmerProfileId: string;
   contactName: string;
   jobSkillRequirements: JobSkillRequirement[];
-  jobCategory: JobCategory;
+  jobCategory?: JobCategory | null;
+  jobCategoryId?: string;
   title: string;
   description: string;
   farm: GetFarmResponse;

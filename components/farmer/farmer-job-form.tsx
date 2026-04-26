@@ -203,6 +203,26 @@ const extractEditableDescription = (rawDescription: string) => {
     .trim()
 }
 
+const resolveJobCategoryId = (job: Job | null | undefined) => {
+  if (!job) {
+    return DEFAULT_JOB_CATEGORY_ID
+  }
+
+  const directCategoryId = job.jobCategoryId?.trim()
+
+  if (directCategoryId) {
+    return directCategoryId
+  }
+
+  const nestedCategoryId = job.jobCategory?.id?.trim()
+
+  if (nestedCategoryId) {
+    return nestedCategoryId
+  }
+
+  return DEFAULT_JOB_CATEGORY_ID
+}
+
 export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
   const router = useRouter()
   const { toast } = useToast()
@@ -592,7 +612,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
         setBenefits(existingJob.privileges?.length ? existingJob.privileges : ["Bao ăn"])
         rememberSkillLabels(existingJob.jobSkillRequirements ?? [])
         setSelectedSkillIds((existingJob.jobSkillRequirements ?? []).map((skill) => skill.id).filter(Boolean))
-        setSelectedJobCategoryId(existingJob.jobCategory?.id ?? DEFAULT_JOB_CATEGORY_ID)
+        setSelectedJobCategoryId(resolveJobCategoryId(existingJob))
         setSelectedFarmId(existingJob.farm?.farmId || (existingJob.farm as any)?.id || DEFAULT_FARM_ID)
         setIsUrgent(Boolean(existingJob.isUrgent))
 
@@ -697,6 +717,17 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
           const firstFarm = fetchedFarms[0]
           return firstFarm?.farmId || (firstFarm as any)?.id || DEFAULT_FARM_ID
         })
+
+        if (!isEditMode) {
+          const firstFarm = fetchedFarms[0]
+
+          if (firstFarm?.address) {
+            setLocation((currentLocation) => (currentLocation.trim() ? currentLocation : firstFarm.address))
+          }
+
+          setLocationLat((currentLat) => (currentLat === undefined ? firstFarm?.latitude : currentLat))
+          setLocationLng((currentLng) => (currentLng === undefined ? firstFarm?.longitude : currentLng))
+        }
       } catch (error) {
         console.error(error)
         setFarms([])
@@ -1221,7 +1252,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
     setBenefits(draft.privileges?.length ? draft.privileges : ["Bao ăn"])
     rememberSkillLabels(draft.jobSkillRequirements ?? [])
     setSelectedSkillIds((draft.jobSkillRequirements ?? []).map((s) => s.id).filter(Boolean))
-    setSelectedJobCategoryId(draft.jobCategory?.id ?? DEFAULT_JOB_CATEGORY_ID)
+    setSelectedJobCategoryId(resolveJobCategoryId(draft))
     setSelectedFarmId(draft.farm?.farmId || (draft.farm as any)?.id || DEFAULT_FARM_ID)
     setIsUrgent(Boolean(draft.isUrgent))
     setDailyStartTime(draft.startTime?.slice(0, 5) ?? "09:00")
