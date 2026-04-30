@@ -236,7 +236,7 @@ export default function FarmerProfilePage() {
                 setIsLoading(true);
                 const response = await farmerService.getProfile();
                 setProfile(response.data);
-                
+
                 // Fetch default farm info
                 if (response.data.mainFarmId) {
                     const farmResponse = await FarmService.getFarm(response.data.mainFarmId);
@@ -367,7 +367,7 @@ export default function FarmerProfilePage() {
                             Địa chỉ & Khác
                         </CardTitle>
                         <CardDescription>Vị trí đất nông nghiệp chính</CardDescription>
-                        
+
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid gap-1">
@@ -385,7 +385,7 @@ export default function FarmerProfilePage() {
                                 <span className="text-sm font-medium text-slate-500">Loại hình</span>
                                 <span className="text-base text-slate-900"> {defaultFarmInfo?.farmType === 1 ? "Chăn nuôi" : defaultFarmInfo?.farmType === 2 ? "Trồng trọt" : "Nuôi trồng thủy hải sản"}</span>
                             </div>
-                         
+
                             <div className="grid gap-1">
                                 <span className="text-sm font-medium text-slate-500">Số lượng vật nuôi</span>
                                 <span className="text-base text-slate-900">
@@ -646,14 +646,13 @@ export default function FarmerProfilePage() {
                             <Input
                                 placeholder="Nhập tối thiểu 2 ký tự tên bài đăng"
                                 value={jobSearchKeyword}
-                                onChange={(event) =>
-                                    {
-                                        const value = event.target.value;
-                                        setJobSearchKeyword(value);
-                                        setJobSearchPage(1);
-                                        setNewDisputeForm((prev) => ({ ...prev, jobPostId: "", jobPostTitle: "", workerId: "" }));
-                                        setSelectedJobWorkers([]);
-                                    }
+                                onChange={(event) => {
+                                    const value = event.target.value;
+                                    setJobSearchKeyword(value);
+                                    setJobSearchPage(1);
+                                    setNewDisputeForm((prev) => ({ ...prev, jobPostId: "", jobPostTitle: "", workerId: "" }));
+                                    setSelectedJobWorkers([]);
+                                }
                                 }
                             />
 
@@ -679,7 +678,7 @@ export default function FarmerProfilePage() {
                                                     setNewDisputeForm((prev) => ({ ...prev, jobPostId: job.id, jobPostTitle: job.title || "", workerId: "" }));
                                                     setJobSearchKeyword(job.title || "");
                                                     setJobSearchResults([]);
-                                                    
+
                                                     try {
                                                         const response = await jobService.getJobDetail(job.id);
                                                         setSelectedJobWorkers(response.data.workers || []);

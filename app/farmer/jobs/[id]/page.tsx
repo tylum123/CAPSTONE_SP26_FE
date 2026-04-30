@@ -873,13 +873,21 @@ export default function FarmerJobDetailPage() {
       return 0
     }
 
-    const selectedDaysCount = Array.isArray(job.selectedDays) ? job.selectedDays.length : 0
-    if (selectedDaysCount <= 0) {
+    const dayCount = Array.isArray(job.jobPostDays) ? job.jobPostDays.length : 0
+    if (dayCount <= 0) {
       return job.workersNeeded
     }
 
-    return Math.ceil(job.workersNeeded / selectedDaysCount)
+    const totalWorkersNeeded = job.jobPostDays?.reduce((sum, day) => sum + day.workersNeeded, 0) ?? job.workersNeeded
+    return Math.ceil(totalWorkersNeeded / dayCount)
   }, [job])
+
+  const getWorkersNeededForDate = (dateStr: string) => {
+    if (!job || !job.jobPostDays || job.jobPostDays.length === 0) return job?.workersNeeded || 1;
+    const targetDate = dateStr.split("T")[0];
+    const match = job.jobPostDays.find(d => d.workDate.split("T")[0] === targetDate);
+    return match ? match.workersNeeded : (job.workersNeeded || 1);
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -1081,8 +1089,8 @@ export default function FarmerJobDetailPage() {
                               </span>
                               <div className="flex items-center gap-2">
                                 <Users className="h-4 w-4 text-emerald-500 shrink-0" />
-                                <span className={`text-sm font-bold ${dayData.acceptedWorkerCount >= workersNeededPerDay ? "text-emerald-600" : "text-amber-600"}`}>
-                                  {dayData.acceptedWorkerCount}/{workersNeededPerDay}
+                                <span className={`text-sm font-bold ${dayData.acceptedWorkerCount >= getWorkersNeededForDate(dayData.date) ? "text-emerald-600" : "text-amber-600"}`}>
+                                  {dayData.acceptedWorkerCount}/{getWorkersNeededForDate(dayData.date)}
                                 </span>
                                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
                               </div>

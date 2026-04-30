@@ -60,7 +60,7 @@ const formatRelativeDate = (dateStr: string) => {
 
 const getScheduleLabel = (job: Job) => {
   if (job.jobTypeId === 2) {
-    const days = job.selectedDays?.length ?? 0
+    const days = job.jobPostDays?.length ?? 0
     return `${days} ngày • ${job.startTime?.slice(0, 5) ?? "?"} - ${job.endTime?.slice(0, 5) ?? "?"}`
   }
   return `${job.startDate ?? "?"} → ${job.endDate ?? "?"}`

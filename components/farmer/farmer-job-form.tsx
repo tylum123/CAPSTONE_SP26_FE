@@ -246,6 +246,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
   const [description, setDescription] = useState("")
   const [income, setIncome] = useState("")
   const [workersNeeded, setWorkersNeeded] = useState("1")
+  const [dailyWorkersNeededMap, setDailyWorkersNeededMap] = useState<Record<string, string>>({})
   const [location, setLocation] = useState("")
   const [locationLat, setLocationLat] = useState<number | undefined>(undefined)
   const [locationLng, setLocationLng] = useState<number | undefined>(undefined)
@@ -322,7 +323,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    title, description, income, workersNeeded, location,
+    title, description, income, workersNeeded, dailyWorkersNeededMap, location,
     requirements, benefits, selectedSkillIds, selectedFarmId,
     selectedJobCategoryId, scheduleType, contractStartDate, contractEndDate,
     selectedDailyDates, dailyStartTime, dailyEndTime, isUrgent,
@@ -626,9 +627,9 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
           setContractStartDate("")
           setContractEndDate("")
 
-          const selectedDates = (existingJob.selectedDays ?? [])
+          const selectedDates = (existingJob.jobPostDays ?? [])
             .map((item) => {
-              const date = new Date(item)
+              const date = new Date(item.workDate)
               if (Number.isNaN(date.getTime())) {
                 return null
               }
@@ -637,7 +638,18 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
             .filter((item): item is Date => item instanceof Date)
 
           setSelectedDailyDates(selectedDates)
-          setWorkersNeeded(String(toDailyWorkersPerDay(existingJob.workersNeeded, selectedDates.length)))
+          const initialDailyWorkersNeeded: Record<string, string> = {}
+          const dailyWorkerCounts = (existingJob.jobPostDays ?? []).map((day) => {
+            const dateStr = day.workDate.split("T")[0]
+            initialDailyWorkersNeeded[dateStr] = String(Math.max(1, day.workersNeeded ?? 1))
+            return day.workersNeeded
+          })
+          setDailyWorkersNeededMap(initialDailyWorkersNeeded)
+
+          const maxWorkersNeeded = dailyWorkerCounts.length
+            ? Math.max(...dailyWorkerCounts)
+            : existingJob.workersNeeded
+          setWorkersNeeded(String(Math.max(1, maxWorkersNeeded)))
         } else {
           setScheduleType("contract")
           setSelectedDailyDates([])
@@ -1015,12 +1027,24 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
 
     const jobTypeId = scheduleType === "daily" ? JOB_TYPE_DAILY_ID : JOB_TYPE_CONTRACT_ID
 
-    const selectedDaysForPayload =
+    const jobPostDaysForPayload =
       scheduleType === "daily"
-        ? normalizedSelectedDailyDates.map((date) => toDateOnlyFromDate(date))
+        ? normalizedSelectedDailyDates.map((date) => {
+            const dateStr = toDateOnlyFromDate(date)
+            const neededStr = dailyWorkersNeededMap[dateStr]
+            const needed = neededStr ? Number.parseInt(neededStr, 10) : Number.parseInt(workersNeeded, 10) || 1
+            return {
+              workDate: dateStr,
+              workersNeeded: !isNaN(needed) && needed > 0 ? needed : 1,
+            }
+          })
         : []
+        
+    const maxDailyNeeded = jobPostDaysForPayload.length 
+      ? Math.max(...jobPostDaysForPayload.map(d => d.workersNeeded))
+      : 1
     const workersNeededForPayload = scheduleType === "daily"
-      ? Math.max(1, workersNeededNumber)
+      ? Math.max(1, maxDailyNeeded)
       : Math.max(1, workersNeededNumber || 1)
 
     const payload: UpdateJobRequest = {
@@ -1035,7 +1059,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       endDate,
       startTime,
       endTime,
-      selectedDays: selectedDaysForPayload,
+      jobPostDays: jobPostDaysForPayload,
       requirements,
       privileges: benefits,
       wageAmount: incomeNumber,
@@ -1061,7 +1085,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       const savedJobUnitIncome = savedJob.wageAmount ?? incomeNumber
       const savedJobDailyDaysCount =
         scheduleType === "daily"
-          ? ((savedJob.selectedDays?.length ?? 0) > 0 ? savedJob.selectedDays.length : selectedDailyDaysCount)
+          ? ((savedJob.jobPostDays?.length ?? 0) > 0 ? savedJob.jobPostDays.length : selectedDailyDaysCount)
           : 1
       const savedJobWorkersNeeded =
         scheduleType === "daily"
@@ -1196,9 +1220,12 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       endDate,
       startTime,
       endTime,
-      selectedDays:
+      jobPostDays:
         scheduleType === "daily"
-          ? normalizedSelectedDailyDates.map((d) => toDateOnlyFromDate(d))
+          ? normalizedSelectedDailyDates.map((d) => ({
+            workDate: toDateOnlyFromDate(d),
+            workersNeeded: Math.max(1, workersNeededNumber || 1),
+          }))
           : [],
       requirements,
       privileges: benefits,
@@ -1262,11 +1289,18 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
       setScheduleType("daily")
       setContractStartDate("")
       setContractEndDate("")
-      const dates = (draft.selectedDays ?? [])
-        .map((d) => { const dd = new Date(d); return Number.isNaN(dd.getTime()) ? null : startOfDay(dd) })
+      const draftDays = draft.jobPostDays?.length
+        ? draft.jobPostDays.map((day) => day.workDate)
+        : (draft as any).selectedDays ?? []
+      const dates = draftDays
+        .map((d: string) => { const dd = new Date(d); return Number.isNaN(dd.getTime()) ? null : startOfDay(dd) })
         .filter((d): d is Date => d !== null)
       setSelectedDailyDates(dates)
-      setWorkersNeeded(String(toDailyWorkersPerDay(draft.workersNeeded, dates.length)))
+      const draftDayWorkers = draft.jobPostDays?.map((day) => day.workersNeeded) ?? []
+      const maxWorkersNeeded = draftDayWorkers.length
+        ? Math.max(...draftDayWorkers)
+        : toDailyWorkersPerDay(draft.workersNeeded, dates.length)
+      setWorkersNeeded(String(Math.max(1, maxWorkersNeeded)))
     } else {
       setScheduleType("contract")
       setSelectedDailyDates([])
@@ -1713,7 +1747,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                   {scheduleType === "contract" ? (
                     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
                       <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase text-muted-foreground">Khoảng thời gian</Label>
+                        <Label className="text-xs font-bold uppercase text-muted-foreground">Khoảng thời gian <span className="text-destructive">*</span></Label>
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button
@@ -1743,17 +1777,17 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
 
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="space-y-2">
-                          <Label className="text-xs font-bold uppercase text-muted-foreground">Ngày bắt đầu</Label>
+                          <Label className="text-xs font-bold uppercase text-muted-foreground">Ngày bắt đầu <span className="text-destructive">*</span></Label>
                           <Input value={contractStartDate} placeholder="dd/mm/yyyy" readOnly className="bg-muted/30" />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-xs font-bold uppercase text-muted-foreground">Ngày kết thúc</Label>
+                          <Label className="text-xs font-bold uppercase text-muted-foreground">Ngày kết thúc <span className="text-destructive">*</span></Label>
                           <Input value={contractEndDate} placeholder="dd/mm/yyyy" readOnly className="bg-muted/30" />
                         </div>
                       </div>
                       <div className="space-y-2 border-t pt-4">
                         <div className="flex justify-between text-sm">
-                          <span>Tiền công</span>
+                          <span>Tiền công <span className="text-destructive">*</span></span>
                         </div>
                         <div className="relative">
                           <Input
@@ -1812,14 +1846,35 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
 
                         <div className="space-y-2 border-t pt-4">
                           <Label className="flex justify-between">
-                            <span>Số lượng nhân công</span>
+                            <span>Số lượng nhân công mỗi ngày <span className="text-destructive">*</span></span>
                           </Label>
-                          <Input type="number" min="1" value={workersNeeded} onChange={(e) => setWorkersNeeded(e.target.value)} />
+                          {normalizedSelectedDailyDates.length === 0 ? (
+                            <div className="text-sm text-muted-foreground italic py-2">Vui lòng chọn ngày trên lịch</div>
+                          ) : (
+                            <div className="max-h-[200px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                              {normalizedSelectedDailyDates.map((date) => {
+                                const dateStr = toDateOnlyFromDate(date);
+                                const currentVal = dailyWorkersNeededMap[dateStr] !== undefined ? dailyWorkersNeededMap[dateStr] : workersNeeded;
+                                return (
+                                  <div key={dateStr} className="flex items-center justify-between gap-3 p-2 rounded-md bg-background border">
+                                    <span className="text-sm font-medium">{date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
+                                    <Input 
+                                      type="number" 
+                                      min="1" 
+                                      value={currentVal} 
+                                      onChange={(e) => setDailyWorkersNeededMap(prev => ({...prev, [dateStr]: e.target.value}))}
+                                      className="w-20 h-8 text-center" 
+                                    />
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
                         </div>
 
                         <div className="space-y-2 border-t pt-4">
                           <div className="flex justify-between text-sm">
-                            <span>Đơn giá</span>
+                            <span>Đơn giá <span className="text-destructive">*</span></span>
                           </div>
                           <div className="relative">
                             <Input
@@ -1828,7 +1883,7 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                               value={income}
                               onChange={(e) => setIncome(formatThousandsWithDots(e.target.value))}
                               className="pr-12 text-lg font-medium text-teal-700 dark:text-teal-400"
-                              placeholder="300.000"
+                              placeholder="Điền số tiền bạn muốn"
                             />
                             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">VNĐ</span>
                           </div>
@@ -2237,7 +2292,16 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                     </div>
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Nhân công</p>
-                      <div className="flex items-center text-xl font-bold"><Users className="mr-2 h-5 w-5 text-amber-500" /> {workersNeededNumber} người/ngày</div>
+                      <div className="flex items-center text-xl font-bold"><Users className="mr-2 h-5 w-5 text-amber-500" /> {scheduleType === "daily" ? (normalizedSelectedDailyDates.length > 0 ? (() => {
+                        const dailyWorkersArr = normalizedSelectedDailyDates.map(date => {
+                          const dateStr = toDateOnlyFromDate(date)
+                          const neededStr = dailyWorkersNeededMap[dateStr]
+                          return neededStr ? Number.parseInt(neededStr, 10) : Number.parseInt(workersNeeded, 10) || 1
+                        });
+                        const min = Math.min(...dailyWorkersArr);
+                        const max = Math.max(...dailyWorkersArr);
+                        return min === max ? `${max} người/ngày` : `${min}-${max} người/ngày`;
+                      })() : `${workersNeededNumber} người/ngày`) : `${workersNeededNumber} người`}</div>
                     </div>
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Khu vực</p>
@@ -2248,7 +2312,11 @@ export function FarmerJobForm({ mode = "create", jobId }: FarmerJobFormProps) {
                   <div className="flex items-center justify-between bg-agro-green p-6 rounded-2xl text-white shadow-xl shadow-agro-green/20">
                     <div>
                       <p className="text-[10px] font-bold uppercase opacity-80 mb-1">Tổng chi phí dự tính</p>
-                      <p className="text-2xl font-black">{formatCurrency(scheduleType === "contract" ? incomeNumber : incomeNumber * workersNeededNumber * selectedDailyDaysCount)}</p>
+                      <p className="text-2xl font-black">{formatCurrency(scheduleType === "contract" ? incomeNumber : incomeNumber * normalizedSelectedDailyDates.reduce((sum, date) => {
+                        const dateStr = toDateOnlyFromDate(date)
+                        const neededStr = dailyWorkersNeededMap[dateStr]
+                        return sum + (neededStr ? Number.parseInt(neededStr, 10) : Number.parseInt(workersNeeded, 10) || 1)
+                      }, 0))}</p>
                     </div>
                     <div className="bg-white/20 p-3 rounded-xl">
                       <div className="h-8 w-8 text-white font-bold flex items-center">VNĐ</div>

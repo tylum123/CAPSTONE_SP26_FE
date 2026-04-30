@@ -43,7 +43,11 @@ export interface ApplicationJobPostDTO {
   address: string;
   startDate: string;
   endDate: string;
-  selectedDays: string[];
+  jobPostDays?: Array<{
+    workDate: string;
+    workersNeeded: number;
+    workersAccepted: number;
+  }>;
   startTime: string;
   endTime: string;
   workersNeeded: number;

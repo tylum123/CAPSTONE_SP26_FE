@@ -5,6 +5,12 @@ export interface JobSkillRequirement {
   name: string;
 }
 
+export interface JobPostDayDTO {
+  workDate: string;
+  workersNeeded: number;
+  workersAccepted: number;
+}
+
 export enum JobPostStatus {
   Draft = 1,
   Published = 2,
@@ -27,7 +33,7 @@ export interface Job {
   address: string;
   startDate: string;
   endDate: string;
-  selectedDays: string[];
+  jobPostDays?: JobPostDayDTO[];
   startTime: string;
   endTime: string;
   workersNeeded: number;
@@ -76,7 +82,10 @@ export interface CreateJobRequest {
   address: string;
   startDate: string;
   endDate: string;
-  selectedDays?: string[];
+  jobPostDays?: Array<{
+    workDate: string;
+    workersNeeded: number;
+  }>;
   startTime: string;
   endTime: string;
   skillIds: string[];
