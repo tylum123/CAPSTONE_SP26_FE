@@ -48,8 +48,8 @@ export const jobService = {
         return response.data;
     },
 
-    getDrafts: async (): Promise<ApiResponse<Job[]>> => {
-        const response = await axiosInstance.get(API_ENDPOINTS.JOBS.GET_DRAFTS);
+    getDrafts: async (params?: {jobType?: number}): Promise<ApiResponse<Job[]>> => {
+        const response = await axiosInstance.get(API_ENDPOINTS.JOBS.GET_DRAFTS, { params });
         return response.data;
     },
 
@@ -69,6 +69,8 @@ export const jobService = {
         category?: string;
         address?: string;
         skill?: string[];
+        jobType?: number;
+        jobPostStatus?: JobPostStatus;
         page?: number;
         limit?: number;
         sortByDatesDescending: boolean;

@@ -11,7 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {
+import {  
   Dialog,
   DialogContent,
   DialogDescription,
@@ -28,7 +28,9 @@ import { useToast } from "@/hooks/use-toast"
 import { useProvinces } from "@/hooks/use-provinces"
 import { handleApiError } from "@/libs/utils/error-handler"
 import { FarmService } from "@/libs/api/services/farm.service"
-import type { GetFarmResponse, UpdateFarmRequest } from "@/libs/types"
+import { jobCategoryService } from "@/libs/api/services/job-category.service"
+import type { GetFarmResponse, UpdateFarmRequest, JobCategory } from "@/libs/types"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, MapPin, Pencil, Plus, Star, Trash2, X, UploadCloud, Eye, ChevronDown, PlusCircleIcon, MapPinIcon } from "lucide-react"
 import Image from "next/image"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@radix-ui/react-collapsible"
@@ -46,7 +48,7 @@ type FarmFormState = {
   ward: string
   detailedAddress: string
   locationName: string
-  farmType: number
+  farmTypeId: string
   livestockCount: number
   areaSize: number
   isPrimary: boolean
@@ -77,7 +79,7 @@ const EMPTY_FORM: FarmFormState = {
   ward: "",
   detailedAddress: "",
   locationName: "",
-  farmType: 2, // 2 = Crop by default
+  farmTypeId: "",
   livestockCount: 0,
   areaSize: 0,
   isPrimary: false,
@@ -96,7 +98,7 @@ function toFormState(farm: GetFarmResponse): FarmFormState {
     ward: "",
     detailedAddress: farm.address, // Populate for form
     locationName: farm.locationName,
-    farmType: farm.farmType || 2,
+    farmTypeId: farm.farmTypeId || "",
     livestockCount: farm.livestockCount || 0,
     areaSize: farm.areaSize || 0,
     isPrimary: farm.isPrimary,
@@ -184,6 +186,26 @@ export function FarmerFarmManager() {
   const [isDraggingImage, setIsDraggingImage] = useState(false)
   const [dragStartX, setDragStartX] = useState(0)
   const [dragStartY, setDragStartY] = useState(0)
+
+  const [jobCategories, setJobCategories] = useState<JobCategory[]>([])
+  const [isLoadingJobCategories, setIsLoadingJobCategories] = useState(true)
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setIsLoadingJobCategories(true)
+        const response = await jobCategoryService.getJobCategories()
+        const payload = response.data as JobCategory[] | { data?: JobCategory[] }
+        const fetchedCategories = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : [])
+        setJobCategories(fetchedCategories.filter((category) => category.isActive !== false))
+      } catch (error) {
+        console.error("Failed to load job categories", error)
+      } finally {
+        setIsLoadingJobCategories(false)
+      }
+    }
+    loadCategories()
+  }, [])
 
   const clearPendingImages = () => {
     pendingImages.forEach((pendingImage) => {
@@ -557,7 +579,7 @@ export function FarmerFarmManager() {
       latitude,
       longitude,
       locationName: formData.locationName.trim(),
-      farmType: formData.farmType,
+      farmTypeId: formData.farmTypeId,
       livestockCount: Number(formData.livestockCount) || 0,
       areaSize: Number(formData.areaSize) || 0,
       isPrimary: formData.isPrimary,
@@ -675,17 +697,17 @@ export function FarmerFarmManager() {
                         <p className="text-sm text-muted-foreground">{farm.address}</p>
                         <div className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-2 mt-1">
                           <span className="flex items-center gap-1.5 line-clamp-1">
-                            <span className="font-medium text-foreground">Loại:</span> {farm.farmType === 1 ? "Chăn nuôi" : farm.farmType === 2 ? "Trồng trọt" : "Nuôi trồng thủy hải sản"}
+                            <span className="font-medium text-foreground">Loại:</span> {farm.farmTypeName || "Chưa xác định"}
                           </span>
-                          {farm.farmType === 2 || farm.farmType === 3 ? (
+                          {(farm.areaSize ?? 0) > 0 ? (
                             <span className="flex items-center gap-1.5 line-clamp-1">
-                              <span className="font-medium text-foreground">Diện tích:</span> {farm.areaSize ? `${farm.areaSize} m²` : "Không có"}
+                              <span className="font-medium text-foreground">Diện tích:</span> {farm.areaSize} m²
                             </span>
-                          ) : (
+                          ) : (farm.livestockCount ?? 0) > 0 ? (
                             <span className="flex items-center gap-1.5 line-clamp-1">
-                              <span className="font-medium text-foreground">Vật nuôi:</span> {farm.livestockCount ? `${farm.livestockCount} con` : "0 con"}
+                              <span className="font-medium text-foreground">Vật nuôi:</span> {farm.livestockCount} con
                             </span>
-                          )}
+                          ) : null}
                         </div>
                         <div className="grid gap-1 text-xs text-muted-foreground/70 sm:grid-cols-2 mt-2 pt-2 border-t">
                           <span>Vĩ độ: {farm.latitude}</span>
@@ -763,45 +785,33 @@ export function FarmerFarmManager() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Lĩnh vực canh tác</Label>
-                    <div className="flex gap-2 w-full">
-                      <Button
-                        type="button"
-                        variant={formData.farmType === 2 ? "default" : "outline"}
-                        className={`flex-1 min-w-0 ${formData.farmType === 2 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
-                        onClick={() => {
-                          handleFieldChange("farmType", 2)
-                          handleFieldChange("livestockCount", 0)
-                        }}
-                      >
-                        Trồng trọt
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={formData.farmType === 1 ? "default" : "outline"}
-                        className={`flex-1 min-w-0 ${formData.farmType === 1 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
-                        onClick={() => {
-                          handleFieldChange("farmType", 1)
-                          handleFieldChange("areaSize", 0)
-                        }}
-                      >
-                        Chăn nuôi
-                      </Button>
-                    </div>
-                    <Button
-                      type="button"
-                      variant={formData.farmType === 3 ? "default" : "outline"}
-                      className={`flex-1 min-w-0 w-full mt-2 ${formData.farmType === 3 ? "bg-agro-green text-white hover:bg-agro-green-dark" : ""}`}
-                      onClick={() => {
-                        handleFieldChange("farmType", 3)
-                        handleFieldChange("livestockCount", 0)
-                      }}
+                    <Select
+                      value={formData.farmTypeId}
+                      onValueChange={(value) => handleFieldChange("farmTypeId", value)}
                     >
-                      Nuôi trồng thủy hải sản
-                    </Button>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Chọn lĩnh vực canh tác" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {isLoadingJobCategories ? (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          </div>
+                        ) : jobCategories.length > 0 ? (
+                          jobCategories.map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-sm text-muted-foreground text-center">Không có dữ liệu</div>
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  {/* Field logic: Crop (2) and Aquaculture (3) use areaSize, Livestock (1) uses livestockCount */}
-                  {formData.farmType === 1 ? (
+                  {/* Field logic: Chăn nuôi uses livestockCount, otherwise areaSize */}
+                  {jobCategories.find((c) => c.id === formData.farmTypeId)?.name.toLowerCase().includes("chăn nuôi") ? (
                     <div className="space-y-2">
                       <Label htmlFor="livestockCount">Số lượng (con)</Label>
                       <Input
@@ -1087,19 +1097,19 @@ export function FarmerFarmManager() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <span className="text-muted-foreground block mb-1">Loại:</span>
-                    <p className="font-medium text-base">{viewingFarmDetails.farmType === 1 ? "Chăn nuôi" : viewingFarmDetails.farmType === 2 ? "Trồng trọt" : "Nuôi trồng thủy hải sản"}</p>
+                    <p className="font-medium text-base">{viewingFarmDetails.farmTypeName || "Chưa xác định"}</p>
                   </div>
-                  {viewingFarmDetails.farmType === 2 || viewingFarmDetails.farmType === 3 ? (
+                  {(viewingFarmDetails.areaSize ?? 0) > 0 ? (
                     <div>
                       <span className="text-muted-foreground block mb-1">Diện tích:</span>
-                      <p className="font-medium text-base">{viewingFarmDetails.areaSize ? `${viewingFarmDetails.areaSize} m²` : "Không có"}</p>
+                      <p className="font-medium text-base">{viewingFarmDetails.areaSize} m²</p>
                     </div>
-                  ) : (
+                  ) : (viewingFarmDetails.livestockCount ?? 0) > 0 ? (
                     <div>
                       <span className="text-muted-foreground block mb-1">Số lượng vật nuôi:</span>
-                      <p className="font-medium text-base">{viewingFarmDetails.livestockCount ? `${viewingFarmDetails.livestockCount} con` : "0 con"}</p>
+                      <p className="font-medium text-base">{viewingFarmDetails.livestockCount} con</p>
                     </div>
-                  )}
+                  ) : null}
                   <div>
                     <span className="text-muted-foreground block mb-1">Trạng thái:</span>
                     <p className="font-medium text-base">{viewingFarmDetails.isPrimary ? "Địa điểm mặc định" : "Bình thường"}</p>

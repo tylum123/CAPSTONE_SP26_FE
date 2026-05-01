@@ -449,11 +449,11 @@ export function AdminJobs() {
                       <JobInfoCard label="Giờ bắt đầu" value={selectedJob.startTime || "-"} />
                       <JobInfoCard label="Giờ kết thúc" value={selectedJob.endTime || "-"} />
                     </div>
-                    {Array.isArray(selectedJob.selectedDays) && selectedJob.selectedDays.length > 0 && (
+                    {Array.isArray(selectedJob.jobPostDays) && selectedJob.jobPostDays.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
-                        {selectedJob.selectedDays.map((d: string) => (
-                          <span key={d} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full font-medium">
-                            {d}
+                        {selectedJob.jobPostDays.map((day) => (
+                          <span key={day.workDate} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full font-medium">
+                            {day.workDate}
                           </span>
                         ))}
                       </div>

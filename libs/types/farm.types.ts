@@ -1,16 +1,10 @@
-export enum FarmTypes {
-  Aquaculture = 'Nuôi trồng thủy hải sản',
-  Crop = 'Trồng trọt',
-  Livestock = 'Chăn nuôi',
-}
-
 export interface UpdateFarmRequest {
   address: string,
   latitude: number,
   longitude: number,
   locationName: string,
   imageUrl: string[],
-  farmType: number,
+  farmTypeId: string,
   livestockCount: number,
   areaSize: number,
   isPrimary: boolean,
@@ -24,8 +18,8 @@ export interface GetFarmResponse {
   longitude: number,
   locationName: string,
   imageUrl: string[],
-  farmType: number,
-  farmTypeName: FarmTypes,
+  farmTypeId: string,
+  farmTypeName: string,
   livestockCount: number,
   areaSize: number,
   isPrimary: boolean,

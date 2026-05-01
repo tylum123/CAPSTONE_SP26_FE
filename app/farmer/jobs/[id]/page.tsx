@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Banknote, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, Clock, FileText, InfoIcon, MailIcon, MapPin, MessageSquare, Play, RotateCw, Star, Users, XCircle, Paperclip, MessageCircleIcon } from "lucide-react"
+import { ArrowLeft, Banknote, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, Clock, FileText, InfoIcon, MailIcon, MapPin, MessageSquare, Play, RotateCw, Star, Users, XCircle, Paperclip, MessageCircleIcon, ArrowDownUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -190,10 +190,11 @@ export default function FarmerJobDetailPage() {
   const router = useRouter()
   const jobId = Array.isArray(params?.id) ? params.id[0] : params?.id
 
-  const [applicationFilter, setApplicationFilter] = useState<"all" | "approved" | "cancelled">("all")
+  const [applicationFilter, setApplicationFilter] = useState<"all" | "pending" | "approved" | "cancelled">("all")
   const [job, setJob] = useState<Job | null>(null)
   const [applications, setApplications] = useState<ApplicationDTO[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isReloading, setIsReloading] = useState(false)
   const [isLoadingApplications, setIsLoadingApplications] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [applicationsError, setApplicationsError] = useState<string | null>(null)
@@ -212,6 +213,8 @@ export default function FarmerJobDetailPage() {
   const [isCompleteJobDialogOpen, setIsCompleteJobDialogOpen] = useState(false)
   const [jobDetails, setJobDetails] = useState<JobDetail[]>([])
   const [isLoadingJobDetails, setIsLoadingJobDetails] = useState(false)
+  const [jobDetailStatusFilter, setJobDetailStatusFilter] = useState<"all" | "in-progress" | "reported" | "completed">("all")
+  const [jobDetailOrderFilter, setJobDetailOrderFilter] = useState<"newest" | "oldest">("newest")
   const [selectedJobDetail, setSelectedJobDetail] = useState<JobDetail | null>(null)
   const [isJobDetailDialogOpen, setIsJobDetailDialogOpen] = useState(false)
   const [isApprovingDetail, setIsApprovingDetail] = useState(false)
@@ -220,6 +223,7 @@ export default function FarmerJobDetailPage() {
   const [isLoadingSingleJobDetail, setIsLoadingSingleJobDetail] = useState(false)
   const [applicationsPage, setApplicationsPage] = useState(1)
   const [applicationsTotalPages, setApplicationsTotalPages] = useState(1)
+  const applicationsPageSize = 4
   const [jobDetailsPage, setJobDetailsPage] = useState(1)
   const [jobDetailsTotalPages, setJobDetailsTotalPages] = useState(1)
   const [autoAcceptingId, setAutoAcceptingId] = useState<string | null>(null)
@@ -400,15 +404,16 @@ export default function FarmerJobDetailPage() {
     }
   }
 
-  const loadApplications = async (currentJobId: string, page: number = 1) => {
+  const loadApplications = async (currentJobId: string, page: number = 1, statusId?: number) => {
     try {
       setIsLoadingApplications(true)
       setApplicationsError(null)
 
       const response = await jobApplicationService.getJobApplicationsByPost(currentJobId, {
-        includeAll: true,
-        limit: 5,
+        limit: 4,
         page: page,
+        statusId: statusId,
+        includeAll: true,
       })
 
       setApplications(response.data.data)
@@ -419,6 +424,37 @@ export default function FarmerJobDetailPage() {
       setApplications([])
     } finally {
       setIsLoadingApplications(false)
+    }
+  }
+
+  const loadJobDetails = async (currentJobId: string, page: number = 1) => {
+    try {
+      setIsLoadingJobDetails(true)
+
+      const jobStatus =
+        jobDetailStatusFilter === "in-progress"
+          ? "InProgress"
+          : jobDetailStatusFilter === "reported"
+            ? "Reported"
+            : jobDetailStatusFilter === "completed"
+              ? "Completed"
+              : undefined
+
+      const response = await jobDetailsService.getJobDetailsByPost(currentJobId, {
+        page,
+        limit: 4,
+        jobStatus,
+        orderByDescending: jobDetailOrderFilter === "newest",
+      })
+
+      setJobDetails(response.data.data)
+      setJobDetailsTotalPages(response.data.pagination?.totalPages || 1)
+    } catch (err) {
+      console.error("Failed to fetch job details:", err)
+      setJobDetails([])
+      setJobDetailsTotalPages(1)
+    } finally {
+      setIsLoadingJobDetails(false)
     }
   }
 
@@ -564,12 +600,7 @@ export default function FarmerJobDetailPage() {
 
       // Refresh job detail in the list
       if (jobId) {
-        const response = await jobDetailsService.getJobDetailsByPost(jobId, {
-          page: jobDetailsPage,
-          limit: 5
-        })
-        setJobDetails(response.data.data)
-        setJobDetailsTotalPages(response.data.pagination?.totalPages || 1)
+        await loadJobDetails(jobId, jobDetailsPage)
       }
 
       // If the approved details fall on the last day of the job, mark job as Completed
@@ -613,6 +644,41 @@ export default function FarmerJobDetailPage() {
       setError("Không thể hủy bài đăng.")
     } finally {
       setIsCancelling(false)
+    }
+  }
+
+  const reloadJobPost = async () => {
+    if (!jobId) return
+    try {
+      setIsReloading(true)
+      setError(null)
+
+      // Reload job details
+      const jobResponse = await jobService.getJobDetail(jobId)
+      if (redirectIfDraftJob(jobResponse.data)) {
+        return
+      }
+      setJob(jobResponse.data)
+
+      // Reload applications
+      await loadApplications(jobId, 1)
+
+      // Reload workers per day
+      const workersResponse = await jobService.getWorkersPerDay(jobId)
+      setWorkersPerDay(workersResponse.data || [])
+
+      // Reload job details if job is in progress
+      if (jobResponse.data.statusId !== JOB_POST_STATUS.Draft &&
+        jobResponse.data.statusId !== JOB_POST_STATUS.Published &&
+        jobResponse.data.statusId !== JOB_POST_STATUS.Closed) {
+        await loadJobDetails(jobId, 1)
+        setJobDetailsPage(1)
+      }
+    } catch (err) {
+      console.error(err)
+      setError("Không thể tải lại dữ liệu. Vui lòng thử lại.")
+    } finally {
+      setIsReloading(false)
     }
   }
 
@@ -807,32 +873,26 @@ export default function FarmerJobDetailPage() {
       return
     }
 
-    void loadApplications(jobId, applicationsPage)
-  }, [jobId, applicationsPage])
+    let statusId: number | undefined
+    if (applicationFilter === "pending") statusId = APP_STATUS.pending
+    else if (applicationFilter === "approved") statusId = APP_STATUS.accepted
+    else if (applicationFilter === "cancelled") statusId = APP_STATUS.cancelled
+    
+    void loadApplications(jobId, applicationsPage, statusId)
+  }, [jobId, applicationsPage, applicationFilter])
 
   useEffect(() => {
     if (job && jobId &&
       job.statusId !== JOB_POST_STATUS.Draft &&
       job.statusId !== JOB_POST_STATUS.Published &&
       job.statusId !== JOB_POST_STATUS.Closed) {
-      const loadJobDetails = async () => {
-        try {
-          setIsLoadingJobDetails(true)
-          const response = await jobDetailsService.getJobDetailsByPost(jobId, {
-            page: jobDetailsPage,
-            limit: 5
-          })
-          setJobDetails(response.data.data)
-          setJobDetailsTotalPages(response.data.pagination?.totalPages || 1)
-        } catch (err) {
-          console.error("Failed to fetch job details:", err)
-        } finally {
-          setIsLoadingJobDetails(false)
-        }
-      }
-      void loadJobDetails()
+      void loadJobDetails(jobId, jobDetailsPage)
     }
-  }, [job, jobId, jobDetailsPage])
+  }, [job, jobId, jobDetailsPage, jobDetailStatusFilter, jobDetailOrderFilter])
+
+  useEffect(() => {
+    setJobDetailsPage(1)
+  }, [jobDetailStatusFilter, jobDetailOrderFilter])
 
   useEffect(() => {
     if (!jobId || job?.statusId !== JOB_POST_STATUS.Completed) {
@@ -860,26 +920,47 @@ export default function FarmerJobDetailPage() {
   }, [job?.statusId, jobId])
 
   const jobTypeLabel = job?.jobTypeId === 1 ? "Khoán" : job?.jobTypeId === 2 ? "Ngày" : "-"
-  const isPerPlotLastDay = Boolean(
-    job?.jobTypeId === 1 &&
-    job?.endDate &&
-    isToday(parseISO(job.endDate))
-  )
-  const isApprovalSectionDisabled = Boolean(
-    job?.statusId === JOB_POST_STATUS.Completed || isPerPlotLastDay
-  )
+
+  // For per-plot jobs (jobTypeId === 1) we only allow responding/approving
+  // the daily report that matches the job's end date. For other job types
+  // approval is allowed unless the job is Completed.
+  const isApprovalSectionDisabledFor = (detail?: JobDetail) => {
+    if (!job) return true
+    if (job.statusId === JOB_POST_STATUS.Completed) return true
+
+    // If this is a per-plot job, only allow approval on the report whose
+    // workDate equals the job's endDate.
+    if (job.jobTypeId === 1) {
+      if (!job.endDate || !detail?.workDate) return true
+      const end = new Date(job.endDate)
+      const work = new Date(detail.workDate)
+      end.setHours(0, 0, 0, 0)
+      work.setHours(0, 0, 0, 0)
+      return end.getTime() !== work.getTime()
+    }
+
+    return false
+  }
   const workersNeededPerDay = useMemo(() => {
     if (!job) {
       return 0
     }
 
-    const selectedDaysCount = Array.isArray(job.selectedDays) ? job.selectedDays.length : 0
-    if (selectedDaysCount <= 0) {
+    const dayCount = Array.isArray(job.jobPostDays) ? job.jobPostDays.length : 0
+    if (dayCount <= 0) {
       return job.workersNeeded
     }
 
-    return Math.ceil(job.workersNeeded / selectedDaysCount)
+    const totalWorkersNeeded = job.jobPostDays?.reduce((sum, day) => sum + day.workersNeeded, 0) ?? job.workersNeeded
+    return Math.ceil(totalWorkersNeeded / dayCount)
   }, [job])
+
+  const getWorkersNeededForDate = (dateStr: string) => {
+    if (!job || !job.jobPostDays || job.jobPostDays.length === 0) return job?.workersNeeded || 1;
+    const targetDate = dateStr.split("T")[0];
+    const match = job.jobPostDays.find(d => d.workDate.split("T")[0] === targetDate);
+    return match ? match.workersNeeded : (job.workersNeeded || 1);
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -897,6 +978,16 @@ export default function FarmerJobDetailPage() {
         <div className="flex gap-2">
           {job && (
             <>
+              <Button
+                variant="outline"
+                onClick={() => void reloadJobPost()}
+                disabled={isReloading}
+                className="bg-white/70 dark:bg-slate-900/70 border-slate-200 hover:bg-slate-50"
+              >
+                <RotateCw className={`h-4 w-4 ${isReloading ? "animate-spin" : ""}`} />
+                <span className="ml-2 hidden sm:inline">Tải lại</span>
+              </Button>
+
               {/* Show "Bắt đầu công việc" if enough applicants and status is Closed */}
               {job.workersAccepted >= job.workersNeeded && job.statusId === JOB_POST_STATUS.Closed && (
                 <Button
@@ -1004,54 +1095,51 @@ export default function FarmerJobDetailPage() {
             </div>
           </div>
 
-          <div className="grid gap-8 lg:grid-cols-3">
-            <div className="space-y-8 lg:col-span-2">
+          <div className="grid gap-8 lg:grid-cols-5">
+            <div className="space-y-8 lg:col-span-3">
               {/* Metrics Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Card className="border-0 shadow-sm bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm hover:shadow-md transition-shadow">
-                  <CardContent className="p-4 flex flex-col items-center text-center gap-1.5">
-                    <div className="p-2.5 rounded-full bg-emerald-100 text-emerald-600 mb-1">
-                      <Banknote className="h-5 w-5" />
+                  <CardContent className="p-3 flex flex-col items-center text-center gap-1">
+                    <div className="p-2 rounded-full bg-emerald-100 text-emerald-600 mb-0.5">
+                      <Banknote className="h-4 w-4" />
                     </div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Mức lương</p>
-                    <p className="text-xl font-bold text-emerald-600">{formatCurrency(job.wageAmount)}</p>
-                    <p className="text-[10px] text-muted-foreground">Lương được trả ở cuối {job.jobTypeId === 1 ? "Khoán" : "Ngày"}</p>
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider leading-tight">Mức lương</p>
+                    <p className="text-lg font-bold text-emerald-600 leading-tight">{formatCurrency(job.wageAmount)}</p>
                   </CardContent>
                 </Card>
 
                 <Card className="border-0 shadow-sm bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm hover:shadow-md transition-shadow">
-                  <CardContent className="p-4 flex flex-col items-center text-center gap-1.5">
-                    <div className="p-2.5 rounded-full bg-amber-100 text-amber-600 mb-1">
-                      <Users className="h-5 w-5" />
+                  <CardContent className="p-3 flex flex-col items-center text-center gap-1">
+                    <div className="p-2 rounded-full bg-amber-100 text-amber-600 mb-0.5">
+                      <Users className="h-4 w-4" />
                     </div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Số lượng</p>
-                    <p className="text-xl font-bold">{job.workersAccepted}/{job.workersNeeded}</p>
-                    <p className="text-[10px] text-muted-foreground">Ứng viên đã nhận</p>
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider leading-tight">Số lượng</p>
+                    <p className="text-lg font-bold leading-tight">{job.workersAccepted}/{job.workersNeeded}</p>
                   </CardContent>
                 </Card>
 
                 <Card className="border-0 shadow-sm bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm hover:shadow-md transition-shadow">
-                  <CardContent className="p-4 flex flex-col items-center text-center gap-1.5">
-                    <div className="p-2.5 rounded-full bg-blue-100 text-blue-600 mb-1">
-                      <CalendarDays className="h-5 w-5" />
+                  <CardContent className="p-3 flex flex-col items-center text-center gap-1">
+                    <div className="p-2 rounded-full bg-blue-100 text-blue-600 mb-0.5">
+                      <CalendarDays className="h-4 w-4" />
                     </div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Thời gian</p>
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider leading-tight">Thời gian</p>
                     <div className="space-y-0.5">
-                      <p className="text-sm font-bold">{formatDate(job.startDate)}</p>
-                      <p className="text-[10px] text-muted-foreground">Đến</p>
-                      <p className="text-sm font-bold">{formatDate(job.endDate)}</p>
+                      <p className="text-xs font-bold leading-tight">{formatDate(job.startDate)}</p>
+                      <p className="text-[9px] text-muted-foreground">Đến</p>
+                      <p className="text-xs font-bold leading-tight">{formatDate(job.endDate)}</p>
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card className="border-0 shadow-sm bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm hover:shadow-md transition-shadow">
-                  <CardContent className="p-4 flex flex-col items-center text-center gap-1.5">
-                    <div className="p-2.5 rounded-full bg-teal-100 text-teal-600 mb-1">
-                      <Clock className="h-5 w-5" />
+                  <CardContent className="p-2 flex flex-col items-center text-center gap-1">
+                    <div className="p-2 rounded-full bg-teal-100 text-teal-600 mb-0.5">
+                      <Clock className="h-4 w-4" />
                     </div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Giờ làm việc</p>
-                    <p className="text-lg font-bold">{job.startTime?.slice(0, 5)} - {job.endTime?.slice(0, 5)}</p>
-                    <p className="text-[10px] text-muted-foreground">Theo lịch bài đăng</p>
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider leading-tight">Giờ làm việc</p>
+                    <p className="text-base font-bold leading-tight">{job.startTime?.slice(0, 5)} - {job.endTime?.slice(0, 5)}</p>
                   </CardContent>
                 </Card>
               </div>
@@ -1081,8 +1169,8 @@ export default function FarmerJobDetailPage() {
                               </span>
                               <div className="flex items-center gap-2">
                                 <Users className="h-4 w-4 text-emerald-500 shrink-0" />
-                                <span className={`text-sm font-bold ${dayData.acceptedWorkerCount >= workersNeededPerDay ? "text-emerald-600" : "text-amber-600"}`}>
-                                  {dayData.acceptedWorkerCount}/{workersNeededPerDay}
+                                <span className={`text-sm font-bold ${dayData.acceptedWorkerCount >= getWorkersNeededForDate(dayData.date) ? "text-emerald-600" : "text-amber-600"}`}>
+                                  {dayData.acceptedWorkerCount}/{getWorkersNeededForDate(dayData.date)}
                                 </span>
                                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
                               </div>
@@ -1221,7 +1309,7 @@ export default function FarmerJobDetailPage() {
             </div>
 
             {/* Applications Sidebar */}
-            <div className="lg:col-span-1 lg:sticky lg:top-8">
+            <div className="lg:col-span-2 lg:sticky lg:top-8">
               <Card className="lg:top-8 border-0 shadow-sm overflow-hidden bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md">
                 <div className="h-1 bg-agro-green" />
                 <CardHeader className="pb-4 flex flex-row items-center justify-between gap-3 space-y-0">
@@ -1245,7 +1333,7 @@ export default function FarmerJobDetailPage() {
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex bg-muted p-1 rounded-lg mb-4 text-center max-w-sm mx-auto sm:max-w-none">
+                  <div className="flex gap-1 bg-muted p-1 rounded-lg mb-4 text-center">
                     <button
                       onClick={() => setApplicationFilter("all")}
                       className={cn("flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all", applicationFilter === "all" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
@@ -1253,14 +1341,20 @@ export default function FarmerJobDetailPage() {
                       Tất cả
                     </button>
                     <button
+                      onClick={() => setApplicationFilter("pending")}
+                      className={cn("flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all", applicationFilter === "pending" ? "bg-background shadow-sm text-amber-600" : "text-muted-foreground hover:text-foreground")}
+                    >
+                      Chờ duyệt
+                    </button>
+                    <button
                       onClick={() => setApplicationFilter("approved")}
-                      className={cn("flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all", applicationFilter === "approved" ? "bg-background shadow-sm text-foreground text-emerald-600" : "text-muted-foreground hover:text-foreground")}
+                      className={cn("flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all", applicationFilter === "approved" ? "bg-background shadow-sm text-emerald-600" : "text-muted-foreground hover:text-foreground")}
                     >
                       Đã duyệt
                     </button>
                     <button
                       onClick={() => setApplicationFilter("cancelled")}
-                      className={cn("flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all", applicationFilter === "cancelled" ? "bg-background shadow-sm text-foreground text-rose-600" : "text-muted-foreground hover:text-foreground")}
+                      className={cn("flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all", applicationFilter === "cancelled" ? "bg-background shadow-sm text-rose-600" : "text-muted-foreground hover:text-foreground")}
                     >
                       Đã hủy/từ chối
                     </button>
@@ -1289,13 +1383,7 @@ export default function FarmerJobDetailPage() {
                       </div>
                     ) : null}
 
-                    {applications
-                      .filter((app) => {
-                        if (applicationFilter === "approved") return app.statusId === APP_STATUS.accepted
-                        if (applicationFilter === "cancelled") return app.statusId === APP_STATUS.cancelled || app.statusId === APP_STATUS.rejected
-                        return true
-                      })
-                      .map((application) => (
+                    {applications.map((application) => (
                         <div
                           key={application.id}
                           className="group relative flex h-full flex-col gap-3 rounded-xl border border-muted bg-muted/30 p-4 transition-all duration-300 hover:border-agro-green/30 hover:bg-muted/50"
@@ -1468,24 +1556,61 @@ export default function FarmerJobDetailPage() {
                       <CardDescription>Chi tiết quá trình thực hiện của các phiên làm việc</CardDescription>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      if (jobId) {
-                        setIsLoadingJobDetails(true)
-                        jobDetailsService.getJobDetailsByPost(jobId, { page: 1, limit: 100 })
-                          .then(res => setJobDetails(res.data.data))
-                          .finally(() => setIsLoadingJobDetails(false))
-                      }
-                    }}
-                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-all"
-                    disabled={isLoadingJobDetails || !canDisplayJobReports}
-                  >
-                    <RotateCw className={cn("h-4 w-4", isLoadingJobDetails && "animate-spin")} />
-                  </Button>
+                  
+                  <div className="flex w-fit gap-1 rounded-lg bg-muted p-1 pb-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (jobId) {
+                          void loadJobDetails(jobId, jobDetailsPage)
+                        }
+                      }}
+                      className="h-8 w-8 rounded-md pb-1 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-all"
+                      disabled={isLoadingJobDetails || !canDisplayJobReports}
+                    >
+                      <RotateCw className={cn("h-4 w-4", isLoadingJobDetails && "animate-spin")} />
+                    </Button>
+                      <Button
+                        onClick={() => setJobDetailOrderFilter((prev) => (prev === "newest" ? "oldest" : "newest"))}
+                        title={jobDetailOrderFilter === "newest" ? "Sắp xếp: Mới nhất" : "Sắp xếp: Cũ nhất"}
+                        className="h-7 w-7 rounded-md bg-background text-foreground shadow-sm transition-all hover:bg-muted/50"
+                      >
+                        {/* Make sure to import ArrowDownUp from lucide-react, or change this back to ChevronDown */}
+                        <ArrowDownUp className={cn("h-3.5 w-3.5 transition-transform", jobDetailOrderFilter === "oldest" && "rotate-180")} />
+                      </Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
+                  <div className="mb-4 flex flex-wrap items-center gap-2">
+                    <div className="flex w-full gap-1 rounded-lg bg-muted p-1">
+                      <button
+                        onClick={() => setJobDetailStatusFilter("all")}
+                        className={cn("flex-1 px-2.5 py-1 text-xs font-medium rounded-md transition-all", jobDetailStatusFilter === "all" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                      >
+                        Tất cả
+                      </button>
+                      <button
+                        onClick={() => setJobDetailStatusFilter("in-progress")}
+                        className={cn("flex-1 px-2.5 py-1 text-xs font-medium rounded-md transition-all", jobDetailStatusFilter === "in-progress" ? "bg-background shadow-sm text-amber-600" : "text-muted-foreground hover:text-foreground")}
+                      >
+                        Chưa báo cáo
+                      </button>
+                      <button
+                        onClick={() => setJobDetailStatusFilter("reported")}
+                        className={cn("flex-1 px-2.5 py-1 text-xs font-medium rounded-md transition-all", jobDetailStatusFilter === "reported" ? "bg-background shadow-sm text-blue-600" : "text-muted-foreground hover:text-foreground")}
+                      >
+                        Đã gửi
+                      </button>
+                      <button
+                        onClick={() => setJobDetailStatusFilter("completed")}
+                        className={cn("flex-1 px-2.5 py-1 text-xs font-medium rounded-md transition-all", jobDetailStatusFilter === "completed" ? "bg-background shadow-sm text-emerald-600" : "text-muted-foreground hover:text-foreground")}
+                      >
+                        Đã duyệt
+                      </button>
+                    </div>
+                  </div>
+
                   {isLoadingJobDetails ? (
                     <div className="flex items-center justify-center py-12">
                       <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-r-transparent" />
@@ -2129,7 +2254,7 @@ export default function FarmerJobDetailPage() {
                 </div>
 
                 {
-                  !isApprovalSectionDisabled && selectedJobDetail.statusId !== JobStatus.Completed && (
+                  !isApprovalSectionDisabledFor(selectedJobDetail) && selectedJobDetail.statusId !== JobStatus.Completed && (
                     <div className="space-y-4 pt-4 border-t border-dashed">
                       <h4 className="font-bold text-base text-foreground">Phê duyệt báo cáo</h4>
 
@@ -2180,7 +2305,7 @@ export default function FarmerJobDetailPage() {
             >
               Thoát
             </Button>
-            {!isApprovalSectionDisabled && selectedJobDetail?.statusId !== JobStatus.Completed && (
+            {!isApprovalSectionDisabledFor(selectedJobDetail) && selectedJobDetail?.statusId !== JobStatus.Completed && (
               <Button
                 className="bg-agro-green hover:bg-agro-green/90 flex-1 sm:flex-none"
                 onClick={requestApproveJobDetail}

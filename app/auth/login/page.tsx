@@ -49,7 +49,10 @@ export default function LoginPage() {
 
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!otp) {
+    const normalizedEmail = farmerEmail.trim().toLowerCase();
+    const normalizedOtp = otp.trim();
+
+    if (!normalizedOtp) {
       toast({
         title: "Lỗi",
         description: "Vui lòng nhập mã OTP",
@@ -61,8 +64,8 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await authService.verifyRegister({
-        email: farmerEmail,
-        otp: otp
+        email: normalizedEmail,
+        otp: normalizedOtp,
       });
 
       toast({
@@ -87,8 +90,10 @@ export default function LoginPage() {
   const handleResendOTP = async () => {
     if (countdown > 0) return;
 
+    const normalizedEmail = farmerEmail.trim().toLowerCase();
+
     try {
-      await authService.resendOTP(farmerEmail);
+      await authService.resendOTP(normalizedEmail);
       toast({
         title: "Thành công",
         description: "Mã OTP mới đã được gửi đến email của bạn.",
@@ -107,9 +112,11 @@ export default function LoginPage() {
     e?.preventDefault?.();
     setIsLoading(true);
 
+    const normalizedEmail = farmerEmail.trim().toLowerCase();
+
     try {
       const response = await authService.login({
-        email: farmerEmail,
+        email: normalizedEmail,
         password: farmerPassword,
       });
 
@@ -141,7 +148,7 @@ export default function LoginPage() {
 
             // Automatically resend OTP
             try {
-              await authService.resendOTP(farmerEmail);
+              await authService.resendOTP(normalizedEmail);
               setCountdown(60);
               setIsVerifying(true);
             } catch (err) {
@@ -249,7 +256,7 @@ export default function LoginPage() {
 
           // Automatically resend OTP
           try {
-            await authService.resendOTP(farmerEmail);
+            await authService.resendOTP(normalizedEmail);
             setCountdown(60);
             setIsVerifying(true);
           } catch (err) {

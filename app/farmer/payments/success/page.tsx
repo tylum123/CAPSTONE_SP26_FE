@@ -4,11 +4,14 @@ import { useEffect, useState, Suspense } from "react"
 import { CheckCircle, XCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { PaymentService } from "@/libs/api/services/payment.service"
 import type { PaymentCallbackRequestParams } from "@/libs/types/payment.types"
 
+const TOP_UP_RETURN_INTENT_KEY = "wallet.topup.return.intent"
+
 function SuccessContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [isVerifying, setIsVerifying] = useState(true)
   const [isSuccess, setIsSuccess] = useState(false)
@@ -43,6 +46,47 @@ function SuccessContent() {
       setIsSuccess(true) // Default to success if no params to verify
     }
   }, [searchParams])
+
+  useEffect(() => {
+    if (isVerifying || !isSuccess) {
+      return
+    }
+
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const rawIntent = window.sessionStorage.getItem(TOP_UP_RETURN_INTENT_KEY)
+
+    if (!rawIntent) {
+      return
+    }
+
+    try {
+      const parsedIntent = JSON.parse(rawIntent) as {
+        returnTo?: string
+        returnStep?: string
+        draftId?: string
+      }
+
+      if (!parsedIntent.returnTo || !parsedIntent.returnTo.startsWith("/")) {
+        return
+      }
+
+      const params = new URLSearchParams()
+      params.set("resumeFromTopUp", "1")
+      params.set("step", parsedIntent.returnStep || "confirm")
+
+      if (parsedIntent.draftId) {
+        params.set("draftId", parsedIntent.draftId)
+      }
+
+      window.sessionStorage.removeItem(TOP_UP_RETURN_INTENT_KEY)
+      router.replace(`${parsedIntent.returnTo}?${params.toString()}`)
+    } catch {
+      window.sessionStorage.removeItem(TOP_UP_RETURN_INTENT_KEY)
+    }
+  }, [isSuccess, isVerifying, router])
 
   if (isVerifying) {
     return (

@@ -19,7 +19,7 @@ export const jobDetailsService = {
         return response.data;
     },
 
-    getJobDetailsByPost: async (id: string, params: { page: number, limit: number }): Promise<ApiResponse<PaginatedResponse<JobDetail>>> => {
+    getJobDetailsByPost: async (id: string, params: {jobStatus?: string; orderByDescending?: boolean; page: number; limit: number }): Promise<ApiResponse<PaginatedResponse<JobDetail>>> => {
         const response = await axiosInstance.get(API_ENDPOINTS.JOBS.JOB_DETAILS_BY_POST(id), { params });
         return response.data;
     },

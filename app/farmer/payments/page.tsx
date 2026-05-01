@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -20,6 +21,7 @@ import type { WalletDTO, WalletTransactionDTO, WithdrawalRequest, CreateWithdraw
 import { BinBank, TransactionType } from "@/libs/types/wallet.types"
 
 const TRANSACTION_PAGE_SIZE = 10
+const TOP_UP_RETURN_INTENT_KEY = "wallet.topup.return.intent"
 
 const WITHDRAWAL_STATUS_MAP: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode; color: string }> = {
   PENDING: { label: "Đang chờ", variant: "secondary", icon: <Timer className="h-3 w-3" />, color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
@@ -48,8 +50,10 @@ const formatThousandsWithDots = (value: string) => {
 const parseFormattedAmount = (value: string) => Number.parseInt(toDigitsOnly(value), 10) || 0
 
 export default function PaymentsPage() {
+  const searchParams = useSearchParams()
   const [depositAmount, setDepositAmount] = useState("")
   const [isDepositing, setIsDepositing] = useState(false)
+  const [isDepositDialogOpen, setIsDepositDialogOpen] = useState(false)
   const { toast } = useToast()
 
   const [wallet, setWallet] = useState<WalletDTO | null>(null)
@@ -137,6 +141,12 @@ export default function PaymentsPage() {
   }, [])
 
   useEffect(() => {
+    if (searchParams.get("openTopUp") === "1") {
+      setIsDepositDialogOpen(true)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
     if (!wallet?.id) return
     fetchTransactions(wallet.id, transactionPage)
   }, [transactionPage])
@@ -174,6 +184,26 @@ export default function PaymentsPage() {
 
     setIsDepositing(true)
     try {
+      const returnTo = searchParams.get("returnTo")
+      const returnStep = searchParams.get("returnStep") || "confirm"
+      const draftId = searchParams.get("draftId")
+
+      if (typeof window !== "undefined") {
+        if (returnTo && returnTo.startsWith("/")) {
+          window.sessionStorage.setItem(
+            TOP_UP_RETURN_INTENT_KEY,
+            JSON.stringify({
+              returnTo,
+              returnStep,
+              draftId: draftId ?? undefined,
+              createdAt: Date.now(),
+            }),
+          )
+        } else {
+          window.sessionStorage.removeItem(TOP_UP_RETURN_INTENT_KEY)
+        }
+      }
+
       const response = await PaymentService.create({
         totalAmount: depositValue,
         description: "Nạp tiền vào ví AgroTemp",
@@ -306,7 +336,7 @@ export default function PaymentsPage() {
             </div>
             <div className="flex gap-2 mt-4">
               {/* Deposit Dialog */}
-              <Dialog>
+              <Dialog open={isDepositDialogOpen} onOpenChange={setIsDepositDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="flex-1 bg-agro-green hover:bg-agro-green/90 text-white shadow-lg shadow-agro-green/20 h-10 px-4">
                     <Plus className="h-4 w-4 mr-2" />

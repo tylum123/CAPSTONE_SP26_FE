@@ -19,7 +19,6 @@ import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { authService } from "@/libs/api/services/auth.service";
 import { useToast } from "@/hooks/use-toast";
 import { GoogleLoginButton } from "@/components/auth/google-login-button";
-import { handleRegistrationError } from "@/libs/utils/error-handler";
 import { useAuth } from "@/libs/stores/auth.store";
 
 function RegisterContent() {
@@ -154,9 +153,13 @@ function RegisterContent() {
       });
 
     } catch (error: any) {
-      const errorMessage = handleRegistrationError(error);
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        "Đăng ký thất bại";
       toast({
-        title: "❌ Đăng ký thất bại",
+        title: "Đã có lỗi khi xử lý phiên đăng ký",
         description: errorMessage,
         variant: "destructive",
       });

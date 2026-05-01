@@ -60,7 +60,7 @@ const formatRelativeDate = (dateStr: string) => {
 
 const getScheduleLabel = (job: Job) => {
   if (job.jobTypeId === 2) {
-    const days = job.selectedDays?.length ?? 0
+    const days = job.jobPostDays?.length ?? 0
     return `${days} ngày • ${job.startTime?.slice(0, 5) ?? "?"} - ${job.endTime?.slice(0, 5) ?? "?"}`
   }
   return `${job.startDate ?? "?"} → ${job.endDate ?? "?"}`
@@ -71,17 +71,18 @@ const getScheduleLabel = (job: Job) => {
 export function JobDraftDialog({ open, onOpenChange, onLoadDraft }: JobDraftDialogProps) {
   const { toast } = useToast()
   const [drafts, setDrafts] = useState<Job[]>([])
+  const [filterTab, setFilterTab] = useState<'all' | 'contract' | 'daily'>('all')
   const [isLoading, setIsLoading] = useState(false)
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null)
   const [pendingDeleteDraft, setPendingDeleteDraft] = useState<Job | null>(null)
   const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchDrafts = useCallback(async () => {
+  const fetchDrafts = useCallback(async (jobType?: number) => {
     try {
       setIsLoading(true)
       setError(null)
-      const response = await jobService.getDrafts()
+      const response = jobType !== undefined ? await jobService.getDrafts({ jobType }) : await jobService.getDrafts()
       const data = response.data
       const list = Array.isArray(data) ? data : (data as any)?.data ?? []
       setDrafts(list)
@@ -96,9 +97,10 @@ export function JobDraftDialog({ open, onOpenChange, onLoadDraft }: JobDraftDial
     if (open) {
       setSelectedDraftId(null)
       setPendingDeleteDraft(null)
-      void fetchDrafts()
+      const jobType = filterTab === 'contract' ? 1 : filterTab === 'daily' ? 2 : undefined
+      void fetchDrafts(jobType)
     }
-  }, [open, fetchDrafts])
+  }, [open, filterTab, fetchDrafts])
 
   const handleDeleteDraft = useCallback(async () => {
     if (!pendingDeleteDraft?.id) {
@@ -152,6 +154,34 @@ export function JobDraftDialog({ open, onOpenChange, onLoadDraft }: JobDraftDial
               </DialogDescription>
             </div>
           </div>
+          <div className="mt-3 flex items-center gap-2">
+            <div className="inline-flex rounded-full bg-muted/10 p-1">
+              <button
+                type="button"
+                onClick={() => setFilterTab('all')}
+                className={cn(
+                  "px-3 py-1 rounded-full text-sm font-medium transition",
+                  filterTab === 'all' ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-muted/20'
+                )}
+              >Tất cả</button>
+              <button
+                type="button"
+                onClick={() => setFilterTab('contract')}
+                className={cn(
+                  "px-3 py-1 rounded-full text-sm font-medium transition",
+                  filterTab === 'contract' ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-muted/20'
+                )}
+              >Khoán</button>
+              <button
+                type="button"
+                onClick={() => setFilterTab('daily')}
+                className={cn(
+                  "px-3 py-1 rounded-full text-sm font-medium transition",
+                  filterTab === 'daily' ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-muted/20'
+                )}
+              >Ngày</button>
+            </div>
+          </div>
         </DialogHeader>
 
         {/* Body */}
@@ -179,21 +209,21 @@ export function JobDraftDialog({ open, onOpenChange, onLoadDraft }: JobDraftDial
                 Bạn có thể lưu bản nháp bất kỳ lúc nào trong quá trình soạn thảo tin tuyển dụng.
               </p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {drafts.map((draft) => (
-                <DraftCard
-                  key={draft.id}
-                  draft={draft}
-                  isSelected={selectedDraftId === draft.id}
-                  isDeleting={deletingDraftId === draft.id}
-                  onSelect={() =>
-                    setSelectedDraftId((prev) => (prev === draft.id ? null : draft.id))
-                  }
-                  onDelete={() => setPendingDeleteDraft(draft)}
-                />
-              ))}
-            </div>
+            ) : (
+              <div className="space-y-3">
+                {drafts.map((draft) => (
+                  <DraftCard
+                    key={draft.id}
+                    draft={draft}
+                    isSelected={selectedDraftId === draft.id}
+                    isDeleting={deletingDraftId === draft.id}
+                    onSelect={() =>
+                      setSelectedDraftId((prev) => (prev === draft.id ? null : draft.id))
+                    }
+                    onDelete={() => setPendingDeleteDraft(draft)}
+                  />
+                ))}
+              </div>
           )}
         </div>
 

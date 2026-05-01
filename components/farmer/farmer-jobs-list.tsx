@@ -72,6 +72,7 @@ export function FarmerJobsList() {
   const [error, setError] = useState<string | null>(null)
   const [filterCategory, setFilterCategory] = useState("all-categories")
   const [filterAddress, setFilterAddress] = useState("all-provinces")
+  const [jobTypeFilter, setJobTypeFilter] = useState<number | undefined>(undefined)
   const [filterSkills, setFilterSkills] = useState<string[]>([])
   const [skillPage, setSkillPage] = useState(1)
   const [skillTotalPages, setSkillTotalPages] = useState(1)
@@ -240,27 +241,40 @@ export function FarmerJobsList() {
       setIsLoading(true)
       setError(null)
 
-      // Use getFilteredJobs if any filter parameters exist, otherwise use getJobs
-      const hasFilters = searchQuery || (filterCategory && filterCategory !== "all-categories") || (filterAddress && filterAddress !== "all-provinces") || filterSkills.length > 0
-
-      let response
-      if (hasFilters) {
-        response = await jobService.getFilteredJobsByFarmer({
-          title: searchQuery || undefined,
-          category: (filterCategory && filterCategory !== "all-categories") ? filterCategory : undefined,
-          address: (filterAddress && filterAddress !== "all-provinces") ? filterAddress : undefined,
-          skill: filterSkills.length > 0 ? filterSkills : undefined,
-          page: jobsPage,
-          limit: jobsPageSize,
-          sortByDatesDescending,
-        })
-      } else {
-        response = await jobService.getFilteredJobsByFarmer({
-          page: jobsPage,
-          limit: jobsPageSize,
-          sortByDatesDescending,
-        })
+      const params: any = {
+        title: searchQuery || undefined,
+        category: (filterCategory && filterCategory !== "all-categories") ? filterCategory : undefined,
+        address: (filterAddress && filterAddress !== "all-provinces") ? filterAddress : undefined,
+        skill: filterSkills.length > 0 ? filterSkills : undefined,
+        page: jobsPage,
+        limit: jobsPageSize,
+        sortByDatesDescending,
       }
+
+      const mapTabToStatus = (tab: JobFilterTab) => {
+        switch (tab) {
+          case "draft":
+            return JobPostStatus.Draft
+          case "active":
+            return JobPostStatus.Published
+          case "filled":
+            return JobPostStatus.Closed
+          case "in-progress":
+            return JobPostStatus.InProgress
+          case "completed":
+            return JobPostStatus.Completed
+          case "cancelled":
+            return JobPostStatus.Cancelled
+          default:
+            return undefined
+        }
+      }
+
+      const jobPostStatus = mapTabToStatus(activeTab)
+      if (jobPostStatus !== undefined) params.jobPostStatus = jobPostStatus
+      if (jobTypeFilter !== undefined) params.jobType = jobTypeFilter
+
+      const response = await jobService.getFilteredJobsByFarmer(params)
 
       const payload = response.data as PaginatedResponse<Job> | Job[] | { data?: Job[]; items?: Job[] }
 
@@ -297,7 +311,7 @@ export function FarmerJobsList() {
     } finally {
       setIsLoading(false)
     }
-  }, [searchQuery, filterCategory, filterAddress, filterSkills, sortByDatesDescending, jobsPage, jobsPageSize])
+  }, [searchQuery, filterCategory, filterAddress, filterSkills, sortByDatesDescending, jobsPage, jobsPageSize, activeTab, jobTypeFilter])
 
   useEffect(() => {
     void loadJobs()
@@ -427,6 +441,7 @@ export function FarmerJobsList() {
 
   const handleActiveTabChange = (value: string) => {
     setActiveTab(value as JobFilterTab)
+    setJobsPage(1)
   }
 
   const handleCardClick = (event: MouseEvent<HTMLDivElement>, jobId: string) => {
@@ -480,7 +495,7 @@ export function FarmerJobsList() {
         {/* Right Controls */}
         <div className="flex items-center gap-3 pl-3 sm:w-auto overflow-x-auto">
           {/* Status Select */}
-          <div className="w-full sm:w-[180px] shrink-0">
+          <div className="w-full sm:w-45 shrink-0 -mr- -ml-2">
             <Select value={activeTab} onValueChange={handleActiveTabChange}>
               <SelectTrigger className="h-10 font-medium bg-white dark:bg-slate-900 border-slate-200">
                 <div className="flex items-center gap-2">
@@ -488,14 +503,30 @@ export function FarmerJobsList() {
                 </div>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tất cả bài đăng</SelectItem>
-                {/* <SelectItem value="draft">Bản nháp</SelectItem> */}
+                  <SelectItem value="all">Tất cả bài đăng</SelectItem>
+                  {/* <SelectItem value="draft">Bản nháp</SelectItem> */}
                 <SelectItem value="active">Đang tuyển</SelectItem>
                 <SelectItem value="filled">Đã tuyển đủ</SelectItem>
                 <SelectItem value="in-progress">Đang làm việc</SelectItem>
                 <SelectItem value="completed">Đã xong</SelectItem>
                 {/* <SelectItem value="passed">Quá hạn</SelectItem> */}
                 <SelectItem value="cancelled">Đã hủy</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Job Type Select */}
+          <div className="w-full sm:w-45 -mr-15 shrink-0">
+            <Select value={jobTypeFilter?.toString() ?? "all"} onValueChange={(val) => { setJobTypeFilter(val === "all" ? undefined : Number(val)); setJobsPage(1) }}>
+              <SelectTrigger className="h-10 font-medium bg-white dark:bg-slate-900 border-slate-200">
+                <div className="flex items-center gap-2">
+                  <SelectValue placeholder="Loại công việc" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả loại</SelectItem>
+                <SelectItem value="1">Khoán</SelectItem>
+                <SelectItem value="2">Ngày</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -669,6 +700,20 @@ export function FarmerJobsList() {
                       {province.name}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Loại công việc</Label>
+              <Select value={jobTypeFilter?.toString() ?? "all"} onValueChange={(value) => { setJobTypeFilter(value === "all" ? undefined : Number(value)); setJobsPage(1) }}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Chọn loại" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả loại</SelectItem>
+                  <SelectItem value="1">Khoán</SelectItem>
+                  <SelectItem value="2">Ngày</SelectItem>
                 </SelectContent>
               </Select>
             </div>

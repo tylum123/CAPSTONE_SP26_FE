@@ -2,6 +2,25 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { API_CONFIG } from './endpoints/config';
 import { API_ENDPOINTS } from './endpoints/config';
 
+const PUBLIC_AUTH_ENDPOINTS = new Set([
+  API_ENDPOINTS.AUTH.LOGIN,
+  API_ENDPOINTS.AUTH.REGISTER,
+  API_ENDPOINTS.AUTH.VERIFY_REGISTER,
+  API_ENDPOINTS.AUTH.RESEND_OTP,
+  API_ENDPOINTS.AUTH.GOOGLE_LOGIN,
+  API_ENDPOINTS.AUTH.FORGOT_PASSWORD,
+  API_ENDPOINTS.AUTH.RESET_PASSWORD,
+]);
+
+const isPublicAuthRequest = (url?: string) => {
+  if (!url) {
+    return false;
+  }
+
+  const normalizedUrl = url.split("?")[0] || url;
+  return PUBLIC_AUTH_ENDPOINTS.has(normalizedUrl);
+};
+
 // Create axios instance
 export const axiosInstance = axios.create({
   baseURL: API_CONFIG.BASE_URL,
@@ -17,14 +36,14 @@ export const axiosInstance = axios.create({
 // Request interceptor
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // Get token from localStorage or cookies
-    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-
     if (typeof FormData !== 'undefined' && config.data instanceof FormData && config.headers) {
       delete (config.headers as any)['Content-Type'];
     }
 
-    if (token && config.headers) {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+
+    // Public auth endpoints should behave like Swagger calls and must not inherit stale auth headers.
+    if (token && config.headers && !isPublicAuthRequest(config.url)) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
