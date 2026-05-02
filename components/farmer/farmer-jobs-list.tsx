@@ -60,7 +60,7 @@ import {
 import { jobService } from "@/libs/api/services/jobs.service"
 import { jobApplicationService } from "@/libs/api/services/jobApplication.service"
 
-type JobFilterTab = "all" | "draft" | "active" | "filled" | "in-progress" | "completed" | "passed" | "cancelled"
+type JobFilterTab = "all" | "draft" | "active" | "filled" | "in-progress" | "completed" | "cancelled"
 
 export function FarmerJobsList() {
   const router = useRouter()
@@ -122,16 +122,7 @@ export function FarmerJobsList() {
     return new Intl.DateTimeFormat("vi-VN").format(date)
   }
 
-  const normalizeStatus = (statusId?: JobPostStatus, startDate?: string): "draft" | "active" | "filled" | "in-progress" | "completed" | "passed" | "cancelled" => {
-    if (statusId === JobPostStatus.Published && startDate) {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const jobStart = new Date(startDate)
-      if (jobStart < today) {
-        return "passed"
-      }
-    }
-
+  const normalizeStatus = (statusId?: JobPostStatus): "draft" | "active" | "filled" | "in-progress" | "completed" | "cancelled" => {
     switch (statusId) {
       case JobPostStatus.Draft:
         return "draft"
@@ -323,7 +314,7 @@ export function FarmerJobsList() {
         .filter(Boolean)
         .some((value) => value.toLowerCase().includes(searchQuery.toLowerCase()))
 
-      const status = normalizeStatus(job.statusId, job.startDate)
+      const status = normalizeStatus(job.statusId)
       const matchesTab = activeTab === "all" || activeTab === status
 
       return matchesSearch && matchesTab
@@ -337,7 +328,7 @@ export function FarmerJobsList() {
     })
   }, [activeTab, jobs, searchQuery, sortByDatesDescending])
 
-  const getStatusBadge = (status: "draft" | "active" | "filled" | "in-progress" | "completed" | "passed" | "cancelled") => {
+  const getStatusBadge = (status: "draft" | "active" | "filled" | "in-progress" | "completed" | "cancelled") => {
     switch (status) {
       case "draft":
         return <Badge variant="outline" className="bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800/60 dark:text-slate-300 border-slate-300">Bản nháp</Badge>
@@ -351,12 +342,6 @@ export function FarmerJobsList() {
         return (
           <Badge variant="outline" className="bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800/60 dark:text-slate-400 border-slate-200 dark:border-slate-700">
             Hoàn thành
-          </Badge>
-        )
-      case "passed":
-        return (
-          <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-400 border-rose-200">
-            Quá hạn
           </Badge>
         )
       case "cancelled":
@@ -509,7 +494,6 @@ export function FarmerJobsList() {
                 <SelectItem value="filled">Đã tuyển đủ</SelectItem>
                 <SelectItem value="in-progress">Đang làm việc</SelectItem>
                 <SelectItem value="completed">Đã xong</SelectItem>
-                {/* <SelectItem value="passed">Quá hạn</SelectItem> */}
                 <SelectItem value="cancelled">Đã hủy</SelectItem>
               </SelectContent>
             </Select>
@@ -760,7 +744,7 @@ export function FarmerJobsList() {
                   <div className="flex flex-wrap items-start gap-3 justify-between">
                     <div className="flex flex-wrap items-center gap-3 flex-1">
                       <h3 className="text-xl font-bold text-foreground hover:text-primary transition-colors cursor-pointer line-clamp-1" title={job.title}>{job.title}</h3>
-                      {getStatusBadge(normalizeStatus(job.statusId, job.startDate))}
+                      {getStatusBadge(normalizeStatus(job.statusId))}
                       {job.isUrgent && (
                         <Badge className="bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/40 dark:text-orange-400 gap-1">
                           <Zap className="h-3 w-3" />
@@ -849,7 +833,7 @@ export function FarmerJobsList() {
                     </div>
                   </div>
 
-                  {normalizeStatus(job.statusId, job.startDate) !== "completed" && (
+                  {normalizeStatus(job.statusId) !== "completed" && (
                     <div className={`bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800 mt-2 w-full ${viewMode === "grid" ? "max-w-md" : "max-w-xl"}`}>
                       <div className="mb-2 flex items-center justify-between text-xs font-medium">
                         <span className="text-muted-foreground uppercase tracking-wider text-[10px]">Tiến độ tuyển dụng</span>
