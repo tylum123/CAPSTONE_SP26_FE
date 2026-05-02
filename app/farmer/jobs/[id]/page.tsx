@@ -23,6 +23,7 @@ import {
 import { cn } from "@/libs/utils/utils"
 import { ApplicationStatusId } from "@/libs/types"
 import { jobService } from "@/libs/api/services/jobs.service"
+import { jobCategoryService } from "@/libs/api/services/job-category.service"
 import { jobApplicationService } from "@/libs/api/services/jobApplication.service"
 import { jobDetailsService } from "@/libs/api/services/jobDetails.service"
 import type { ApplicationDTO, Job, JobDetail, PaginatedResponse, RespondApplicationRequest } from "@/libs/types"
@@ -237,6 +238,7 @@ export default function FarmerJobDetailPage() {
   const [ratedByWorkerId, setRatedByWorkerId] = useState<Record<string, RatingDTO>>({})
   const [workersPerDay, setWorkersPerDay] = useState<{ date: string; acceptedWorkerCount: number }[]>([])
   const [isLoadingWorkersPerDay, setIsLoadingWorkersPerDay] = useState(false)
+  const [resolvedJobCategoryName, setResolvedJobCategoryName] = useState("Chưa phân loại")
   const [confirmAction, setConfirmAction] = useState<{
     type: "cancel-application" | "auto-accept-application" | "approve-job-detail"
     applicationId?: string
@@ -827,6 +829,42 @@ export default function FarmerJobDetailPage() {
   }
 
   useEffect(() => {
+    let isMounted = true
+
+    const nestedCategoryName = job?.jobCategory?.name?.trim()
+    if (nestedCategoryName) {
+      setResolvedJobCategoryName(nestedCategoryName)
+      return () => {
+        isMounted = false
+      }
+    }
+
+    const categoryId = job?.jobCategoryId?.trim()
+    if (!categoryId) {
+      setResolvedJobCategoryName("Chưa phân loại")
+      return () => {
+        isMounted = false
+      }
+    }
+
+    jobCategoryService
+      .getJobCategoryDetail(categoryId)
+      .then((response) => {
+        if (!isMounted) return
+        const categoryName = response.data?.name?.trim()
+        setResolvedJobCategoryName(categoryName || "Chưa phân loại")
+      })
+      .catch(() => {
+        if (!isMounted) return
+        setResolvedJobCategoryName("Chưa phân loại")
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [job?.jobCategory?.name, job?.jobCategoryId])
+
+  useEffect(() => {
     if (!jobId) {
       setError("Không tìm thấy bài đăng.")
       setIsLoading(false)
@@ -1073,6 +1111,9 @@ export default function FarmerJobDetailPage() {
                 <div className="space-y-2 max-w-2xl">
                   <div className="flex flex-wrap items-center gap-3">
                     <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">{job.title}</h1>
+                    <Badge variant="outline" className="bg-white/60 dark:bg-zinc-800/60 text-cyan-700 dark:text-cyan-400 border-cyan-200 text-sm mt-3">
+                      {resolvedJobCategoryName}
+                    </Badge>
                     {job.jobTypeId && (
                       <Badge variant="secondary" className="bg-white/60 dark:bg-zinc-800/60 text-emerald-700 dark:text-emerald-400 border-emerald-200 text-sm mt-3">
                         {job.jobTypeId === 1 ? "Khoán" : job.jobTypeId === 2 ? "Ngày" : "Khác"}

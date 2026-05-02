@@ -141,6 +141,110 @@ export function FarmerJobsList() {
     }
   }
 
+  const categoryNameById = useMemo(() => {
+    const entries = categories
+      .filter((category) => Boolean(category.id) && Boolean(category.name))
+      .map((category) => [String(category.id), String(category.name)] as const)
+
+    return new Map(entries)
+  }, [categories])
+
+  const getResolvedJobCategoryName = (job: Job) => {
+    const nestedCategoryName = job.jobCategory?.name?.trim()
+    if (nestedCategoryName) {
+      return nestedCategoryName
+    }
+
+    const categoryId = job.jobCategoryId?.trim()
+    if (categoryId) {
+      return categoryNameById.get(categoryId) ?? "Chưa phân loại"
+    }
+
+    return "Chưa phân loại"
+  }
+
+  const getJobCategoryBackgroundImage = (categoryName?: string) => {
+    const normalizedName = categoryName
+      ?.toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+
+    if (!normalizedName) {
+      return "/default_job.jpg"
+    }
+
+    if (
+      normalizedName.includes("thuy san") ||
+      normalizedName.includes("nuoi trong") ||
+      normalizedName.includes("aquaculture") ||
+      normalizedName.includes("fish")
+    ) {
+      return "/aquaculture.jpg"
+    }
+
+    if (
+      normalizedName.includes("chan nuoi") ||
+      normalizedName.includes("gia suc") ||
+      normalizedName.includes("livestock") ||
+      normalizedName.includes("bo")
+    ) {
+      return "/livestock.jpg"
+    }
+
+    if (
+      normalizedName.includes("trong trot") ||
+      normalizedName.includes("cay trong") ||
+      normalizedName.includes("crop") ||
+      normalizedName.includes("farming")
+    ) {
+      return "/farming.jpg"
+    }
+
+    return "/default_job.jpg"
+  }
+
+  const getJobCategoryTintClass = (categoryName?: string) => {
+    const normalizedName = categoryName
+      ?.toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+
+    if (!normalizedName) {
+      return "from-slate-500/18 via-slate-400/10 to-transparent"
+    }
+
+    if (
+      normalizedName.includes("thuy san") ||
+      normalizedName.includes("nuoi trong") ||
+      normalizedName.includes("aquaculture") ||
+      normalizedName.includes("fish")
+    ) {
+      return "from-cyan-500/24 via-sky-400/14 to-transparent"
+    }
+
+    if (
+      normalizedName.includes("chan nuoi") ||
+      normalizedName.includes("gia suc") ||
+      normalizedName.includes("livestock") ||
+      normalizedName.includes("bo")
+    ) {
+      return "from-emerald-500/24 via-lime-400/14 to-transparent"
+    }
+
+    if (
+      normalizedName.includes("trong trot") ||
+      normalizedName.includes("cay trong") ||
+      normalizedName.includes("crop") ||
+      normalizedName.includes("farming")
+    ) {
+      return "from-green-500/24 via-yellow-400/14 to-transparent"
+    }
+
+    return "from-teal-500/20 via-emerald-400/12 to-transparent"
+  }
+
   // Fetch categories on mount
   useEffect(() => {
     const fetchCategories = async () => {
@@ -736,9 +840,21 @@ export function FarmerJobsList() {
           </div>
         ) : null}
 
-        {filteredJobs.map((job) => (
-          <Card key={job.id} className="overflow-hidden hover:shadow-md transition-all duration-200 border-slate-200 dark:border-slate-800 flex flex-col h-full cursor-pointer" onClick={(event) => handleCardClick(event, job.id)}>
-            <CardContent className="p-0 flex flex-col h-full">
+        {filteredJobs.map((job) => {
+          const resolvedCategoryName = getResolvedJobCategoryName(job)
+
+          return (
+          <Card key={job.id} className="relative overflow-hidden hover:shadow-md transition-all duration-200 border-slate-200 dark:border-slate-800 flex flex-col h-full cursor-pointer" onClick={(event) => handleCardClick(event, job.id)}>
+            <div className="pointer-events-none absolute inset-0">
+              <div
+                className="absolute inset-0 bg-cover bg-right-center opacity-35"
+                style={{ backgroundImage: `url(${getJobCategoryBackgroundImage(resolvedCategoryName)})` }}
+              />
+              <div className={`absolute inset-0 bg-linear-to-r ${getJobCategoryTintClass(resolvedCategoryName)}`} />
+              <div className="absolute inset-0 bg-linear-to-r from-background/96 via-background/84 to-background/52 dark:from-slate-950/96 dark:via-slate-950/84 dark:to-slate-950/55" />
+            </div>
+
+            <CardContent className="relative z-10 p-0 flex flex-col h-full">
               <div className={`flex flex-col gap-5 p-6 flex-1 ${viewMode === "grid" ? "" : "lg:flex-row lg:items-start lg:justify-between"}`}>
                 <div className="flex-1 space-y-4">
                   <div className="flex flex-wrap items-start gap-3 justify-between">
@@ -808,13 +924,20 @@ export function FarmerJobsList() {
                     )}
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary" className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                      {job.jobSkillRequirements?.[0]?.name ?? job.requiredSkills ?? "Nông nghiệp"}
-                    </Badge>
-                    <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400">
-                      {job.jobTypeId === 1 ? "Khoán" : job.jobTypeId === 2 ? "Ngày" : "Khác"}
-                    </Badge>
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline" className="border-cyan-200 text-cyan-700 bg-cyan-50 dark:bg-cyan-900/30 dark:text-cyan-400">
+                        {resolvedCategoryName}
+                      </Badge>
+                      <Badge variant="outline" className="border-emerald-200 text-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400">
+                        {job.jobTypeId === 1 ? "Khoán" : job.jobTypeId === 2 ? "Ngày" : "Khác"}
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary" className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700">
+                        {job.jobSkillRequirements?.[0]?.name ?? job.requiredSkills ?? "Không có"}
+                      </Badge>
+                    </div>
                   </div>
                   <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed max-w-4xl">{job.description || "Không có mô tả chi tiết."}</p>
 
@@ -926,7 +1049,8 @@ export function FarmerJobsList() {
               </div>
             </CardContent>
           </Card>
-        ))}
+          )
+        })}
       </div>
 
       <AlertDialog
