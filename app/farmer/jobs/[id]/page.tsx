@@ -244,6 +244,15 @@ export default function FarmerJobDetailPage() {
     applicationId?: string
   } | null>(null)
 
+  const filteredApplications = useMemo(() => {
+    return applications.filter((app) => {
+      if (applicationFilter === "pending") return app.statusId === APP_STATUS.pending
+      if (applicationFilter === "approved") return app.statusId === APP_STATUS.accepted
+      if (applicationFilter === "cancelled") return app.statusId === APP_STATUS.cancelled || app.statusId === APP_STATUS.rejected
+      return true
+    })
+  }, [applications, applicationFilter])
+
   const redirectIfDraftJob = (jobData: Job) => {
     if (jobData.statusId === JOB_POST_STATUS.Draft) {
       router.replace("/farmer/jobs")
@@ -415,7 +424,7 @@ export default function FarmerJobDetailPage() {
         limit: 4,
         page: page,
         statusId: statusId,
-        includeAll: true,
+        includeAll: statusId === undefined,
       })
 
       setApplications(response.data.data)
@@ -1359,7 +1368,7 @@ export default function FarmerJobDetailPage() {
                       <Users className="h-5 w-5" />
                     </div>
                     <div>
-                      <CardTitle className="text-xl">Ứng viên ({applications.length})</CardTitle>
+                      <CardTitle className="text-xl">Ứng viên ({filteredApplications.length})</CardTitle>
                       <CardDescription>Danh sách hồ sơ ứng tuyển</CardDescription>
                     </div>
                   </div>
@@ -1424,7 +1433,7 @@ export default function FarmerJobDetailPage() {
                       </div>
                     ) : null}
 
-                    {applications.map((application) => (
+                    {filteredApplications.map((application) => (
                         <div
                           key={application.id}
                           className="group relative flex h-full flex-col gap-3 rounded-xl border border-muted bg-muted/30 p-4 transition-all duration-300 hover:border-agro-green/30 hover:bg-muted/50"

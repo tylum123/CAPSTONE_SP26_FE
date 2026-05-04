@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useAuth } from "@/libs/stores/auth.store";
 import { Button } from "@/components/ui/button";
 import { FileText, ChevronDown, Sparkles, Users, Briefcase, Smartphone, QrCode } from "lucide-react";
 import Link from "next/link";
@@ -18,6 +19,7 @@ export function HeroSection() {
   const subRef = useRef<HTMLParagraphElement>(null);
   const ctaFarmerRef = useRef<HTMLDivElement>(null);
   const ctaWorkerRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     const els = [headlineRef.current, subRef.current, ctaFarmerRef.current, ctaWorkerRef.current];
@@ -107,7 +109,7 @@ export function HeroSection() {
               <p className="mb-5 text-sm text-white/75 leading-relaxed">
                 Đăng tin tuyển dụng và tìm lao động phù hợp ngay hôm nay
               </p>
-              <Link href="/auth/register" passHref>
+              <Link href={user?.role === "farmer" ? "/farmer/create-job" : "/auth/register"} passHref>
                 <Button
                   size="lg"
                   className="w-full bg-agro-green hover:bg-agro-green-dark text-white font-semibold cursor-pointer shadow-lg transition-all duration-300 hover:shadow-agro-green/40 hover:shadow-xl hover:-translate-y-0.5"
@@ -180,9 +182,9 @@ export function HeroSection() {
                         Scan to Download
                       </div>
                       <div className="w-full h-px bg-gray-100 px-10" />
-                      <div className="flex gap-4">
+                      {/* <div className="flex gap-4">
                         <img src="/amazon-appstore-badge-english-black.png" alt="Get it on Google Play" className="h-12 cursor-pointer hover:scale-105 transition-transform" />
-                      </div>
+                      </div> */}
                     </div>
                   </div>
                 </DialogContent>

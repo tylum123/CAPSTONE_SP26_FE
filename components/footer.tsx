@@ -117,9 +117,9 @@ export function Footer() {
               <div className="h-28 w-28 rounded-2xl bg-white p-2">
                 <img src="/qrcode.png" alt="Download QR" className="h-full w-full object-contain" />
               </div>
-              <div className="space-y-2 overflow-hidden">
+              {/* <div className="space-y-2 overflow-hidden">
                 <img src="/amazon-appstore-badge-english-black.png" alt="Google Play" className="h-10 cursor-pointer hover:opacity-80 transition-opacity" />
-              </div>
+              </div> */}
             </div>
             {/* <div className="pt-6 border-t border-white/10">
               <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mb-4">Chứng nhận bảo mật</p>
