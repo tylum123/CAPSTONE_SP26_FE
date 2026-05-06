@@ -6,8 +6,6 @@ import {
   MessageSquare,
   CheckCircle,
   Edit,
-  UserX,
-  Trash2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import {
@@ -30,7 +28,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChatSidebar } from "../chat/chat-sidebar";
+import { useToast } from "@/hooks/use-toast";
 type UserMap = Record<string, { fullName: string; email: string }>;
 
 export function AdminDisputes() {
@@ -38,6 +38,7 @@ export function AdminDisputes() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userMap, setUserMap] = useState<UserMap>({});
+  const { toast } = useToast();
 
   useEffect(() => {
     let ignore = false;
@@ -67,29 +68,22 @@ export function AdminDisputes() {
         //   hasMore = pageData && pageData.length === 100;
         //   page++;
         // }
-        // Map userId to user info
-        const map: UserMap = {};
-        // users.forEach((u: any) => {
-        //   map[u.userId] = { fullName: u.fullName, email: u.email };
-        // });
-        debugger;
-
         if (!ignore) {
           setDisputes(res.data.disputeReports);
-          const userMap: UserMap = {};
+          const nextUserMap: UserMap = {};
           res.data.farmers.forEach((farmer: FarmerProfileDTO) => {
-            userMap[farmer.userId] = {
+            nextUserMap[farmer.userId] = {
               fullName: farmer.contactName,
               email: farmer.user.email,
             };
           });
           res.data.workers.forEach((worker: WorkerProfileDTO) => {
-            userMap[worker.userId] = {
+            nextUserMap[worker.userId] = {
               fullName: worker.fullName,
               email: worker.email,
             };
           });
-          setUserMap(userMap);
+          setUserMap(nextUserMap);
           // Fetch summary counts for stats (best-effort)
           try {
             const sumRes = await disputeService.getSummary();
@@ -129,7 +123,11 @@ export function AdminDisputes() {
 
   const openChat = (userId?: string | null, displayName?: string, avatarUrl?: string) => {
     if (!userId) {
-      alert("Người dùng không tồn tại");
+      toast({
+        title: "Không thể mở trò chuyện",
+        description: "Không tìm thấy người dùng để bắt đầu cuộc trò chuyện.",
+        variant: "destructive",
+      });
       return;
     }
     setChatReceiver({
@@ -232,10 +230,17 @@ export function AdminDisputes() {
       setIsStatusDialogOpen(false);
       setSelectedDispute(null);
       setSelectedStatusId(null);
-      alert("Cập nhật trạng thái thành công");
+      toast({
+        title: "Đã cập nhật trạng thái",
+        description: "Trạng thái tranh chấp đã được lưu thành công.",
+      });
     } catch (err: any) {
       console.error(err);
-      alert(err?.message || "Lỗi khi cập nhật trạng thái");
+      toast({
+        title: "Cập nhật thất bại",
+        description: err?.message || "Không thể cập nhật trạng thái tranh chấp.",
+        variant: "destructive",
+      });
     } finally {
       setStatusSubmitting(false);
     }
@@ -355,26 +360,28 @@ export function AdminDisputes() {
             className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-card text-foreground placeholder-muted-foreground"
           />
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2 border border-border rounded-lg bg-card text-foreground"
-        >
-          <option>All</option>
-          <option>Pending</option>
-          <option>Investigating</option>
-          <option>Resolved</option>
-        </select>
-        <select
-          value={severityFilter}
-          onChange={(e) => setSeverityFilter(e.target.value)}
-          className="px-4 py-2 border border-border rounded-lg bg-card text-foreground"
-        >
-          <option>All</option>
-          <option>High</option>
-          <option>Medium</option>
-          <option>Low</option>
-        </select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-44 px-4 py-2 border border-border rounded-lg bg-card text-foreground">
+            <SelectValue placeholder="Trạng thái" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All</SelectItem>
+            <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="Investigating">Investigating</SelectItem>
+            <SelectItem value="Resolved">Resolved</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={severityFilter} onValueChange={setSeverityFilter}>
+          <SelectTrigger className="w-44 px-4 py-2 border border-border rounded-lg bg-card text-foreground">
+            <SelectValue placeholder="Mức độ" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All</SelectItem>
+            <SelectItem value="High">High</SelectItem>
+            <SelectItem value="Medium">Medium</SelectItem>
+            <SelectItem value="Low">Low</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="bg-card rounded-lg border border-border overflow-hidden">

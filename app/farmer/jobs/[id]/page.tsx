@@ -788,6 +788,12 @@ export default function FarmerJobDetailPage() {
     }
   }
 
+  const handleRepostJob = () => {
+    if (!jobId) return
+
+    router.push(`/farmer/create-job?repostFromJobId=${encodeURIComponent(jobId)}`)
+  }
+
   const openRatingDialog = (application: ApplicationDTO) => {
     const workerId = application.worker?.userId
     const existingRating = workerId ? ratedByWorkerId[workerId] : undefined
@@ -1078,6 +1084,16 @@ export default function FarmerJobDetailPage() {
                   <Link href={`/farmer/jobs/${jobId}/edit`}>
                     Sửa bài đăng
                   </Link>
+                </Button>
+              )}
+
+              {job.statusId === JOB_POST_STATUS.Cancelled && (
+                <Button
+                  variant="outline"
+                  onClick={handleRepostJob}
+                  className="border-agro-green/20 text-agro-green hover:bg-agro-green/10"
+                >
+                  Đăng lại
                 </Button>
               )}
             </>
