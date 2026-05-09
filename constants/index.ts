@@ -17,20 +17,10 @@ export const ROUTES = {
   FARMER_JOBS: "/farmer/jobs",
   FARMER_CREATE_JOB: "/farmer/create-job",
   FARMER_APPLICANTS: "/farmer/applicants",
-  FARMER_APPLICATIONS: "/farmer/applications",
   FARMER_MESSAGES: "/farmer/messages",
   FARMER_PAYMENTS: "/farmer/payments",
   FARMER_SETTINGS: "/farmer/settings",
-
-  // Worker routes
-  WORKER: "/worker",
-  WORKER_DASHBOARD: "/worker/dashboard",
-  WORKER_JOBS: "/worker/jobs",
-  WORKER_APPLICATIONS: "/worker/applications",
-  WORKER_MESSAGES: "/worker/messages",
-  WORKER_PROFILE: "/worker/profile",
-  WORKER_SETTINGS: "/worker/settings",
-
+  
   // Admin routes
   ADMIN: "/admin",
   ADMIN_USERS: "/admin/users",
