@@ -16,6 +16,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { jobApplicationService } from "@/libs/api/services/jobApplication.service"
 import { ApplicationStatusId } from "@/libs/types"
 import type { ApplicationDTO } from "@/libs/types"
+import { JobPostStatus } from "@/libs/types"
 import { formatDistanceToNow, parseISO } from "date-fns"
 import { vi } from "date-fns/locale"
 import { toast } from "sonner"
@@ -134,7 +135,12 @@ export default function FarmerDashboard() {
     fetchPendingApplications(applicationsPage)
   }, [applicationsPage])
 
-  const handleApproveApplication = async (applicationId: string) => {
+  const handleApproveApplication = async (applicationId: string, jobStatusId?: JobPostStatus) => {
+    if (jobStatusId === JobPostStatus.Closed) {
+      toast.error("Không thể duyệt hồ sơ vì bài đăng đã đóng")
+      return
+    }
+
     try {
       await jobApplicationService.approveApplicant(applicationId)
       toast.success("Hồ sơ đã được duyệt")
@@ -359,13 +365,15 @@ export default function FarmerDashboard() {
                                   Xem
                                 </Button>
                               </Link>
-                              <Button
-                                size="sm"
-                                onClick={() => handleApproveApplication(app.id)}
-                                className="text-xs h-7 bg-agro-green hover:bg-agro-green-dark text-white px-2"
-                              >
-                                Duyệt
-                              </Button>
+                              {app.jobPost?.statusId !== JobPostStatus.Closed && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleApproveApplication(app.id, app.jobPost?.statusId as JobPostStatus | undefined)}
+                                  className="text-xs h-7 bg-agro-green hover:bg-agro-green-dark text-white px-2"
+                                >
+                                  Duyệt
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </div>

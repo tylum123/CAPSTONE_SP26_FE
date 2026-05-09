@@ -7,6 +7,7 @@ import { AdminUsers } from "@/components/admin/admin-users";
 import { AdminJobs } from "@/components/admin/admin-jobs";
 import { AdminTransactions } from "@/components/admin/admin-transactions";
 import { AdminDisputes } from "@/components/admin/admin-disputes";
+import { AdminSkills } from "@/components/admin/admin-skills";
 import { AdminSettings } from "@/components/admin/admin-settings";
 
 type AdminPageKey =
@@ -15,6 +16,7 @@ type AdminPageKey =
   | "jobs"
   | "transactions"
   | "disputes"
+  | "skills"
   | "config";
 
 interface AdminShellProps {
@@ -34,6 +36,8 @@ export function AdminShell({ initialPage = "dashboard" }: AdminShellProps) {
         return <AdminTransactions />;
       case "disputes":
         return <AdminDisputes />;
+      case "skills":
+        return <AdminSkills />;
       // case "config":
       //   return <AdminSettings />;
       case "dashboard":

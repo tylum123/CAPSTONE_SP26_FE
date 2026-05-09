@@ -8,6 +8,7 @@ import {
   Settings,
   Home,
   LogOut,
+  Zap,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/libs/stores/auth.store";
@@ -38,6 +39,7 @@ export function AdminSidebar({ currentPage, onPageChange }: AdminSidebarProps) {
     { id: "jobs", label: "Quản lý công việc", icon: Briefcase },
     { id: "transactions", label: "Giao dịch & Ví", icon: DollarSign },
     { id: "disputes", label: "Tranh chấp", icon: AlertCircle },
+    { id: "skills", label: "Quản lý kỹ năng", icon: Zap },
     // { id: "config", label: "Cấu hình hệ thống", icon: Settings },
   ];
 
@@ -69,10 +71,11 @@ export function AdminSidebar({ currentPage, onPageChange }: AdminSidebarProps) {
             <button
               key={item.id}
               onClick={() => onPageChange(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${isActive
-                ? "bg-[#28683C] text-white"
-                : "text-white hover:bg-white/10"
-                }`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? "bg-[#28683C] text-white"
+                  : "text-white hover:bg-white/10"
+              }`}
             >
               <Icon size={20} />
               <span>{item.label}</span>

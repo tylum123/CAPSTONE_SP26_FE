@@ -6,8 +6,13 @@ import {
   MessageSquare,
   CheckCircle,
   Edit,
+  UserX,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -28,100 +33,197 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ChatSidebar } from "../chat/chat-sidebar";
+
+const PAGE_SIZE = 10;
+
 import { useToast } from "@/hooks/use-toast";
 type UserMap = Record<string, { fullName: string; email: string }>;
 
+const DISPUTE_TYPE_META: Record<number, { label: string; className: string }> =
+  {
+    1: {
+      label: "Chất lượng công việc",
+      className: "bg-amber-100 text-amber-800 border border-amber-200",
+    },
+    2: {
+      label: "Thanh toán",
+      className: "bg-sky-100 text-sky-800 border border-sky-200",
+    },
+    3: {
+      label: "Khác",
+      className: "bg-slate-100 text-slate-800 border border-slate-200",
+    },
+  };
+
+const DISPUTE_STATUS_META: Record<
+  number,
+  { label: string; className: string }
+> = {
+  1: {
+    label: "Đang chờ",
+    className: "bg-orange-100 text-orange-800 border border-orange-200",
+  },
+  2: {
+    label: "Đang xử lý",
+    className: "bg-blue-100 text-blue-800 border border-blue-200",
+  },
+  3: {
+    label: "Đã giải quyết",
+    className: "bg-emerald-100 text-emerald-800 border border-emerald-200",
+  },
+  4: {
+    label: "Từ chối",
+    className: "bg-rose-100 text-rose-800 border border-rose-200",
+  },
+};
+
 export function AdminDisputes() {
   const [disputes, setDisputes] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userMap, setUserMap] = useState<UserMap>({});
   const { toast } = useToast();
 
-  useEffect(() => {
-    let ignore = false;
-    async function fetchDisputesAndUsers() {
-      setLoading(true);
-      setError(null);
-      try {
-        // Fetch disputes
-        const res = await disputeService.getAllDisputes();
-        let disputesData = Array.isArray(res.data) ? res.data : [];
-        // Collect all user IDs (reporter, accused)
-        const userIds = new Set<string>();
-        disputesData.forEach((d: any) => {
-          if (d.reporterUserId) userIds.add(d.reporterUserId);
-          if (d.accusedUserId) userIds.add(d.accusedUserId);
-        });
-        // Fetch all users (adminService.getUsers returns paginated)
-        // let users: any[] = [];
-        let page = 1;
-        let hasMore = true;
-        // while (hasMore) {
-        //   const userRes = await adminService.getUsers({ page, limit: 100 });
-        //   let pageData = Array.isArray(userRes.data?.data)
-        //     ? userRes.data.data
-        //     : userRes.data;
-        //   if (Array.isArray(pageData)) users.push(...pageData);
-        //   hasMore = pageData && pageData.length === 100;
-        //   page++;
-        // }
-        if (!ignore) {
-          setDisputes(res.data.disputeReports);
-          const nextUserMap: UserMap = {};
-          res.data.farmers.forEach((farmer: FarmerProfileDTO) => {
-            nextUserMap[farmer.userId] = {
-              fullName: farmer.contactName,
-              email: farmer.user.email,
-            };
-          });
-          res.data.workers.forEach((worker: WorkerProfileDTO) => {
-            nextUserMap[worker.userId] = {
-              fullName: worker.fullName,
-              email: worker.email,
-            };
-          });
-          setUserMap(nextUserMap);
-          // Fetch summary counts for stats (best-effort)
-          try {
-            const sumRes = await disputeService.getSummary();
-            const data = Array.isArray(sumRes)
-              ? sumRes
-              : Array.isArray(sumRes?.data)
-                ? sumRes.data
-                : sumRes?.data?.data ?? [];
-            if (!ignore) setSummaryStats(data as any[]);
-          } catch (err) {
-            console.error("Failed to fetch dispute summary", err);
-          }
-        }
-      } catch (e: any) {
-        setError(e?.message || "Lỗi khi gọi API");
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchDisputesAndUsers();
-    return () => {
-      ignore = true;
-    };
-  }, []);
-
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [severityFilter, setSeverityFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [disputeTypeFilter, setDisputeTypeFilter] = useState("");
+
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(
+      () => setDebouncedSearch(searchTerm),
+      400,
+    );
+    return () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    };
+  }, [searchTerm]);
+
+  const [summaryStats, setSummaryStats] = useState<
+    Array<{ statusId: number; statusName: string; count: number }>
+  >([]);
+
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [selectedDispute, setSelectedDispute] = useState<any | null>(null);
   const [selectedStatusId, setSelectedStatusId] = useState<number | null>(null);
   const [statusSubmitting, setStatusSubmitting] = useState(false);
-  const [summaryStats, setSummaryStats] = useState<Array<{ statusId: number; statusName: string; count: number }>>([]);
 
   const [isChatDialogOpen, setIsChatDialogOpen] = useState(false);
-  const [chatReceiver, setChatReceiver] = useState<{ id: string; name: string; avatarUrl?: string } | null>(null);
+  const [chatReceiver, setChatReceiver] = useState<{
+    id: string;
+    name: string;
+    avatarUrl?: string;
+  } | null>(null);
 
-  const openChat = (userId?: string | null, displayName?: string, avatarUrl?: string) => {
+  const fetchDisputes = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, unknown> = {
+        pageNumber: page,
+        pageSize: PAGE_SIZE,
+      };
+      if (debouncedSearch) params.jobPostName = debouncedSearch;
+      if (statusFilter) params.statusId = Number(statusFilter);
+      if (disputeTypeFilter) params.disputeTypeId = Number(disputeTypeFilter);
+
+      const res = await adminService.getDisputes(
+        params as Parameters<typeof adminService.getDisputes>[0],
+      );
+
+      const payload = res.data as any;
+
+      // Handle the new API response format
+      if (payload && typeof payload === "object") {
+        // New format: items, total_count, page_number, page_size, total_pages
+        if ("items" in payload) {
+          setDisputes((payload.items as any[]) || []);
+          setTotal(payload.total_count || 0);
+          setTotalPages(payload.total_pages || 1);
+        } else if ("data" in payload) {
+          // Old PaginatedResponse format
+          setDisputes(payload.data || []);
+          if (payload.pagination) {
+            setTotal(payload.pagination.total || 0);
+            setTotalPages(payload.pagination.totalPages || 1);
+          }
+        }
+
+        // Build user map from farmers and workers
+        const newUserMap: UserMap = {};
+        if (
+          "farmers" in payload &&
+          payload.farmers &&
+          Array.isArray(payload.farmers)
+        ) {
+          payload.farmers.forEach((farmer: FarmerProfileDTO) => {
+            newUserMap[farmer.userId] = {
+              fullName: farmer.contactName,
+              email: farmer.user?.email || "",
+            };
+          });
+        }
+        if (
+          "workers" in payload &&
+          payload.workers &&
+          Array.isArray(payload.workers)
+        ) {
+          payload.workers.forEach((worker: WorkerProfileDTO) => {
+            newUserMap[worker.userId] = {
+              fullName: worker.fullName,
+              email: worker.email,
+            };
+          });
+        }
+        setUserMap(newUserMap);
+      }
+
+      // Fetch summary stats
+      try {
+        const sumRes = await disputeService.getSummary();
+        const data = Array.isArray(sumRes)
+          ? sumRes
+          : Array.isArray(sumRes?.data)
+            ? sumRes.data
+            : (sumRes?.data?.data ?? []);
+        setSummaryStats(data as any[]);
+      } catch (err) {
+        console.error("Failed to fetch dispute summary", err);
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Lỗi khi gọi API");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, debouncedSearch, statusFilter, disputeTypeFilter]);
+
+  useEffect(() => {
+    fetchDisputes();
+  }, [fetchDisputes]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter, disputeTypeFilter]);
+
+  const openChat = (
+    userId?: string | null,
+    displayName?: string,
+    avatarUrl?: string,
+  ) => {
     if (!userId) {
       toast({
         title: "Không thể mở trò chuyện",
@@ -132,88 +234,19 @@ export function AdminDisputes() {
     }
     setChatReceiver({
       id: userId,
-      name: displayName || (userId.length > 8 ? `Người dùng ${userId.substring(0, 8).toUpperCase()}` : userId),
+      name:
+        displayName ||
+        (userId.length > 8
+          ? `Người dùng ${userId.substring(0, 8).toUpperCase()}`
+          : userId),
       avatarUrl: avatarUrl || "/placeholder.svg",
     });
     setIsChatDialogOpen(true);
   };
 
-  const filteredDisputes = disputes.filter((dispute) => {
-    // Tùy chỉnh lại các trường filter cho phù hợp với API trả về
-    const matchSearch =
-      (dispute.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        dispute.description
-          ?.toLowerCase()
-          .includes(searchTerm.toLowerCase())) ??
-      false;
-    const matchStatus =
-      statusFilter === "All" || dispute.status === statusFilter;
-    // severity có thể không có trong API, tạm bỏ filter này nếu không có
-    return matchSearch && matchStatus;
-  });
-
-  const getSeverityColor = (severity: string) => {
-    const colors: Record<string, string> = {
-      High: "bg-destructive/20 text-destructive",
-      Medium: "bg-[#D28228]/20 text-[#D28228]",
-      Low: "bg-[#10B981]/20 text-[#10B981]",
-    };
-    return colors[severity] ?? "bg-muted text-muted-foreground";
-  };
-
-  const getStatusIcon = (status: string) => {
-    if (status === "Resolved") {
-      return <CheckCircle size={18} className="text-green-600" />;
-    } else if (status === "Investigating") {
-      return <AlertCircle size={18} className="text-[#D28228]" />;
-    } else {
-      return <AlertCircle size={18} className="text-destructive" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      Resolved: "bg-green-100 text-green-700",
-      Investigating: "bg-[#D28228]/20 text-[#D28228]",
-      Pending: "bg-destructive/20 text-destructive",
-    };
-    return colors[status] ?? "bg-muted text-muted-foreground";
-  };
-
-
-
-  // Build stats from API summary (fallback to defaults)
-  const statusLabelMap: Record<number, { label: string; color: string }> = {
-    1: { label: "Tranh chấp đang chờ", color: "text-destructive" },
-    2: { label: "Đang xử lý", color: "text-[#D28228]" },
-    3: { label: "Đã giải quyết", color: "text-green-700" },
-    4: { label: "Từ chối", color: "text-destructive" },
-  };
-
-  const statsSource = summaryStats && summaryStats.length
-    ? summaryStats
-    : [
-      { statusId: 1, statusName: "Pending", count: 0 },
-      { statusId: 2, statusName: "UnderReview", count: 0 },
-      { statusId: 3, statusName: "Resolved", count: 0 },
-      { statusId: 4, statusName: "Rejected", count: 0 },
-    ];
-
-  const stats = statsSource.map((s: any) => {
-    const meta = statusLabelMap[s.statusId] ?? { label: s.statusName ?? String(s.statusId), color: "text-muted-foreground" };
-    return { label: meta.label, value: String(s.count ?? 0), textColor: meta.color };
-  });
-
-  // Determine responsive grid columns for stats (max 4 columns)
-  const statsCols = Math.min(stats.length, 4);
-  let mdGridColsClass = "md:grid-cols-1";
-  if (statsCols === 2) mdGridColsClass = "md:grid-cols-2";
-  else if (statsCols === 3) mdGridColsClass = "md:grid-cols-3";
-  else if (statsCols >= 4) mdGridColsClass = "md:grid-cols-4";
-
   const openStatusDialog = (dispute: any) => {
     setSelectedDispute(dispute);
-    setSelectedStatusId(dispute?.status ?? 1);
+    setSelectedStatusId(dispute?.statusId ?? 1);
     setIsStatusDialogOpen(true);
   };
 
@@ -221,10 +254,15 @@ export function AdminDisputes() {
     if (!selectedDispute || selectedStatusId == null) return;
     setStatusSubmitting(true);
     try {
-      await disputeService.updateStatus(selectedDispute.id, Number(selectedStatusId));
+      await disputeService.updateStatus(
+        selectedDispute.id,
+        Number(selectedStatusId),
+      );
       setDisputes((prev) =>
         prev.map((d) =>
-          d.id === selectedDispute.id ? { ...d, status: Number(selectedStatusId) } : d,
+          d.id === selectedDispute.id
+            ? { ...d, statusId: Number(selectedStatusId) }
+            : d,
         ),
       );
       setIsStatusDialogOpen(false);
@@ -238,13 +276,51 @@ export function AdminDisputes() {
       console.error(err);
       toast({
         title: "Cập nhật thất bại",
-        description: err?.message || "Không thể cập nhật trạng thái tranh chấp.",
+        description:
+          err?.message || "Không thể cập nhật trạng thái tranh chấp.",
         variant: "destructive",
       });
     } finally {
       setStatusSubmitting(false);
     }
   };
+
+  // Build stats from API summary (fallback to defaults)
+  const statusLabelMap: Record<number, { label: string; color: string }> = {
+    1: { label: "Tranh chấp đang chờ", color: "text-destructive" },
+    2: { label: "Đang xử lý", color: "text-[#D28228]" },
+    3: { label: "Đã giải quyết", color: "text-green-700" },
+    4: { label: "Từ chối", color: "text-destructive" },
+  };
+
+  const statsSource =
+    summaryStats && summaryStats.length
+      ? summaryStats
+      : [
+          { statusId: 1, statusName: "Pending", count: 0 },
+          { statusId: 2, statusName: "UnderReview", count: 0 },
+          { statusId: 3, statusName: "Resolved", count: 0 },
+          { statusId: 4, statusName: "Rejected", count: 0 },
+        ];
+
+  const stats = statsSource.map((s: any) => {
+    const meta = statusLabelMap[s.statusId] ?? {
+      label: s.statusName ?? String(s.statusId),
+      color: "text-muted-foreground",
+    };
+    return {
+      label: meta.label,
+      value: String(s.count ?? 0),
+      textColor: meta.color,
+    };
+  });
+
+  // Determine responsive grid columns for stats (max 4 columns)
+  const statsCols = Math.min(stats.length, 4);
+  let mdGridColsClass = "md:grid-cols-1";
+  if (statsCols === 2) mdGridColsClass = "md:grid-cols-2";
+  else if (statsCols === 3) mdGridColsClass = "md:grid-cols-3";
+  else if (statsCols >= 4) mdGridColsClass = "md:grid-cols-4";
 
   return (
     <div className="p-8 space-y-6">
@@ -263,7 +339,9 @@ export function AdminDisputes() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Cập nhật trạng thái</DialogTitle>
-            <DialogDescription>Chọn trạng thái cho tranh chấp</DialogDescription>
+            <DialogDescription>
+              Chọn trạng thái cho tranh chấp
+            </DialogDescription>
           </DialogHeader>
 
           <div className="mt-2 space-y-4">
@@ -276,7 +354,7 @@ export function AdminDisputes() {
               onChange={(e) => setSelectedStatusId(Number(e.target.value))}
               className="w-full border border-border rounded px-3 py-2 bg-card text-foreground"
             >
-              <option value={1} disabled>Đang chờ</option>
+              <option value={1}>Đang chờ</option>
               <option value={2}>Đang xử lý</option>
               <option value={3}>Đã giải quyết</option>
               <option value={4}>Từ chối</option>
@@ -284,10 +362,17 @@ export function AdminDisputes() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsStatusDialogOpen(false)} className="mr-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsStatusDialogOpen(false)}
+              className="mr-2"
+            >
               Hủy
             </Button>
-            <Button onClick={submitStatusChange} disabled={statusSubmitting || selectedStatusId == null}>
+            <Button
+              onClick={submitStatusChange}
+              disabled={statusSubmitting || selectedStatusId == null}
+            >
               {statusSubmitting ? "Đang gửi..." : "Cập nhật"}
             </Button>
           </DialogFooter>
@@ -297,7 +382,11 @@ export function AdminDisputes() {
       <Dialog open={isChatDialogOpen} onOpenChange={setIsChatDialogOpen}>
         <DialogContent className="sm:max-w-[1200px] w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{chatReceiver ? `Chat với ${chatReceiver.name}` : 'Cuộc trò chuyện'}</DialogTitle>
+            <DialogTitle>
+              {chatReceiver
+                ? `Chat với ${chatReceiver.name}`
+                : "Cuộc trò chuyện"}
+            </DialogTitle>
             <DialogDescription></DialogDescription>
           </DialogHeader>
 
@@ -325,11 +414,8 @@ export function AdminDisputes() {
                 </div>
               )}
             </SignalRProvider>
-
           </div>
-
         </DialogContent>
-
       </Dialog>
 
       <div className={`grid grid-cols-1 ${mdGridColsClass} gap-6`}>
@@ -354,34 +440,33 @@ export function AdminDisputes() {
           />
           <input
             type="text"
-            placeholder="Tìm kiếm theo tên hoặc khiếu nại..."
+            placeholder="Tìm kiếm theo tên công việc..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-card text-foreground placeholder-muted-foreground"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-44 px-4 py-2 border border-border rounded-lg bg-card text-foreground">
-            <SelectValue placeholder="Trạng thái" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All</SelectItem>
-            <SelectItem value="Pending">Pending</SelectItem>
-            <SelectItem value="Investigating">Investigating</SelectItem>
-            <SelectItem value="Resolved">Resolved</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={severityFilter} onValueChange={setSeverityFilter}>
-          <SelectTrigger className="w-44 px-4 py-2 border border-border rounded-lg bg-card text-foreground">
-            <SelectValue placeholder="Mức độ" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All</SelectItem>
-            <SelectItem value="High">High</SelectItem>
-            <SelectItem value="Medium">Medium</SelectItem>
-            <SelectItem value="Low">Low</SelectItem>
-          </SelectContent>
-        </Select>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+        >
+          <option value="">Tất cả trạng thái</option>
+          <option value="1">Đang chờ</option>
+          <option value="2">Đang xử lý</option>
+          <option value="3">Đã giải quyết</option>
+          <option value="4">Từ chối</option>
+        </select>
+        <select
+          value={disputeTypeFilter}
+          onChange={(e) => setDisputeTypeFilter(e.target.value)}
+          className="px-4 py-2 border border-border rounded-lg bg-card text-foreground"
+        >
+          <option value="">Tất cả loại</option>
+          <option value="1">Chất lượng công việc</option>
+          <option value="2">Thanh toán</option>
+          <option value="3">Khác</option>
+        </select>
       </div>
 
       <div className="bg-card rounded-lg border border-border overflow-hidden">
@@ -425,155 +510,201 @@ export function AdminDisputes() {
               </tr>
             </thead>
             <tbody>
-              {filteredDisputes.map((dispute) => (
-                <tr
-                  key={dispute.id}
-                  className="border-b border-border hover:bg-muted/50 transition-colors"
-                >
-                  {/* Người tố cáo */}
-                  <td className="px-6 py-4 max-w-xs">
-                    <span title={dispute.reporterUserId}>
-                      {userMap[dispute.reporterUserId]?.fullName ||
-                        dispute.reporterUserId ||
-                        "-"}
-                    </span>
-                  </td>
-                  {/* Người bị tố cáo */}
-                  <td className="px-6 py-4 max-w-xs">
-                    <span title={dispute.accusedUserId}>
-                      {userMap[dispute.accusedUserId]?.fullName ||
-                        dispute.accusedUserId ||
-                        "-"}
-                    </span>
-                  </td>
-                  {/* Công việc */}
-                  <td className="px-6 py-4 max-w-xs">
-                    {dispute.jobPost?.title || "-"}
-                  </td>
-                  {/* Lý do */}
-                  <td className="px-6 py-4 max-w-xs">
-                    <p
-                      className="font-semibold text-foreground truncate"
-                      title={dispute.reason}
-                    >
-                      {dispute.reason}
-                    </p>
-                  </td>
-                  {/* Mô tả */}
-                  <td className="px-6 py-4 max-w-xs">
-                    <p
-                      className="text-muted-foreground truncate"
-                      title={dispute.description}
-                    >
-                      {dispute.description}
-                    </p>
-                  </td>
-                  {/* Bằng chứng */}
-                  <td className="px-6 py-4">
-                    {dispute.evidenceUrl ? (
-                      <a
-                        href={dispute.evidenceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary underline"
-                      >
-                        Xem
-                      </a>
-                    ) : (
-                      <span className="text-muted-foreground">Không có</span>
-                    )}
-                  </td>
-                  {/* Loại */}
-                  <td className="px-6 py-4">
-                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground">
-                      {dispute.disputeType === 1
-                        ? "Chất lượng công việc"
-                        : dispute.disputeType === 2
-                          ? "Thanh toán"
-                          : "Khác"}
-                    </span>
-                  </td>
-                  {/* Trạng thái */}
-                  <td className="px-6 py-4">
-                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground">
-                      {dispute.status === 1
-                        ? "Đang chờ"
-                        : dispute.status === 2
-                          ? "Đang xử lý"
-                          : dispute.status === 3
-                            ? "Đã giải quyết"
-                            : dispute.status === 4
-                              ? "Từ chối"
-                              : "-"}
-                    </span>
-                  </td>
-
-                  {/* Ngày tạo */}
-                  <td className="px-6 py-4">
-                    <p className="text-muted-foreground text-sm">
-                      {dispute.createdAt
-                        ? new Date(dispute.createdAt).toLocaleString()
-                        : ""}
-                    </p>
-                  </td>
-                  {/* Ngày xử lý */}
-                  <td className="px-6 py-4">
-                    <p className="text-muted-foreground text-sm">
-                      {dispute.resolvedAt
-                        ? new Date(dispute.resolvedAt).toLocaleString()
-                        : "-"}
-                    </p>
-                  </td>
-                  {/* Hành động */}
-                  <td className="px-6 py-4 flex gap-2">
-                    {dispute.status === 2 && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            className="p-2 hover:bg-muted rounded-lg transition-colors"
-                            title="Bình luận"
-                          >
-                            <MessageSquare size={18} className="text-primary" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              openChat(
-                                dispute.reporterUserId,
-                                userMap[dispute.reporterUserId]?.fullName
-                              )
-                            }
-                          >
-                            Chat với người tố cáo
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              openChat(
-                                dispute.accusedUserId,
-                                userMap[dispute.accusedUserId]?.fullName
-                              )
-                            }
-                          >
-                            Chat với người bị tố cáo
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                    {dispute.status !== 3 && dispute.status !== 4 && (
-                      <button
-                        className="p-2 hover:bg-muted rounded-lg transition-colors"
-                        title="Cập nhật"
-                        onClick={() => openStatusDialog(dispute)}
-                      >
-                        <Edit size={18} className="text-blue-500" />
-                      </button>
-                    )}
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={11}
+                    className="py-16 text-center text-muted-foreground"
+                  >
+                    <Loader2 size={28} className="inline animate-spin mr-2" />
+                    Đang tải...
                   </td>
                 </tr>
-              ))}
+              ) : disputes.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={11}
+                    className="py-16 text-center text-muted-foreground"
+                  >
+                    Không tìm thấy tranh chấp nào.
+                  </td>
+                </tr>
+              ) : (
+                disputes.map((dispute) => (
+                  <tr
+                    key={dispute.id}
+                    className="border-b border-border hover:bg-muted/50 transition-colors"
+                  >
+                    {/* Người tố cáo */}
+                    <td className="px-6 py-4 max-w-xs">
+                      <span title={dispute.reporterUserId}>
+                        {userMap[dispute.reporterUserId]?.fullName ||
+                          dispute.reporterUserId ||
+                          "-"}
+                      </span>
+                    </td>
+                    {/* Người bị tố cáo */}
+                    <td className="px-6 py-4 max-w-xs">
+                      <span title={dispute.accusedUserId}>
+                        {userMap[dispute.accusedUserId]?.fullName ||
+                          dispute.accusedUserId ||
+                          "-"}
+                      </span>
+                    </td>
+                    {/* Công việc */}
+                    <td className="px-6 py-4 max-w-xs">
+                      {dispute.jobPost?.title || "-"}
+                    </td>
+                    {/* Lý do */}
+                    <td className="px-6 py-4 max-w-xs">
+                      <p
+                        className="font-semibold text-foreground truncate"
+                        title={dispute.reason}
+                      >
+                        {dispute.reason}
+                      </p>
+                    </td>
+                    {/* Mô tả */}
+                    <td className="px-6 py-4 max-w-xs">
+                      <p
+                        className="text-muted-foreground truncate"
+                        title={dispute.description}
+                      >
+                        {dispute.description}
+                      </p>
+                    </td>
+                    {/* Bằng chứng */}
+                    <td className="px-6 py-4">
+                      {dispute.evidenceUrl ? (
+                        <a
+                          href={dispute.evidenceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary underline"
+                        >
+                          Xem
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground">Không có</span>
+                      )}
+                    </td>
+                    {/* Loại */}
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                          DISPUTE_TYPE_META[dispute.disputeTypeId]?.className ||
+                          "border border-muted bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {DISPUTE_TYPE_META[dispute.disputeTypeId]?.label ||
+                          "Khác"}
+                      </span>
+                    </td>
+                    {/* Trạng thái */}
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                          DISPUTE_STATUS_META[dispute.statusId]?.className ||
+                          "border border-muted bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {DISPUTE_STATUS_META[dispute.statusId]?.label || "-"}
+                      </span>
+                    </td>
+
+                    {/* Ngày tạo */}
+                    <td className="px-6 py-4">
+                      <p className="text-muted-foreground text-sm">
+                        {dispute.createdAt
+                          ? new Date(dispute.createdAt).toLocaleString()
+                          : ""}
+                      </p>
+                    </td>
+                    {/* Ngày xử lý */}
+                    <td className="px-6 py-4">
+                      <p className="text-muted-foreground text-sm">
+                        {dispute.resolvedAt
+                          ? new Date(dispute.resolvedAt).toLocaleString()
+                          : "-"}
+                      </p>
+                    </td>
+                    {/* Hành động */}
+                    <td className="px-6 py-4 flex gap-2">
+                      {dispute.statusId === 2 && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              className="p-2 hover:bg-muted rounded-lg transition-colors"
+                              title="Bình luận"
+                            >
+                              <MessageSquare
+                                size={18}
+                                className="text-primary"
+                              />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                openChat(
+                                  dispute.reporterUserId,
+                                  userMap[dispute.reporterUserId]?.fullName,
+                                )
+                              }
+                            >
+                              Chat với người tố cáo
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                openChat(
+                                  dispute.accusedUserId,
+                                  userMap[dispute.accusedUserId]?.fullName,
+                                )
+                              }
+                            >
+                              Chat với người bị tố cáo
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                      {dispute.statusId !== 3 && dispute.statusId !== 4 && (
+                        <button
+                          className="p-2 hover:bg-muted rounded-lg transition-colors"
+                          title="Cập nhật"
+                          onClick={() => openStatusDialog(dispute)}
+                        >
+                          <Edit size={18} className="text-blue-500" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Trang {page} / {totalPages} · Tổng {total} tranh chấp
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1 || loading}
+            className="p-2 border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages || loading}
+            className="p-2 border border-border rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight size={18} />
+          </button>
         </div>
       </div>
     </div>

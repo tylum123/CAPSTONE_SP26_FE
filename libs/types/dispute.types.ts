@@ -27,7 +27,7 @@ export enum DisputeUserRole {
 }
 
 export interface CustomDisputeReportDTO {
-  disputeReports: DisputeReportDTO[];
+  items: DisputeReportDTO[];
   farmers: FarmerProfileDTO[];
   workers: WorkerProfileDTO[];
 }

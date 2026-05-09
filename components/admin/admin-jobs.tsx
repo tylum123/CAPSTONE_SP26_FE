@@ -37,7 +37,7 @@ export function AdminJobs() {
       setError(null);
       try {
         const params: any = { page, limit };
-        if (searchTerm) params.search = searchTerm;
+        if (searchTerm.trim()) params.title = searchTerm.trim();
         if (statusFilter !== "All") params.status = statusFilter;
         const res: AdminJobListResponse = await adminService.getJobs(params);
         if (!ignore) {
@@ -100,17 +100,20 @@ export function AdminJobs() {
 
   const statusColors: Record<string, string> = {
     Completed: "bg-green-100 text-green-700",
-    InProgress: "bg-[#10B981]/20 text-[#10B981]",
-    Pending: "bg-[#D28228]/20 text-[#D28228]",
-    Cancelled: "bg-destructive/20 text-destructive",
+    InProgress: "bg-blue-100 text-blue-700",
+    Published: "bg-yellow-100 text-yellow-700",
+    Cancelled: "bg-red-100 text-red-600",
+    Draft: "bg-gray-100 text-gray-500",
+    Closed: "bg-orange-100 text-orange-600",
   };
 
   const STATUS_LABEL: Record<string, string> = {
     Completed: "Hoàn thành",
     InProgress: "Đang tiến hành",
-    Pending: "Đang chờ",
     Cancelled: "Đã hủy",
     Draft: "Nháp",
+    Published: "Đã đăng",
+    Closed: "Đã đóng",
   };
 
   return (
@@ -157,10 +160,12 @@ export function AdminJobs() {
           className="px-4 py-2 border border-border rounded-lg bg-card text-foreground"
         >
           <option value="All">Tất cả</option>
-          <option value="Completed">Hoàn thành</option>
+          <option value="Draft">Nháp</option>
+          <option value="Published">Đã đăng</option>
           <option value="InProgress">Đang tiến hành</option>
-          <option value="Pending">Đang chờ</option>
+          <option value="Completed">Hoàn thành</option>
           <option value="Cancelled">Đã hủy</option>
+          <option value="Closed">Đã đóng</option>
         </select>
       </div>
 
