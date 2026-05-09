@@ -33,9 +33,18 @@ export const adminService = {
     page?: number;
     limit?: number;
     status?: string;
+    title?: string;
     search?: string;
   }): Promise<any> => {
-    const response = await axiosInstance.get("/admin/jobpost", { params });
+    const queryParams = { ...params };
+    if (!queryParams.title && queryParams.search) {
+      queryParams.title = queryParams.search;
+    }
+    delete queryParams.search;
+
+    const response = await axiosInstance.get("/admin/jobpost", {
+      params: queryParams,
+    });
     return response.data;
   },
   /**
@@ -222,9 +231,9 @@ export const adminService = {
       const systemTotal =
         Number(
           dataSource.systemTotal ??
-          dataSource.total ??
-          dataSource.todayTotal ??
-          0,
+            dataSource.total ??
+            dataSource.todayTotal ??
+            0,
         ) || 0;
       const locked =
         Number(dataSource.locked ?? dataSource.pendingTotal ?? 0) || 0;
@@ -308,5 +317,4 @@ export const adminService = {
     );
     return response.data;
   },
-
 };

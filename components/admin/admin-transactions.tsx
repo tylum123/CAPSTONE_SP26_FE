@@ -1,6 +1,13 @@
 "use client";
 
-import { Search, ArrowUpRight, ArrowDownLeft, DollarSign } from "lucide-react";
+import {
+  Search,
+  ArrowUpRight,
+  ArrowDownLeft,
+  DollarSign,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { adminService } from "@/libs/api/services/admin.service";
 
@@ -40,6 +47,8 @@ export function AdminTransactions() {
   const [limit, setLimit] = useState(10);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   // We'll fetch transactions from API; local filtering is not used now.
 
@@ -55,9 +64,18 @@ export function AdminTransactions() {
     const t = (type ?? "").toLowerCase();
     const colors: Record<string, string> = {
       deposit: "bg-green-100 text-green-700",
-      payment: "bg-primary/20 text-primary",
-      refund: "bg-[#10B981]/20 text-[#10B981]",
-      withdrawal: "bg-[#D28228]/20 text-[#D28228]",
+      "1": "bg-green-100 text-green-700",
+      payment: "bg-blue-100 text-blue-700",
+      job_payment: "bg-blue-100 text-blue-700",
+      "3": "bg-blue-100 text-blue-700",
+      refund: "bg-violet-100 text-violet-700",
+      "4": "bg-violet-100 text-violet-700",
+      withdraw: "bg-orange-100 text-orange-700",
+      withdrawal: "bg-orange-100 text-orange-700",
+      "2": "bg-orange-100 text-orange-700",
+      job_lock: "bg-rose-100 text-rose-700",
+      lock: "bg-rose-100 text-rose-700",
+      "5": "bg-rose-100 text-rose-700",
     };
     return colors[t] ?? "bg-muted text-muted-foreground";
   };
@@ -100,8 +118,14 @@ export function AdminTransactions() {
         queryParams.type = typeFilter.toUpperCase();
 
       const res = await adminService.getWalletTransactions(queryParams as any);
-      const items = (res as any)?.data ?? (res as any)?.items ?? [];
-      setTransactions(Array.isArray(items) ? items : (items.items ?? []));
+      const resData = res as any;
+      const items = resData?.data ?? resData?.items ?? [];
+      const itemsArr = Array.isArray(items) ? items : (items.items ?? []);
+      setTransactions(itemsArr);
+      const t = resData?.total ?? resData?.totalCount ?? itemsArr.length;
+      const tp = resData?.totalPages ?? Math.max(1, Math.ceil(t / limit));
+      setTotal(t);
+      setTotalPages(tp);
     } catch (err: any) {
       console.error(err);
       setError(err.message ?? "Failed to load transactions");
@@ -417,6 +441,32 @@ export function AdminTransactions() {
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-border px-6 py-4 bg-card rounded-b-lg">
+          <p className="text-sm text-muted-foreground"></p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="p-2 rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-sm text-foreground">
+              Trang <span className="font-semibold">{page}</span> / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="p-2 rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
